@@ -8,13 +8,7 @@ import Wifi from './views/Wifi.vue'
 import Login from './views/Login.vue'
 import { store } from '@/service/store'
 
-const ifNotAuthenticated = (to, from, next) => {
-  if (store.state.isAuthenticated) {
-    next()
-    return
-  }
-  next('/login')
-}
+const PROTECTED_ROUTE = { requiresAuth: true }
 
 // Vue.use(Router)
 
@@ -23,25 +17,25 @@ const routes = [
     path: '/',
     name: 'home',
     component: Home,
-    beforeEnter: ifNotAuthenticated
+    meta: PROTECTED_ROUTE
   },
   {
     path: '/schedule',
     name: 'schedule',
     component: Schedule,
-    beforeEnter: ifNotAuthenticated
+    meta: PROTECTED_ROUTE
   },
   {
     path: '/wifi',
     name: 'wifi',
     component: Wifi,
-    beforeEnter: ifNotAuthenticated
+    meta: PROTECTED_ROUTE
   },
   {
     path: '/settings',
     name: 'settings',
     component: Settings,
-    beforeEnter: ifNotAuthenticated
+    meta: PROTECTED_ROUTE
   },
   {
     path: '/about',
@@ -59,6 +53,14 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
   linkActiveClass: 'is-active'
+})
+
+router.beforeEach((to, _from, next) => {
+  if (to.meta && to.meta.requiresAuth && !store.state.isAuthenticated) {
+    next('/login')
+  } else {
+    next()
+  }
 })
 
 export default router
