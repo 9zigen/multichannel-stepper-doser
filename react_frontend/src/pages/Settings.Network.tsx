@@ -29,7 +29,7 @@ const NetworkPage: React.FC = (): React.ReactElement => {
     return (
         <div className="flex flex-col items-center justify-center">
             <section className="flex flex-col items-center justify-center gap-6 w-full sm:w-[400px]">
-                <div className="flex flex-row bg-gray-50 rounded-md p-4 w-full">
+                <div className="flex flex-row bg-gray-50 rounded-md p-6 w-full shadow-xl">
                     <div className="flex flex-col w-full">
                         <p className="text-xl font-bold">
                             Network

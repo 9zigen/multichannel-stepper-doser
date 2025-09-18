@@ -10,14 +10,9 @@ const Home: React.FC = (): React.ReactElement => {
 
     return (
         <div className="flex flex-col items-center justify-center gap-4">
-            <section className="flex flex-col items-center gap-6">
-                <div className="flex flex-row bg-gray-50 rounded-md p-4 w-full">
-                    <PumpControl pumps={pumps} />
-                </div>
-
-                <div className="flex flex-row bg-gray-50 rounded-md p-4 w-full">
-                    <DeviceInfo {...(deviceStatus as DeviceInfoProps)} />
-                </div>
+            <section className="flex flex-col items-center gap-6 sm:w-[400px] xl:w-[600px]">
+              <PumpControl pumps={pumps} />
+              <DeviceInfo {...(deviceStatus as DeviceInfoProps)} />
             </section>
         </div>
     );
