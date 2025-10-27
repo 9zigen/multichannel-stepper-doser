@@ -1,195 +1,170 @@
-import React from "react";
+import React, {useEffect} from 'react';
 
-import {Controller, SubmitHandler, useForm} from "react-hook-form";
-import {zodResolver} from "@hookform/resolvers/zod";
-import {z} from "zod";
+import { Controller, SubmitHandler, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
-import { Input } from "@/components/ui/input.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label"
+import { Input } from '@/components/ui/input.tsx';
+import { Button } from '@/components/ui/button.tsx';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
-import { NetworkState } from "@/lib/api.ts";
-import { AppStoreState, useAppStore } from "@/hooks/use-store.ts";
-import { toast } from "sonner";
+import { NetworkState, NetworkType } from '@/lib/api.ts';
+import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import settingsNetwork from '@/pages/Settings.Network.tsx';
+import IPv4Fields from '@/components/network-form/ipv4-fields.tsx';
 
-type FormData = {
-    id: number;
-    ssid: string;
-    password: string;
-    ip_address: string;
-    mask: string;
-    gateway: string;
-    dns: string;
-    dhcp: boolean;
-};
+import { FormData } from './network-form/types.ts';
 
-const FormSchema = z
-    .object({
-        id: z.number(),
-        ssid: z.string({required_error: "This field is required."}),
-        password: z.string().or(z.literal('')),
-        dhcp: z.boolean(),
-        ip_address: z.string().ip().or(z.literal('')),
-        mask: z.string().ip().or(z.literal('')),
-        gateway: z.string().ip().or(z.literal('')),
-        dns: z.string().ip().or(z.literal('')),
-    })
+const FormSchema = z.object({
+  id: z.number().optional(),
+  ssid: z.string({ required_error: 'This field is required.' }),
+  password: z.string().or(z.literal('')),
+  dhcp: z.boolean(),
+  ip_address: z.string().ip().or(z.literal('')),
+  mask: z.string().ip().or(z.literal('')),
+  gateway: z.string().ip().or(z.literal('')),
+  dns: z.string().ip().or(z.literal('')),
+  type: z.number().lte(5),
+});
 
 export interface NetworkFormProps {
-    network: NetworkState
-    success: () => void
+  id?: number;
+  isNew: boolean;
+  type: NetworkType;
+  success?: () => void;
 }
 
-const NetworkForm = ({network, success}: NetworkFormProps): React.ReactElement => {
-    const { id, ssid, password, dhcp, ip_address, mask, gateway, dns } = network;
-    const updateNetwork = useAppStore((state: AppStoreState) => state.updateNetwork);
+const NetworkForm = (props: NetworkFormProps): React.ReactElement => {
+  const { isNew, type, success } = props;
+  
+  const networks = useAppStore((state: AppStoreState) => state.settings.networks);
+  const updateNetwork = useAppStore((state: AppStoreState) => state.updateNetwork);
+  const addNetwork = useAppStore((state: AppStoreState) => state.addNetwork);
 
-    const { control, register, handleSubmit, watch, formState: { errors }, setError } = useForm<FormData>({
-        resolver: zodResolver(FormSchema),
-        defaultValues: {
-            id: id,
-            ssid: ssid,
-            password: password,
-            dhcp: dhcp,
-            ip_address: ip_address,
-            mask: mask,
-            gateway: gateway,
-            dns: dns,
-        }
-    });
+  const network = networks.find((n) => n.id === props.id);
+  
+  const defaults = {
+    ssid: network?.ssid?? '',
+    password: network?.password?? '',
+    ip_address: network?.ip_address?? '0.0.0.0',
+    mask: network?.mask?? '255.255.255.0',
+    gateway: network?.gateway?? '0.0.0.0',
+    dns: network?.dns?? '0.0.0.0',
+    dhcp: network?.dhcp?? true,
+    type: network?.type?? type,
+  }
+  
+  const { control, register, handleSubmit, watch, formState, setValue, setError } = useForm<FormData>({
+    resolver: zodResolver(FormSchema),
+    defaultValues: defaults,
+  });
 
-    const onSubmit: SubmitHandler<FormData> = async (data) => {
-        if (!data.dhcp) {
-            if (data.ip_address === '') {
-                setError('ip_address', {message: 'IP address is required.'})
-                return;
-            }
+  useEffect(() => {
+    if (network === undefined) {
+      return;
+    }
+    
+    setValue('ssid', network.ssid);
+    setValue('password', network.password);
+    setValue('dhcp', network.dhcp);
+    setValue('ip_address', network.ip_address);
+    setValue('mask', network.mask);
+    setValue('gateway', network.gateway);
+    setValue('dns', network.dns);
+    setValue('dhcp', network.dhcp);
+    setValue('type', network.type);
+  }, [network]);
+  
+  const typeOptions = Object.keys(NetworkType)
+    .filter((key) => key.length > 1)
+    .map((key, idx) => ({
+      label: key,
+      value: idx,
+    }));
 
-            if (data.mask === '') {
-                setError('mask', {message: 'Mask is required.'})
-                return;
-            }
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
+    if (!data.dhcp) {
+      if (data.ip_address === '') {
+        setError('ip_address', { message: 'IP address is required.' });
+        return;
+      }
 
-        }
+      if (data.mask === '') {
+        setError('mask', { message: 'Mask is required.' });
+        return;
+      }
+    }
 
-        if (await updateNetwork(data)) {
-            toast.success("Network settings saved.")
-            success();
-        } else {
-            toast.error("Network settings not saved.")
-        }
-    };
+    try {
+      if (isNew) {
+        addNetwork(data);
+      } else if (network?.id !== undefined) {
+        data.id = network?.id;
+        await updateNetwork(data as NetworkState);
+      } else {
+        return toast.error('Network settings not saved.');
+      }
+      
+    } catch (error) {
+      const e = error as Error;
+      toast.error(e.message);
+    }
+  };
 
-    const dhcp_actual = watch("dhcp")
+  const typeSelected = watch('type');
 
-    return (
-        <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
-            <div className="flex flex-row gap-4 mb-4">
-                <div className="w-[50%]">
-                    <div className="text-gray-500 pb-1">
-                        <label>SSID</label>
-                    </div>
-                    <Input
-                        type="text"
-                        placeholder="WiFI SSID"
-                        {...register("ssid")}
-                    />
-                    {errors.ssid && <p role="alert">{errors.ssid?.message}</p>}
-                </div>
+  const renderFormFields = () => {
+    switch (typeSelected) {
+      case NetworkType.WiFi:
+      case NetworkType.Ethernet: {
+        return <IPv4Fields {...{ register, watch, formState, control }}></IPv4Fields>;
+      }
 
-                <div className="w-[50%]">
-                    <div className="text-gray-500 pb-1">
-                        <label>Password</label>
-                    </div>
-                    <Input
-                        type="string"
-                        placeholder="WiFI Password"
-                        {...register("password")}
-                    />
-                    {errors.password && <p role="alert">{errors.password?.message}</p>}
-                </div>
-            </div>
+      default:
+        return null;
+    }
+  };
 
-            <div className="flex mb-2 gap-2">
-                <Controller
-                    name="dhcp"
-                    control={control}
-                    render={({ field }) =>
-                        <Switch id="dhcp-mode" checked={field.value} onCheckedChange={field.onChange} />}
-                />
-                <div className="text-gray-500">
-                    <Label htmlFor="dhcp-mode">DHCP</Label>
-                </div>
-            </div>
+  return (
+    <form className="w-full flex flex-col" onSubmit={handleSubmit(onSubmit)}>
+      <div className="flex flex-row gap-4 mb-4 items-center">
+        <div>
+          <label>Type</label>
+        </div>
+        <Controller
+          name="type"
+          control={control}
+          render={({ field }) => (
+            <Select onValueChange={(value) => field.onChange(Number(value))} value={String(field.value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Connection Type" />
+              </SelectTrigger>
+              <SelectContent>
+                {typeOptions.map((item) => (
+                  <SelectItem key={item.value} value={String(item.value)}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </div>
 
-            {
-                !dhcp_actual ? (
-                    <React.Fragment>
-                        <div className="flex flex-row gap-4 mb-4">
-                            <div className="w-[50%]">
-                                <div className="text-gray-500 pb-1">
-                                    <label>Static IP Address</label>
-                                </div>
+      {renderFormFields()}
 
-                                <Input
-                                    type="text"
-                                    placeholder="IP Address"
-                                    {...register("ip_address")}
-                                />
-                                {errors.ip_address && <p role="alert">{errors.ip_address?.message}</p>}
-                            </div>
-
-                            <div className="w-[50%]">
-                                <div className="text-gray-500 pb-1">
-                                    <label>Mask</label>
-                                </div>
-
-                                <Input
-                                    type="text"
-                                    placeholder="Net Mask"
-                                    {...register("mask")}
-                                />
-                                {errors.mask && <p role="alert">{errors.mask?.message}</p>}
-                            </div>
-                        </div>
-
-                        <div className="flex flex-row gap-4 mb-4">
-                            <div className="w-[50%]">
-                                <div className="text-gray-500 pb-1">
-                                    <label>Gateway</label>
-                                </div>
-
-                                <Input
-                                    type="text"
-                                    placeholder="Gateway"
-                                    {...register("gateway")}
-                                />
-                                {errors.gateway && <p role="alert">{errors.gateway?.message}</p>}
-                            </div>
-
-                            <div className="w-[50%]">
-                                <div className="text-gray-500 pb-1">
-                                    <label>DNS</label>
-                                </div>
-
-                                <Input
-                                    type="text"
-                                    placeholder="Net Mask"
-                                    {...register("dns")}
-                                />
-                                {errors.dns && <p role="alert">{errors.dns?.message}</p>}
-                            </div>
-                        </div>
-                    </React.Fragment>
-                ) : null
-            }
-
-            <div className="flex flex-row mt-8">
-                <Button type="submit" className="w-full">Save</Button>
-            </div>
-        </form>
-    );
+      <div className="flex flex-row mt-8">
+        <Button type="submit" className="w-full duration-400 transition-all ease-in-out">
+          {
+            isNew? 'Add connection' : 'Save connection'
+          }
+        </Button>
+      </div>
+    </form>
+  );
 };
 
 export default NetworkForm;

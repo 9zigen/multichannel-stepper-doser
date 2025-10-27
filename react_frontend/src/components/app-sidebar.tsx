@@ -1,14 +1,6 @@
-"use client"
-import * as React from "react"
-import {
-  Home,
-  Network,
-  CalendarClock,
-  LogOut,
-  Cog,
-  Play,
-  Disc
-} from "lucide-react"
+'use client';
+import * as React from 'react';
+import { Home, Network, CalendarClock, LogOut, Cog, Play, Disc } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -17,44 +9,45 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from "@/components/ui/sidebar"
-import { AppStoreState, useAppStore } from "@/hooks/use-store.ts";
-import { NavMain } from "@/components/nav-main.tsx";
+} from '@/components/ui/sidebar';
+import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
+import { NavMain } from '@/components/nav-main.tsx';
 
 const navigation = {
   navMain: [
     {
-      name: "Home",
-      url: "/",
+      name: 'Home',
+      url: '/',
       icon: Home,
     },
     {
-      name: "Schedule",
-      url: "/schedule",
+      name: 'Schedule',
+      url: '/schedule',
       icon: CalendarClock,
-    }],
+    },
+  ],
   navSettings: [
     {
-      name: "General",
-      url: "/settings/general",
+      name: 'General',
+      url: '/settings/general',
       icon: Cog,
     },
     {
-      name: "Network",
-      url: "/settings/network",
+      name: 'Network',
+      url: '/settings/network',
       icon: Network,
     },
     {
-      name: "Services",
-      url: "/settings/services",
+      name: 'Services',
+      url: '/settings/services',
       icon: Play,
     },
     {
-      name: "Pumps",
-      url: "/settings/pumps",
+      name: 'Pumps',
+      url: '/settings/pumps',
       icon: Disc,
-    }
-  ]
+    },
+  ],
   // navSettings: [
   //     {
   //         title: "Settings",
@@ -82,13 +75,13 @@ const navigation = {
   //         ],
   //     }
   // ]
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const logout = useAppStore((state: AppStoreState) => state.logout);
-  
+
   return (
-    <Sidebar {...props} variant="floating">
+    <Sidebar {...props} variant="inset">
       <SidebarContent>
         <NavMain items={navigation.navMain} />
         <NavMain items={navigation.navSettings} />
@@ -107,5 +100,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }

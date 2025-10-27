@@ -8,9 +8,7 @@
 
     "composite": true,
 
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -26,8 +24,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": [
-    "vite.config.ts",
-    "@types/node/module.d.ts",
-  ]
+  "include": ["vite.config.ts", "@types/node/module.d.ts"]
 }

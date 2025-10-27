@@ -1,11 +1,11 @@
-import React from "react";
+import React from 'react';
 
 const NotFound: React.FC = (): React.ReactElement => {
-    return (
-        <div>
-            <p>Not Found Page</p>
-        </div>
-    );
+  return (
+    <div>
+      <p>Not Found Page</p>
+    </div>
+  );
 };
 
 export default NotFound;

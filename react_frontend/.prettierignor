@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Generated files
+*.tsbuildinfo
+
+# Lock files
+package-lock.json
+yarn.lock
+
+# Logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# Other
+.DS_Store
