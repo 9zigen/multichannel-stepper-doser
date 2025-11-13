@@ -95,10 +95,11 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
     },
   });
 
-  console.log(pump);
-
   const [pumpCalibrations, setPumpCalibrations] = useState(calibration);
+  const [calibrationChanged, setCalibrationChanged] = useState(false);
+
   const direction_actual = watch('direction');
+  const unsaved = isDirty || calibrationChanged;
 
   useEffect(() => {
     setPumpCalibrations(calibration);
@@ -116,6 +117,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
 
     if (await updatePump(data, true)) {
       reset(data);
+      setCalibrationChanged(false);
       toast.success('Pumps settings saved.');
       if (success) {
         success();
@@ -125,9 +127,10 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
     }
   };
 
-  const updateCalibtarionData = async (data: PumpCalibrationState[]) => {
+  const updateCalibrationData = async (data: PumpCalibrationState[]) => {
     try {
       await updatePump({ ...pump, calibration: data }, false);
+      setCalibrationChanged(true);
       toast.success('Pump calibration updated. Please save the pump settings to apply the changes.');
     } catch (e) {
       const error = e as Error;
@@ -136,12 +139,12 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
   };
   const removeCalibration = async (index: number) => {
     const newCalibrations = pumpCalibrations.filter((_item, idx) => idx !== index);
-    await updateCalibtarionData(newCalibrations);
+    await updateCalibrationData(newCalibrations);
   };
 
   const addCalibration = async (cal: PumpCalibrationState) => {
     const newCalibrations = [...pumpCalibrations, cal];
-    await updateCalibtarionData(newCalibrations);
+    await updateCalibrationData(newCalibrations);
   };
 
   return (
@@ -300,7 +303,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
       </ScrollArea>
 
       <div className="flex flex-row">
-        <Button size="icon" type="submit" className="w-full" disabled={!isDirty} form="pump-form">
+        <Button size="icon" type="submit" className="w-full" disabled={!unsaved} form="pump-form">
           {isSubmitting ? (
             <>
               <LoaderCircle size={20} className="animate-spin" /> Saving

@@ -33,7 +33,7 @@ const FormSchema = z.object({
   ntp_server: z.string().min(3).max(20).or(z.literal('')),
   utc_offset: z.number(),
   ntp_dst: z.boolean(),
-  mqtt_ip_address: z.string().ip().or(z.literal('')),
+  mqtt_ip_address: z.ipv4().or(z.literal('')),
   mqtt_port: z.string().or(z.literal('')),
   mqtt_user: z.string().or(z.literal('')),
   mqtt_password: z.string().or(z.literal('')),

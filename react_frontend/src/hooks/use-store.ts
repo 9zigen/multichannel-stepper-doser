@@ -141,7 +141,7 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
 
   saveSettings: async (entity: string | string[] | null, data: Partial<SettingsState>) => {
     try {
-      let message: Partial<SettingsState> = {};
+      const message: Partial<SettingsState> = {};
       const settings = get().settings as Partial<SettingsState>;
 
       // if (entity === null) {
@@ -196,7 +196,7 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     }
 
     data.id = networks?.length ?? 0;
-    let d = [...networks, ...[data]];
+    const d = [...networks, ...[data]];
     set({
       settings: {
         ...get().settings,
@@ -204,7 +204,6 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       },
     });
     console.log(get());
-    
   },
 
   updateNetwork: async (data: NetworkState): Promise<boolean> => {
@@ -229,17 +228,17 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
 
     return false;
   },
-  
+
   deleteNetwork: async (id: number): Promise<boolean> => {
     const networks = get().settings.networks;
     const idx = networks.findIndex((x) => x.id === id);
     if (idx == -1) {
       throw new Error('This connection already exists');
     }
-    
-    let d = [...networks];
+
+    const d = [...networks];
     d.splice(idx, 1);
-    
+
     set({
       settings: {
         ...get().settings,

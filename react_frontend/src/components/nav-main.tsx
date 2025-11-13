@@ -26,7 +26,7 @@ export const NavMain = (props: NavMainProps) => {
   const { items } = props;
 
   return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+    <SidebarGroup>
       <SidebarGroupLabel>Main</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item: NavMainItem) => (

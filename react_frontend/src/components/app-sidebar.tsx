@@ -81,7 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const logout = useAppStore((state: AppStoreState) => state.logout);
 
   return (
-    <Sidebar {...props} variant="inset">
+    <Sidebar {...props}>
       <SidebarContent>
         <NavMain items={navigation.navMain} />
         <NavMain items={navigation.navSettings} />

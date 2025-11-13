@@ -37,17 +37,48 @@ export enum NetworkType {
   Thread = 3,
   CAN = 4,
 }
-export type NetworkState = {
+
+export interface NetworkStateBase {
   id: number;
-  ssid: string;
-  password: string;
+  type: NetworkType;
+  is_dirty: boolean;
+}
+
+export interface NetworkStateBaseEthernet extends NetworkStateBase {
   ip_address: string;
   mask: string;
   gateway: string;
   dns: string;
   dhcp: boolean;
-  type: NetworkType;
-};
+}
+
+export interface NetworkStateEthernet extends NetworkStateBaseEthernet {
+  type: NetworkType.Ethernet;
+}
+
+export interface NetworkStateWifi extends NetworkStateBaseEthernet {
+  ssid: string;
+  password: string;
+  type: NetworkType.WiFi;
+}
+
+export interface NetworkStateBle extends NetworkStateBase {
+  type: NetworkType.BLE;
+}
+
+export interface NetworkStateThread extends NetworkStateBase {
+  channel: number;
+  network_name: string;
+  network_key: string;
+  pan_id: string;
+  ext_pan_id: string;
+  pskc: string;
+  mesh_local_prefix: string;
+  force_dataset: boolean;
+  type: NetworkType.Thread;
+}
+
+export type NetworkState = NetworkStateEthernet | NetworkStateWifi | NetworkStateBle | NetworkStateThread;
 
 export type PumpCalibrationState = {
   speed: number;

@@ -6,10 +6,11 @@ import PumpForm from '@/components/pump-form.tsx';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer.tsx';
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Cog, RotateCcw, RotateCw } from 'lucide-react';
+import { Cog, Cylinder, RotateCcw, RotateCw } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile.ts';
-import { Card, CardContent } from '@/components/ui/card.tsx';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx';
 import { Button } from '@/components/ui/button.tsx';
+import { Badge } from '@/components/ui/badge.tsx';
 
 const PumpsPage: React.FC = (): React.ReactElement => {
   const isMobile = useIsMobile();
@@ -33,26 +34,44 @@ const PumpsPage: React.FC = (): React.ReactElement => {
 
   return (
     <div className="flex flex-col items-center justify-center gap-6">
-      <section className="flex flex-row justify-center gap-6 w-full">
+      <section className="flex flex-col sm:flex-row sm:flex-wrap justify-center gap-6 w-full">
         {pumps?.map((pump) => {
           const percentage = (pump.tank_current_vol / pump.tank_full_vol) * 100;
           return (
-            <Card key={pump.id} className="w-full shadow-none animate-in fade-in zoom-in">
-              <CardContent className="text-sm">
-                <div className="flex flex-row items-center justify-between pb-4">
-                  <span className="text-xl">{pump.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="cursor-pointer"
-                    onClick={() => setSelectedPump({ ...pump })}
-                  >
-                    <Cog />
-                  </Button>
-                </div>
+            <Card
+              key={pump.id}
+              className="w-full sm:w-[calc(50%-(--spacing(6)))] xl:w-[calc(30%-(--spacing(24)))] 2xl:w-[calc(25%-(--spacing(24)))] shadow-none animate-in fade-in zoom-in"
+            >
+              <CardHeader>
+                <CardTitle>
+                  <div className="flex flex-row items-center justify-between">
+                    {pump.name}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="cursor-pointer"
+                      onClick={() => setSelectedPump({ ...pump })}
+                    >
+                      <Cog />
+                    </Button>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  <div className="flex flex-row items-center gap-1">
+                    <Badge variant="secondary" className="gap-2">
+                      <Cylinder size={16} />
+                      {percentage}%
+                    </Badge>
+                    <Badge variant="secondary">{pump.state ? 'Active' : 'Off'}</Badge>
+                  </div>
+                </CardDescription>
+              </CardHeader>
 
+              <CardContent>
                 <div className="flex items-center gap-2">Rotation: {renderRotation(pump)}</div>
-                <div className="flex items-center gap-2">Tank Volume: {percentage.toFixed(2)} %</div>
+                <div className="flex items-center gap-2">Calibration Points: {pump.calibration.length}</div>
+                <div className="flex items-center gap-2">Tank Volume: {pump.tank_current_vol.toFixed(2)} ml</div>
+                <div className="flex items-center gap-2">Tank Full Volume: {pump.tank_full_vol.toFixed(2)} ml</div>
               </CardContent>
             </Card>
           );
