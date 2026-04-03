@@ -83,6 +83,7 @@ const initialState: MockState = {
       state: true,
       name: 'Magnesium',
       direction: true,
+      running_hours: 412.5,
       tank_full_vol: 1000,
       tank_current_vol: 900,
       tank_concentration_total: 800,
@@ -107,6 +108,7 @@ const initialState: MockState = {
       state: true,
       name: 'CaRx',
       direction: true,
+      running_hours: 1287.25,
       tank_full_vol: 1000,
       tank_current_vol: 900,
       tank_concentration_total: 800,
@@ -131,6 +133,7 @@ const initialState: MockState = {
       state: true,
       name: 'Alkalinity',
       direction: true,
+      running_hours: 863.4,
       tank_full_vol: 1000,
       tank_current_vol: 632,
       tank_concentration_total: 800,
@@ -155,6 +158,7 @@ const initialState: MockState = {
       state: true,
       name: 'NO3',
       direction: true,
+      running_hours: 219.75,
       tank_full_vol: 1000,
       tank_current_vol: 900,
       tank_concentration_total: 800,
@@ -189,6 +193,12 @@ const initialState: MockState = {
     firmware_version: '1.1-dirty',
     firmware_date: '20/03/2026 11:02AM',
     hardware_version: 'ESP32',
+    wifi_disconnects: 7,
+    packets_dropped: 132,
+    tx_packets: 284512,
+    rx_packets: 418907,
+    reboot_count: 14,
+    last_reboot_reason: 'ESP_RST_POWERON',
   },
   time: {
     time_zone: 'UTC+1',
@@ -340,6 +350,7 @@ function updatePumpRuntime(payload: PumpRunState) {
 
   const pumpedVolume = Number(((selected.flow / 60) * payload.time).toFixed(2));
   pump.tank_current_vol = Math.max(0, pump.tank_current_vol - pumpedVolume);
+  pump.running_hours = Number((pump.running_hours + payload.time / 60).toFixed(2));
 }
 
 export const mockAdapter: AxiosAdapter = async (config) => {

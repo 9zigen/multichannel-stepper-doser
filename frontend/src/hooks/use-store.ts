@@ -65,6 +65,12 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     firmware_version: '',
     firmware_date: '',
     hardware_version: '',
+    wifi_disconnects: 0,
+    packets_dropped: 0,
+    tx_packets: 0,
+    rx_packets: 0,
+    reboot_count: 0,
+    last_reboot_reason: '',
   },
   settings: {
     services: {

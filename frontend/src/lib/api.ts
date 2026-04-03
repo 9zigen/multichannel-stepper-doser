@@ -104,6 +104,7 @@ export type PumpState = {
   state: boolean;
   name: string;
   direction: boolean;
+  running_hours: number;
   tank_full_vol: number;
   tank_current_vol: number;
   tank_concentration_total: number /* runtime data */;
@@ -155,6 +156,12 @@ export type StatusState = {
   firmware_version: string;
   firmware_date: string;
   hardware_version: string;
+  wifi_disconnects: number;
+  packets_dropped: number;
+  tx_packets: number;
+  rx_packets: number;
+  reboot_count: number;
+  last_reboot_reason: string;
 };
 
 export type PumpRunState = {

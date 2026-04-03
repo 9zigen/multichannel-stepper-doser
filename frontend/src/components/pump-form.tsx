@@ -21,6 +21,7 @@ type FormData = {
   state: boolean;
   name: string;
   direction: boolean;
+  running_hours: number;
   tank_full_vol: number;
   tank_current_vol: number;
   tank_concentration_total: number;
@@ -34,6 +35,7 @@ const FormSchema = z.object({
   state: z.boolean(),
   name: z.string(),
   direction: z.boolean(),
+  running_hours: z.number(),
   tank_full_vol: z.number(),
   tank_current_vol: z.number(),
   tank_concentration_total: z.number(),
@@ -60,6 +62,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
     state,
     name,
     direction,
+    running_hours,
     tank_full_vol,
     tank_current_vol,
     tank_concentration_total,
@@ -86,6 +89,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
       state: state,
       name: name,
       direction: direction,
+      running_hours: running_hours,
       tank_full_vol: tank_full_vol,
       tank_current_vol: tank_current_vol,
       tank_concentration_total: tank_concentration_total,
