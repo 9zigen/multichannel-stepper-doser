@@ -6,7 +6,15 @@ import { CalendarClock, Check, Clock3, LoaderCircle, Repeat, Waves } from 'lucid
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button.tsx';
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input.tsx';
 import { Toggle } from '@/components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -106,7 +114,9 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
   const modeDetails = modeMeta[modeActual];
 
   const toggleHour = (field: ControllerRenderProps<FormData, 'schedule.work_hours'>, hour: number) => {
-    const value = field.value.includes(hour) ? field.value.filter((item: number) => item !== hour) : [...field.value, hour];
+    const value = field.value.includes(hour)
+      ? field.value.filter((item: number) => item !== hour)
+      : [...field.value, hour];
     field.onChange(value.sort((a, b) => a - b));
   };
 
@@ -265,7 +275,9 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
               </FieldTitle>
             </div>
 
-            <div className={cn('grid gap-4', modeActual === SCHEDULE_MODE.PERIODIC ? 'md:grid-cols-2' : 'md:grid-cols-1')}>
+            <div
+              className={cn('grid gap-4', modeActual === SCHEDULE_MODE.PERIODIC ? 'md:grid-cols-2' : 'md:grid-cols-1')}
+            >
               <Field>
                 <FieldLabel htmlFor={`speed-${pump.id}`}>Speed [rpm]</FieldLabel>
                 <FieldContent>

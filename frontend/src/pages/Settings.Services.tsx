@@ -19,7 +19,9 @@ const ServicesPage: React.FC = (): React.ReactElement => {
         <Card className="shadow-none animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Service Overview</CardTitle>
-            <CardDescription>Quick operational view of clock sync, broker connectivity, and OTA readiness.</CardDescription>
+            <CardDescription>
+              Quick operational view of clock sync, broker connectivity, and OTA readiness.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="rounded-xl border bg-muted/20 p-4">
@@ -82,7 +84,8 @@ const ServicesPage: React.FC = (): React.ReactElement => {
             <Alert>
               <AlertTitle>Useful IoT defaults</AlertTitle>
               <AlertDescription>
-                Enable NTP for schedule accuracy, keep MQTT on the local broker, and host OTA binaries on a stable LAN address.
+                Enable NTP for schedule accuracy, keep MQTT on the local broker, and host OTA binaries on a stable LAN
+                address.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -91,7 +94,10 @@ const ServicesPage: React.FC = (): React.ReactElement => {
         <Card className="w-full shadow-none animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Services</CardTitle>
-            <CardDescription>Split by role so network identity, clock sync, telemetry, and firmware delivery can be configured independently.</CardDescription>
+            <CardDescription>
+              Split by role so network identity, clock sync, telemetry, and firmware delivery can be configured
+              independently.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ServicesForm services={serviceState} />

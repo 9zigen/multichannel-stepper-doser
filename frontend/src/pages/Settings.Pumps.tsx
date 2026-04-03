@@ -43,7 +43,9 @@ const PumpsPage: React.FC = (): React.ReactElement => {
         <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Pump Overview</CardTitle>
-            <CardDescription>Track dosing inventory, calibration coverage, and which heads are ready for operation.</CardDescription>
+            <CardDescription>
+              Track dosing inventory, calibration coverage, and which heads are ready for operation.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-accent/20 via-card to-card p-5 shadow-sm">
@@ -94,7 +96,8 @@ const PumpsPage: React.FC = (): React.ReactElement => {
               <Settings2 />
               <AlertTitle>Useful IoT defaults</AlertTitle>
               <AlertDescription>
-                Keep reagent names explicit, track tank volume conservatively, and recalibrate after tubing changes or motor service.
+                Keep reagent names explicit, track tank volume conservatively, and recalibrate after tubing changes or
+                motor service.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -104,12 +107,15 @@ const PumpsPage: React.FC = (): React.ReactElement => {
           <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
             <CardHeader>
               <CardTitle className="text-xl">Pumps</CardTitle>
-              <CardDescription>Each dosing head is presented as an operational card with editing isolated into a dedicated panel.</CardDescription>
+              <CardDescription>
+                Each dosing head is presented as an operational card with editing isolated into a dedicated panel.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-6 sm:grid-cols-2 2xl:grid-cols-3">
                 {pumps?.map((pump) => {
-                  const percentage = pump.tank_full_vol > 0 ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100) : 0;
+                  const percentage =
+                    pump.tank_full_vol > 0 ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100) : 0;
                   const lowInventory = percentage <= 25;
 
                   return (
@@ -130,11 +136,18 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                                 <Droplets data-icon="inline-start" />
                                 {percentage}%
                               </Badge>
-                              <Badge variant={pump.state ? 'default' : 'outline'}>{pump.state ? 'Enabled' : 'Disabled'}</Badge>
+                              <Badge variant={pump.state ? 'default' : 'outline'}>
+                                {pump.state ? 'Enabled' : 'Disabled'}
+                              </Badge>
                             </CardDescription>
                           </div>
 
-                          <Button variant="ghost" size="sm" className="cursor-pointer" onClick={() => setSelectedPump({ ...pump })}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="cursor-pointer"
+                            onClick={() => setSelectedPump({ ...pump })}
+                          >
                             <Cog data-icon="inline-start" />
                             Edit
                           </Button>
@@ -145,13 +158,17 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-xs uppercase tracking-[0.14em] text-muted-foreground">
                             <span>Inventory</span>
-                            <span>{pump.tank_current_vol.toFixed(0)} / {pump.tank_full_vol.toFixed(0)} ml</span>
+                            <span>
+                              {pump.tank_current_vol.toFixed(0)} / {pump.tank_full_vol.toFixed(0)} ml
+                            </span>
                           </div>
                           <div className="h-2 overflow-hidden rounded-full bg-muted">
                             <div
                               className={cn(
                                 'h-full rounded-full bg-gradient-to-r transition-all',
-                                lowInventory ? 'from-destructive to-destructive/70' : 'from-primary via-primary/85 to-accent'
+                                lowInventory
+                                  ? 'from-destructive to-destructive/70'
+                                  : 'from-primary via-primary/85 to-accent'
                               )}
                               style={{ width: `${Math.max(6, Math.min(percentage, 100))}%` }}
                             />
@@ -200,10 +217,14 @@ const PumpsPage: React.FC = (): React.ReactElement => {
               <div className="mx-auto flex w-full flex-col items-center sm:w-[400px]">
                 <DrawerHeader className="text-center">
                   <DrawerTitle>Edit: {selectedPump?.name}</DrawerTitle>
-                  <DrawerDescription>Adjust pump identity, tank data, and calibration points in one place.</DrawerDescription>
+                  <DrawerDescription>
+                    Adjust pump identity, tank data, and calibration points in one place.
+                  </DrawerDescription>
                 </DrawerHeader>
                 <div className="flex flex-col">
-                  {selectedPump === null ? null : <PumpForm pump={selectedPump} success={() => setSelectedPump(null)} />}
+                  {selectedPump === null ? null : (
+                    <PumpForm pump={selectedPump} success={() => setSelectedPump(null)} />
+                  )}
                 </div>
               </div>
             </DrawerContent>
@@ -213,7 +234,9 @@ const PumpsPage: React.FC = (): React.ReactElement => {
             <DialogContent className="border-white/45 bg-card/96 shadow-xl backdrop-blur-xl sm:max-w-[425px] lg:max-w-[500px] xl:max-w-[800px]">
               <DialogHeader>
                 <DialogTitle>Edit: {selectedPump?.name}</DialogTitle>
-                <DialogDescription>Adjust pump identity, tank data, and calibration points in one place.</DialogDescription>
+                <DialogDescription>
+                  Adjust pump identity, tank data, and calibration points in one place.
+                </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col">
                 {selectedPump === null ? null : <PumpForm pump={selectedPump} success={() => setSelectedPump(null)} />}

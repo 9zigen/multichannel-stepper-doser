@@ -55,7 +55,11 @@ const NetworkPage: React.FC = (): React.ReactElement => {
   }, [networks]);
 
   const primaryConnection = useMemo(
-    () => networks.find((network) => network.type === NetworkType.WiFi) ?? networks.find((network) => network.type === NetworkType.Ethernet) ?? networks[0] ?? null,
+    () =>
+      networks.find((network) => network.type === NetworkType.WiFi) ??
+      networks.find((network) => network.type === NetworkType.Ethernet) ??
+      networks[0] ??
+      null,
     [networks]
   );
 
@@ -65,7 +69,10 @@ const NetworkPage: React.FC = (): React.ReactElement => {
         <Card className="shadow-none animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Network Overview</CardTitle>
-            <CardDescription>Review active interfaces, choose which link to edit, and keep addressing predictable for local device access.</CardDescription>
+            <CardDescription>
+              Review active interfaces, choose which link to edit, and keep addressing predictable for local device
+              access.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="rounded-xl border bg-muted/20 p-4">
@@ -86,13 +93,25 @@ const NetworkPage: React.FC = (): React.ReactElement => {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span>Address mode</span>
-                  <Badge variant={primaryConnection && 'dhcp' in primaryConnection && !primaryConnection.dhcp ? 'secondary' : 'outline'}>
-                    {primaryConnection && 'dhcp' in primaryConnection ? (primaryConnection.dhcp ? 'DHCP' : 'Static') : 'N/A'}
+                  <Badge
+                    variant={
+                      primaryConnection && 'dhcp' in primaryConnection && !primaryConnection.dhcp
+                        ? 'secondary'
+                        : 'outline'
+                    }
+                  >
+                    {primaryConnection && 'dhcp' in primaryConnection
+                      ? primaryConnection.dhcp
+                        ? 'DHCP'
+                        : 'Static'
+                      : 'N/A'}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span>Device reachability</span>
-                  <Badge variant={networks.length ? 'secondary' : 'outline'}>{networks.length ? 'Configured' : 'Missing'}</Badge>
+                  <Badge variant={networks.length ? 'secondary' : 'outline'}>
+                    {networks.length ? 'Configured' : 'Missing'}
+                  </Badge>
                 </div>
               </div>
             </div>
@@ -117,7 +136,8 @@ const NetworkPage: React.FC = (): React.ReactElement => {
               <ShieldCheck />
               <AlertTitle>Useful IoT defaults</AlertTitle>
               <AlertDescription>
-                Use DHCP during first boot, switch to static addressing only for devices that need a stable endpoint, and keep Wi-Fi credentials distinct from your broker credentials.
+                Use DHCP during first boot, switch to static addressing only for devices that need a stable endpoint,
+                and keep Wi-Fi credentials distinct from your broker credentials.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -129,7 +149,9 @@ const NetworkPage: React.FC = (): React.ReactElement => {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex flex-col gap-1">
                   <CardTitle className="text-xl">Connections</CardTitle>
-                  <CardDescription>Each interface is split by transport so Wi-Fi and Ethernet can be managed independently.</CardDescription>
+                  <CardDescription>
+                    Each interface is split by transport so Wi-Fi and Ethernet can be managed independently.
+                  </CardDescription>
                 </div>
                 <AddNetworkCombobox />
               </div>
@@ -159,7 +181,10 @@ const NetworkPage: React.FC = (): React.ReactElement => {
                         </div>
 
                         <div className="flex gap-2">
-                          <Button variant={isSelected ? 'secondary' : 'outline'} onClick={() => setSelectedNetwork(network)}>
+                          <Button
+                            variant={isSelected ? 'secondary' : 'outline'}
+                            onClick={() => setSelectedNetwork(network)}
+                          >
                             <Edit data-icon="inline-start" />
                             {isSelected ? 'Editing' : 'Edit'}
                           </Button>
@@ -175,7 +200,9 @@ const NetworkPage: React.FC = (): React.ReactElement => {
                 <Alert>
                   <PlusCircle />
                   <AlertTitle>No connections yet</AlertTitle>
-                  <AlertDescription>Add a Wi-Fi or Ethernet profile to bring the device onto your local network.</AlertDescription>
+                  <AlertDescription>
+                    Add a Wi-Fi or Ethernet profile to bring the device onto your local network.
+                  </AlertDescription>
                 </Alert>
               )}
             </CardContent>

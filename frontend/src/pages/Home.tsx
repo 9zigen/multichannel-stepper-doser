@@ -25,10 +25,7 @@ const Home: React.FC = (): React.ReactElement => {
     [pumps]
   );
 
-  const totalRunningHours = useMemo(
-    () => pumps.reduce((sum, pump) => sum + pump.running_hours, 0),
-    [pumps]
-  );
+  const totalRunningHours = useMemo(() => pumps.reduce((sum, pump) => sum + pump.running_hours, 0), [pumps]);
 
   const resetPumpCounter = async (pumpId: number) => {
     const pump = pumps.find((item) => item.id === pumpId);
@@ -55,7 +52,9 @@ const Home: React.FC = (): React.ReactElement => {
         <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Device Overview</CardTitle>
-            <CardDescription>Operational summary for pump aging, connectivity stability, and restart history.</CardDescription>
+            <CardDescription>
+              Operational summary for pump aging, connectivity stability, and restart history.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-accent/20 via-card to-card p-5 shadow-sm">
@@ -73,7 +72,11 @@ const Home: React.FC = (): React.ReactElement => {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span>Highest wear pump</span>
-                  <Badge variant={highestWearPump?.running_hours && highestWearPump.running_hours > 1000 ? 'destructive' : 'outline'}>
+                  <Badge
+                    variant={
+                      highestWearPump?.running_hours && highestWearPump.running_hours > 1000 ? 'destructive' : 'outline'
+                    }
+                  >
                     {highestWearPump ? highestWearPump.name : 'N/A'}
                   </Badge>
                 </div>
@@ -88,7 +91,8 @@ const Home: React.FC = (): React.ReactElement => {
               <TimerReset />
               <AlertTitle>Aging control</AlertTitle>
               <AlertDescription>
-                Running hours are intended for service intervals and tubing/head aging. Reset a counter after maintenance, not after every refill.
+                Running hours are intended for service intervals and tubing/head aging. Reset a counter after
+                maintenance, not after every refill.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -102,7 +106,9 @@ const Home: React.FC = (): React.ReactElement => {
               <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
                 <CardHeader>
                   <CardTitle className="text-lg">Connectivity Stability</CardTitle>
-                  <CardDescription>Use these counters to spot weak Wi-Fi links or noisy local network conditions.</CardDescription>
+                  <CardDescription>
+                    Use these counters to spot weak Wi-Fi links or noisy local network conditions.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4">
                   <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-card via-card to-secondary/30 p-4 shadow-sm">
@@ -152,7 +158,9 @@ const Home: React.FC = (): React.ReactElement => {
               <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
                 <CardHeader>
                   <CardTitle className="text-lg">System</CardTitle>
-                  <CardDescription>Boot and firmware information for diagnosing crash loops, brownouts, or watchdog resets.</CardDescription>
+                  <CardDescription>
+                    Boot and firmware information for diagnosing crash loops, brownouts, or watchdog resets.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
@@ -192,12 +200,16 @@ const Home: React.FC = (): React.ReactElement => {
           <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
             <CardHeader>
               <CardTitle className="text-xl">Pump Aging</CardTitle>
-              <CardDescription>Track head wear and reset the running-hours counter after replacing tubing, rotor, or dosing line components.</CardDescription>
+              <CardDescription>
+                Track head wear and reset the running-hours counter after replacing tubing, rotor, or dosing line
+                components.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-6 sm:grid-cols-2 2xl:grid-cols-4">
                 {pumps.map((pump) => {
-                  const percentage = pump.tank_full_vol > 0 ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100) : 0;
+                  const percentage =
+                    pump.tank_full_vol > 0 ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100) : 0;
                   const warning = pump.running_hours >= 1000;
 
                   return (
@@ -214,7 +226,9 @@ const Home: React.FC = (): React.ReactElement => {
                             <CardTitle className="text-lg">{pump.name}</CardTitle>
                             <CardDescription className="flex flex-wrap items-center gap-2">
                               <Badge variant="secondary">{percentage}% full</Badge>
-                              <Badge variant={pump.state ? 'default' : 'outline'}>{pump.state ? 'Enabled' : 'Disabled'}</Badge>
+                              <Badge variant={pump.state ? 'default' : 'outline'}>
+                                {pump.state ? 'Enabled' : 'Disabled'}
+                              </Badge>
                             </CardDescription>
                           </div>
                           <Badge variant={warning ? 'destructive' : 'outline'}>{formatHours(pump.running_hours)}</Badge>

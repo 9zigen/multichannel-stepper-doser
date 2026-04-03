@@ -27,10 +27,12 @@ const Schedule: React.FC = (): React.ReactElement => {
         <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Scheduler Overview</CardTitle>
-            <CardDescription>Each pump can be disabled, run continuously, or follow a periodic dosing plan.</CardDescription>
+            <CardDescription>
+              Each pump can be disabled, run continuously, or follow a periodic dosing plan.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-accent/20 via-card to-card p-5 shadow-sm">
+            <div className="rounded-2xl border border-white/45 bg-linear-to-br from-accent/20 via-card to-card p-5 shadow-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 font-medium">
                   <CalendarClock className="size-4 text-muted-foreground" />
@@ -54,11 +56,12 @@ const Schedule: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <Alert className="border-white/45 bg-gradient-to-br from-card via-card to-accent/10 shadow-sm">
+            <Alert className="border-white/45 bg-linear-to-br from-card via-card to-accent/10 shadow-sm">
               <CalendarClock />
               <AlertTitle>Modern scheduling pattern</AlertTitle>
               <AlertDescription>
-                Use visible mode chips instead of a dropdown. The operator should understand the state before opening the fine-grained controls.
+                Use visible mode chips instead of a dropdown. The operator should understand the state before opening
+                the fine-grained controls.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -67,42 +70,44 @@ const Schedule: React.FC = (): React.ReactElement => {
         <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Schedules</CardTitle>
-            <CardDescription>Each card shows the current schedule mode first, then reveals only the controls relevant to that mode.</CardDescription>
+            <CardDescription>
+              Each card shows the current schedule mode first, then reveals only the controls relevant to that mode.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 sm:grid-cols-2 2xl:grid-cols-3">
-        {pumps?.map((pump) => {
-          const percentage = (pump.tank_current_vol / pump.tank_full_vol) * 100;
-          const mode = modeBadge[pump.schedule.mode];
-          const ModeIcon = mode.icon;
-          return (
-            <Card
-              key={pump.id}
-              className="overflow-hidden border-white/45 bg-gradient-to-br from-card via-card to-secondary/30 shadow-md"
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex flex-col gap-2">
-                    <CardTitle>{pump.name}</CardTitle>
-                    <CardDescription className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary">
-                        <Droplets data-icon="inline-start" />
-                        {Math.round(percentage)}%
-                      </Badge>
-                      <Badge variant={mode.variant}>
-                        <ModeIcon data-icon="inline-start" />
-                        {mode.label}
-                      </Badge>
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <ScheduleForm pump={pump} />
-              </CardContent>
-            </Card>
-          );
-        })}
+              {pumps?.map((pump) => {
+                const percentage = (pump.tank_current_vol / pump.tank_full_vol) * 100;
+                const mode = modeBadge[pump.schedule.mode];
+                const ModeIcon = mode.icon;
+                return (
+                  <Card
+                    key={pump.id}
+                    className="overflow-hidden border-white/45 bg-gradient-to-br from-card via-card to-secondary/30 shadow-md"
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-2">
+                          <CardTitle>{pump.name}</CardTitle>
+                          <CardDescription className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">
+                              <Droplets data-icon="inline-start" />
+                              {Math.round(percentage)}%
+                            </Badge>
+                            <Badge variant={mode.variant}>
+                              <ModeIcon data-icon="inline-start" />
+                              {mode.label}
+                            </Badge>
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <ScheduleForm pump={pump} />
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

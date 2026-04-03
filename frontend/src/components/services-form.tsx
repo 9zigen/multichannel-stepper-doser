@@ -6,7 +6,15 @@ import { Clock3, Globe, RadioTower, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button.tsx';
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input.tsx';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
@@ -30,14 +38,20 @@ type FormData = {
 };
 
 const FormSchema = z.object({
-  hostname: z.string().min(3, 'Hostname must be at least 3 characters.').max(20, 'Hostname must be 20 characters or fewer.'),
+  hostname: z
+    .string()
+    .min(3, 'Hostname must be at least 3 characters.')
+    .max(20, 'Hostname must be 20 characters or fewer.'),
   ntp_server: z.string().max(64, 'NTP server must be 64 characters or fewer.'),
   utc_offset: z.number(),
   ntp_dst: z.boolean(),
   mqtt_ip_address: z.string().max(64, 'Broker host must be 64 characters or fewer.'),
   mqtt_port: z
     .string()
-    .refine((value) => value === '' || (/^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535), 'Port must be between 1 and 65535.'),
+    .refine(
+      (value) => value === '' || (/^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535),
+      'Port must be between 1 and 65535.'
+    ),
   mqtt_user: z.string().max(64, 'User must be 64 characters or fewer.'),
   mqtt_password: z.string().max(64, 'Password must be 64 characters or fewer.'),
   mqtt_qos: z.number().min(0, 'QoS must be 0, 1, or 2.').max(2, 'QoS must be 0, 1, or 2.'),
@@ -124,7 +138,13 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
           <Field>
             <FieldLabel htmlFor="hostname">Hostname</FieldLabel>
             <FieldContent>
-              <Input id="hostname" type="text" placeholder="reef-doser" {...register('hostname')} aria-invalid={!!errors.hostname} />
+              <Input
+                id="hostname"
+                type="text"
+                placeholder="reef-doser"
+                {...register('hostname')}
+                aria-invalid={!!errors.hostname}
+              />
               <FieldDescription>Used for network discovery, dashboards, and local troubleshooting.</FieldDescription>
               <FieldError errors={[errors.hostname]} />
             </FieldContent>
@@ -186,12 +206,16 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
           <Field orientation="horizontal" className="items-start justify-between rounded-xl border bg-muted/20 p-4">
             <FieldContent className="gap-1">
               <FieldLabel htmlFor="dst-mode">Daylight saving time</FieldLabel>
-              <FieldDescription>Apply DST automatically when your dosing schedule should follow local clock time.</FieldDescription>
+              <FieldDescription>
+                Apply DST automatically when your dosing schedule should follow local clock time.
+              </FieldDescription>
             </FieldContent>
             <Controller
               name="ntp_dst"
               control={control}
-              render={({ field }) => <Switch id="dst-mode" checked={field.value} onCheckedChange={field.onChange} disabled={!enableNtp} />}
+              render={({ field }) => (
+                <Switch id="dst-mode" checked={field.value} onCheckedChange={field.onChange} disabled={!enableNtp} />
+              )}
             />
           </Field>
         </SettingsSection>
@@ -204,7 +228,9 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
           <Field orientation="horizontal" className="items-start justify-between rounded-xl border bg-muted/20 p-4">
             <FieldContent className="gap-1">
               <FieldLabel htmlFor="enable-mqtt">Enable MQTT</FieldLabel>
-              <FieldDescription>Turn this on when the doser should report to Home Assistant, Node-RED, or another broker.</FieldDescription>
+              <FieldDescription>
+                Turn this on when the doser should report to Home Assistant, Node-RED, or another broker.
+              </FieldDescription>
             </FieldContent>
             <Controller
               name="enable_mqtt"
@@ -305,8 +331,16 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
           <Field>
             <FieldLabel htmlFor="ota_url">OTA URL</FieldLabel>
             <FieldContent>
-              <Input id="ota_url" type="text" placeholder="http://192.168.1.10/device.ota.bin" {...register('ota_url')} aria-invalid={!!errors.ota_url} />
-              <FieldDescription>Prefer a stable local URL so field updates do not depend on internet access.</FieldDescription>
+              <Input
+                id="ota_url"
+                type="text"
+                placeholder="http://192.168.1.10/device.ota.bin"
+                {...register('ota_url')}
+                aria-invalid={!!errors.ota_url}
+              />
+              <FieldDescription>
+                Prefer a stable local URL so field updates do not depend on internet access.
+              </FieldDescription>
               <FieldError errors={[errors.ota_url]} />
             </FieldContent>
           </Field>

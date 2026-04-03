@@ -129,7 +129,9 @@ const FirmwarePage: React.FC = (): React.ReactElement => {
                         </div>
                         <div className="flex flex-col gap-1">
                           <span className="font-medium">Drop firmware here</span>
-                          <span className="text-sm text-muted-foreground">or click to browse `.bin` and `.ota` files</span>
+                          <span className="text-sm text-muted-foreground">
+                            or click to browse `.bin` and `.ota` files
+                          </span>
                         </div>
                       </>
                     ) : (
@@ -167,7 +169,11 @@ const FirmwarePage: React.FC = (): React.ReactElement => {
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center justify-between gap-4 text-sm">
                             <span className="text-muted-foreground">
-                              {isUploading ? 'Uploading firmware...' : isUploaded ? 'Upload complete' : 'Ready to upload'}
+                              {isUploading
+                                ? 'Uploading firmware...'
+                                : isUploaded
+                                  ? 'Upload complete'
+                                  : 'Ready to upload'}
                             </span>
                             <span className="font-medium">{progress}%</span>
                           </div>
@@ -180,7 +186,12 @@ const FirmwarePage: React.FC = (): React.ReactElement => {
               </Field>
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={isUploading}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => inputRef.current?.click()}
+                  disabled={isUploading}
+                >
                   <FolderOpen data-icon="inline-start" />
                   Choose file
                 </Button>

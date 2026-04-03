@@ -233,7 +233,11 @@
   body {
     background:
       radial-gradient(circle at top left, color-mix(in oklab, var(--color-accent) 14%, transparent) 0, transparent 32%),
-      radial-gradient(circle at top right, color-mix(in oklab, var(--color-primary) 10%, transparent) 0, transparent 26%),
+      radial-gradient(
+        circle at top right,
+        color-mix(in oklab, var(--color-primary) 10%, transparent) 0,
+        transparent 26%
+      ),
       linear-gradient(180deg, color-mix(in oklab, var(--color-secondary) 48%, transparent), transparent 28%),
       var(--color-background);
     min-height: 100vh;

@@ -83,8 +83,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props}>
       <SidebarContent>
-        <NavFlat items={navigation.navMain} title="Main"/>
-        <NavFlat items={navigation.navSettings} title="Settings"/>
+        <NavFlat items={navigation.navMain} title="Main" />
+        <NavFlat items={navigation.navSettings} title="Settings" />
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
