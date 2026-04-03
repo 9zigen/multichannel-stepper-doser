@@ -154,6 +154,7 @@ export type StatusState = {
   ntp_service: { enabled: boolean; sync: boolean };
   firmware_version: string;
   firmware_date: string;
+  hardware_version: string;
 };
 
 export type PumpRunState = {

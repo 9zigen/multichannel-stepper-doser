@@ -187,7 +187,8 @@ const initialState: MockState = {
     mqtt_service: { enabled: false, connected: false },
     ntp_service: { enabled: true, sync: true },
     firmware_version: '1.1-dirty',
-    firmware_date: '1.1-dirty',
+    firmware_date: '20/03/2026 11:02AM',
+    hardware_version: 'ESP32',
   },
   time: {
     time_zone: 'UTC+1',
@@ -265,12 +266,7 @@ function getToken(config: AxiosRequestConfig): string | undefined {
   return undefined;
 }
 
-function response<T>(
-  config: InternalAxiosRequestConfig,
-  data: T,
-  status = 200,
-  statusText = 'OK'
-): AxiosResponse<T> {
+function response<T>(config: InternalAxiosRequestConfig, data: T, status = 200, statusText = 'OK'): AxiosResponse<T> {
   return {
     config,
     data,
@@ -413,7 +409,13 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   if (url === '/upload' && method === 'post') {
     simulateUploadProgress(config.onUploadProgress);
     const mockResponse = response(config, { success: true });
-    debugRequest(config, { method, url, requestBody: '[FormData]', responseBody: mockResponse.data, status: mockResponse.status });
+    debugRequest(config, {
+      method,
+      url,
+      requestBody: '[FormData]',
+      responseBody: mockResponse.data,
+      status: mockResponse.status,
+    });
     return mockResponse;
   }
 
