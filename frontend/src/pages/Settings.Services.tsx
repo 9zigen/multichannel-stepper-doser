@@ -2,7 +2,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx';
-import { Clock3, Globe2, RadioTower, RefreshCcw } from 'lucide-react';
+import {Clock3, Globe2, RadioTower, RefreshCcw, Settings2} from 'lucide-react';
 
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import ServicesForm from '@/components/services-form';
@@ -14,8 +14,8 @@ const ServicesPage: React.FC = (): React.ReactElement => {
     : 'Not configured';
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-8">
-      <section className="container grid gap-6 px-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
+      <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="shadow-none animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Service Overview</CardTitle>
@@ -63,7 +63,7 @@ const ServicesPage: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <div className="rounded-xl border bg-card p-4 text-sm">
+            <div className="rounded-xl border bg-card p-6 text-sm">
               <div className="mb-2 font-medium">Current endpoints</div>
               <div className="grid gap-3 text-muted-foreground">
                 <div>
@@ -81,7 +81,8 @@ const ServicesPage: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <Alert>
+            <Alert className="p-4">
+              <Settings2 />
               <AlertTitle>Useful IoT defaults</AlertTitle>
               <AlertDescription>
                 Enable NTP for schedule accuracy, keep MQTT on the local broker, and host OTA binaries on a stable LAN

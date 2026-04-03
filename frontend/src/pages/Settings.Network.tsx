@@ -64,8 +64,8 @@ const NetworkPage: React.FC = (): React.ReactElement => {
   );
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-8">
-      <section className="container grid gap-6 px-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
+      <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="shadow-none animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Network Overview</CardTitle>
@@ -132,7 +132,7 @@ const NetworkPage: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <Alert>
+            <Alert className="p-4">
               <ShieldCheck />
               <AlertTitle>Useful IoT defaults</AlertTitle>
               <AlertDescription>

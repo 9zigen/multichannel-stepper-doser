@@ -23,7 +23,7 @@ const Schedule: React.FC = (): React.ReactElement => {
 
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
-      <section className="container grid gap-8 px-4 md:px-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Scheduler Overview</CardTitle>
@@ -75,7 +75,7 @@ const Schedule: React.FC = (): React.ReactElement => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-6 sm:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-6 sm:grid-cols-1 2xl:grid-cols-2">
               {pumps?.map((pump) => {
                 const percentage = (pump.tank_current_vol / pump.tank_full_vol) * 100;
                 const mode = modeBadge[pump.schedule.mode];
@@ -83,7 +83,7 @@ const Schedule: React.FC = (): React.ReactElement => {
                 return (
                   <Card
                     key={pump.id}
-                    className="overflow-hidden border-white/45 bg-gradient-to-br from-card via-card to-secondary/30 shadow-md"
+                    className="overflow-hidden border-white/45 bg-linear-to-br from-card via-card to-secondary/30 shadow-md"
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between gap-4">

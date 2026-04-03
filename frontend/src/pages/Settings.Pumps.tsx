@@ -48,7 +48,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-accent/20 via-card to-card p-5 shadow-sm">
+            <div className="rounded-xl border bg-muted/20 p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 font-medium">
                   <Activity className="size-4 text-muted-foreground" />
@@ -74,7 +74,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-secondary/45 via-card to-card p-5 text-sm shadow-sm">
+            <div className="rounded-xl border border-white/10 bg-linear-to-br from-secondary/45 via-card to-card p-5 shadow-sm dark:shadow-none">
               <div className="mb-2 font-medium">Quick guidance</div>
               <div className="grid gap-3 text-muted-foreground">
                 <div>
@@ -92,7 +92,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <Alert className="border-white/45 bg-gradient-to-br from-card via-card to-accent/10 shadow-sm">
+            <Alert className="border-white/10 bg-linear-to-br from-card via-card to-accent/10 p-4 shadow-sm dark:shadow-none">
               <Settings2 />
               <AlertTitle>Useful IoT defaults</AlertTitle>
               <AlertDescription>
@@ -121,10 +121,10 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                   return (
                     <Card
                       key={pump.id}
-                      className="overflow-hidden border-white/50 bg-gradient-to-br from-card via-card to-secondary/30 shadow-md transition-transform duration-200 hover:-translate-y-0.5"
+                      className="overflow-hidden border-white/50 bg-linear-to-br from-card via-card to-secondary/30 shadow-md transition-transform duration-200 hover:-translate-y-0.5"
                     >
                       <div
-                        className="h-1.5 w-full bg-gradient-to-r from-primary via-primary/80 to-accent"
+                        className="h-1.5 w-full bg-linear-to-r from-primary via-primary/80 to-accent"
                         style={{ opacity: pump.state ? 1 : 0.35 }}
                       />
                       <CardHeader className="pb-4">
@@ -165,7 +165,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                           <div className="h-2 overflow-hidden rounded-full bg-muted">
                             <div
                               className={cn(
-                                'h-full rounded-full bg-gradient-to-r transition-all',
+                                'h-full rounded-full bg-linear-to-r transition-all',
                                 lowInventory
                                   ? 'from-destructive to-destructive/70'
                                   : 'from-primary via-primary/85 to-accent'

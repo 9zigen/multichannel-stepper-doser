@@ -141,7 +141,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
   return (
     <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
       <FieldGroup className="gap-5">
-        <section className="rounded-2xl border border-white/45 bg-gradient-to-br from-card via-card to-accent/10 p-4 shadow-sm">
+        <section className="rounded-2xl border border-white/45 bg-linear-to-br from-card via-card to-accent/10 p-4 shadow-sm">
           <div className="mb-4 flex items-start gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-background shadow-xs">
               <modeDetails.icon className="text-primary" />
@@ -156,7 +156,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
             name="schedule.mode"
             control={control}
             render={({ field }) => (
-              <div className="rounded-[1.75rem] bg-foreground/[0.06] p-1.5">
+              <div className="rounded-[1.75rem] bg-foreground/6 p-1.5">
                 <ToggleGroup
                   type="single"
                   spacing={3}
@@ -179,7 +179,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                           'h-11 rounded-[1.35rem] border border-transparent bg-background/88 px-3 text-sm font-medium shadow-xs transition-all',
                           'hover:bg-background',
                           selected
-                            ? 'border-primary/25 bg-primary text-primary-foreground shadow-sm'
+                            ? 'border-primary/25 bg-primary text-primary shadow-sm'
                             : 'text-foreground/80'
                         )}
                       >

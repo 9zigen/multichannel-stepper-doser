@@ -85,7 +85,7 @@ const FirmwarePage: React.FC = (): React.ReactElement => {
 
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-8">
-      <section className="container flex gap-6 px-6">
+      <section className="container flex gap-6 px-4">
         <Card className="w-full shadow-none animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle>Firmware</CardTitle>

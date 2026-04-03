@@ -48,7 +48,7 @@ const Home: React.FC = (): React.ReactElement => {
 
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
-      <section className="container grid gap-8 px-4 md:px-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Device Overview</CardTitle>
