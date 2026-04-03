@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_MOCK?: string;
+  readonly VITE_API_DEBUG?: string;
   readonly VITE_DEVICE_IP?: string;
 }
 

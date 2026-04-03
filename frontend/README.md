@@ -21,6 +21,7 @@ Notes:
 
 - `VITE_DEVICE_IP` accepts either a bare IP like `192.168.1.199` or a full URL like `http://192.168.1.199`.
 - In normal dev mode without `VITE_DEVICE_IP`, the frontend keeps using the local mock unless `VITE_API_MOCK=false` is set.
+- To debug frontend requests handled by the mock backend, run with `VITE_API_DEBUG=true`. The mock adapter will log each request and response in the browser console.
 
 # React + TypeScript + Vite
 
