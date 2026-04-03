@@ -32,7 +32,7 @@ const Schedule: React.FC = (): React.ReactElement => {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="rounded-2xl border border-white/45 bg-linear-to-br from-accent/20 via-card to-card p-5 shadow-sm">
+            <div className="rounded-xl border border-white/10 bg-linear-to-br from-accent/20 via-card to-card p-6 shadow-sm dark:shadow-none">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 font-medium">
                   <CalendarClock className="size-4 text-muted-foreground" />
@@ -56,7 +56,7 @@ const Schedule: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <Alert className="border-white/45 bg-linear-to-br from-card via-card to-accent/10 shadow-sm">
+            <Alert className="border-white/10 bg-linear-to-br from-card via-card to-accent/10 p-6 shadow-sm dark:shadow-none">
               <CalendarClock />
               <AlertTitle>Modern scheduling pattern</AlertTitle>
               <AlertDescription>
