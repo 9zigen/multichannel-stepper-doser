@@ -1,0 +1,310 @@
+/***
+** Created by Aleksey Volkov on 15.12.2019.
+***/
+
+#include <stdlib.h>
+#include <string.h>
+
+#include "cJSON.h"
+#include "esp_log.h"
+
+#include "auth.h"
+#include "web_server.h"
+
+#include "app_http_backend_priv.h"
+
+static const char *TAG = "WEBSERVER";
+static httpd_handle_t server = NULL;
+
+char app_http_auth_token[65];
+
+extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
+extern const uint8_t favicon_ico_end[] asm("_binary_favicon_ico_end");
+extern const uint8_t app_css_start[] asm("_binary_app_css_gz_start");
+extern const uint8_t app_css_end[] asm("_binary_app_css_gz_end");
+extern const uint8_t app_js_start[] asm("_binary_app_js_gz_start");
+extern const uint8_t app_js_end[] asm("_binary_app_js_gz_end");
+extern const uint8_t index_html_start[] asm("_binary_index_html_gz_start");
+extern const uint8_t index_html_end[] asm("_binary_index_html_gz_end");
+
+char *app_http_success_response_json(bool success)
+{
+    char *string = NULL;
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddBoolToObject(response, "success", success);
+    string = cJSON_Print(response);
+    cJSON_Delete(response);
+    return string;
+}
+
+esp_err_t app_http_validate_request(httpd_req_t *req)
+{
+    size_t buf_len = httpd_req_get_hdr_value_len(req, "Authorization") + 1;
+    if (buf_len > 1) {
+        char *buf = malloc(buf_len);
+        if (httpd_req_get_hdr_value_str(req, "Authorization", buf, buf_len) == ESP_OK) {
+            ESP_LOGD(TAG, "Found header => Authorization: %s", buf);
+            if (strncmp(app_http_auth_token, buf, strlen(app_http_auth_token)) == 0) {
+                ESP_LOGD(TAG, "Authorization: success");
+                free(buf);
+                return ESP_OK;
+            }
+        }
+        free(buf);
+    }
+
+    return ESP_ERR_HTTPD_INVALID_REQ;
+}
+
+esp_err_t favicon_get_handler(httpd_req_t *req)
+{
+    const size_t size = (favicon_ico_end - favicon_ico_start);
+    httpd_resp_set_type(req, "image/x-icon");
+    httpd_resp_send(req, (const char *)favicon_ico_start, (ssize_t)size);
+    return ESP_OK;
+}
+
+esp_err_t index_get_handler(httpd_req_t *req)
+{
+    const size_t size = (index_html_end - index_html_start);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, (const char *)index_html_start, (ssize_t)size);
+    return ESP_OK;
+}
+
+esp_err_t js_handler(httpd_req_t *req)
+{
+    const size_t size = (app_js_end - app_js_start);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    httpd_resp_set_type(req, "text/javascript");
+    httpd_resp_send(req, (const char *)app_js_start, (ssize_t)size);
+    return ESP_OK;
+}
+
+esp_err_t css_handler(httpd_req_t *req)
+{
+    const size_t size = (app_css_end - app_css_start);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    httpd_resp_set_type(req, "text/css");
+    httpd_resp_send(req, (const char *)app_css_start, (ssize_t)size);
+    return ESP_OK;
+}
+
+esp_err_t options_handler(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
+httpd_handle_t start_webserver(void)
+{
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 24;
+    config.recv_wait_timeout = 30;
+    config.send_wait_timeout = 60;
+
+    ESP_LOGI(TAG, "Starting web server on port: '%d'", config.server_port);
+
+    if (server != NULL) {
+        stop_webserver();
+    }
+
+    auth_t *auth = get_auth_config();
+    if (!strlen(auth->token)) {
+        generateToken(app_http_auth_token);
+    } else {
+        strncpy(app_http_auth_token, auth->token, sizeof(app_http_auth_token));
+    }
+
+    if (httpd_start(&server, &config) == ESP_OK) {
+        httpd_uri_t global_options = {
+            .uri = "/*",
+            .method = HTTP_OPTIONS,
+            .handler = options_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_home_page = {
+            .uri = "/",
+            .method = HTTP_GET,
+            .handler = index_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_js = {
+            .uri = "/app.js",
+            .method = HTTP_GET,
+            .handler = js_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_css = {
+            .uri = "/app.css",
+            .method = HTTP_GET,
+            .handler = css_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_settings_page = {
+            .uri = "/settings/network",
+            .method = HTTP_GET,
+            .handler = index_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_login_page = {
+            .uri = "/login",
+            .method = HTTP_GET,
+            .handler = index_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_schedule_page = {
+            .uri = "/schedule",
+            .method = HTTP_GET,
+            .handler = index_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_wifi_page = {
+            .uri = "/wifi",
+            .method = HTTP_GET,
+            .handler = index_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_about_page = {
+            .uri = "/about",
+            .method = HTTP_GET,
+            .handler = index_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_favicon = {
+            .uri = "/favicon.ico",
+            .method = HTTP_GET,
+            .handler = favicon_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_reboot = {
+            .uri = "/reboot",
+            .method = HTTP_GET,
+            .handler = reboot_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_factory = {
+            .uri = "/factory",
+            .method = HTTP_GET,
+            .handler = factory_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_ota = {
+            .uri = "/update",
+            .method = HTTP_GET,
+            .handler = ota_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t update_post = {
+            .uri = "/upload",
+            .method = HTTP_POST,
+            .handler = upload_post_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_status = {
+            .uri = "/api/status",
+            .method = HTTP_GET,
+            .handler = status_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t post_run = {
+            .uri = "/api/run",
+            .method = HTTP_POST,
+            .handler = run_post_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t post_calibrate = {
+            .uri = "/api/calibrate",
+            .method = HTTP_POST,
+            .handler = calibrate_post_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_schedule = {
+            .uri = "/api/schedule",
+            .method = HTTP_GET,
+            .handler = schedule_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t post_schedule = {
+            .uri = "/api/schedule",
+            .method = HTTP_POST,
+            .handler = schedule_post_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_settings = {
+            .uri = "/api/settings",
+            .method = HTTP_GET,
+            .handler = settings_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t post_settings = {
+            .uri = "/api/settings",
+            .method = HTTP_POST,
+            .handler = settings_post_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t post_auth = {
+            .uri = "/api/auth",
+            .method = HTTP_POST,
+            .handler = auth_post_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_register_uri_handler(server, &global_options);
+        httpd_register_uri_handler(server, &get_home_page);
+        httpd_register_uri_handler(server, &get_settings_page);
+        httpd_register_uri_handler(server, &get_login_page);
+        httpd_register_uri_handler(server, &get_schedule_page);
+        httpd_register_uri_handler(server, &get_wifi_page);
+        httpd_register_uri_handler(server, &get_about_page);
+        httpd_register_uri_handler(server, &get_favicon);
+        httpd_register_uri_handler(server, &get_js);
+        httpd_register_uri_handler(server, &get_css);
+        httpd_register_uri_handler(server, &get_status);
+        httpd_register_uri_handler(server, &post_run);
+        httpd_register_uri_handler(server, &post_calibrate);
+        httpd_register_uri_handler(server, &get_schedule);
+        httpd_register_uri_handler(server, &post_schedule);
+        httpd_register_uri_handler(server, &get_settings);
+        httpd_register_uri_handler(server, &post_settings);
+        httpd_register_uri_handler(server, &post_auth);
+        httpd_register_uri_handler(server, &get_reboot);
+        httpd_register_uri_handler(server, &get_factory);
+        httpd_register_uri_handler(server, &get_ota);
+        httpd_register_uri_handler(server, &update_post);
+
+        return server;
+    }
+
+    ESP_LOGI(TAG, "Error starting server!");
+    return NULL;
+}
+
+void stop_webserver(void)
+{
+    httpd_stop(server);
+    server = NULL;
+}
