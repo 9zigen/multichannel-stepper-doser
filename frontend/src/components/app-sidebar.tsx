@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { Home, Network, CalendarClock, LogOut, Cog, Play, Disc } from 'lucide-react';
+import { Home, Network, CalendarClock, LogOut, Cpu, Play, Disc } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -28,9 +28,9 @@ const navigation = {
   ],
   navSettings: [
     {
-      name: 'General',
-      url: '/settings/general',
-      icon: Cog,
+      name: 'Firmware',
+      url: '/settings/firmware',
+      icon: Cpu,
     },
     {
       name: 'Network',

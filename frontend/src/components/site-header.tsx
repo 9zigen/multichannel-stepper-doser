@@ -21,8 +21,10 @@ export function SiteHeader(): React.ReactElement {
   const routes = [
     { path: '/', name: 'Home' },
     { path: '/settings', name: 'Settings' },
-    { path: '/settings/general', name: 'General' },
+    { path: '/settings/firmware', name: 'Firmware' },
     { path: '/settings/network', name: 'Network' },
+    { path: '/settings/services', name: 'Services' },
+    { path: '/settings/pumps', name: 'Pumps' },
   ];
 
   const Breadcrumbs: React.FC = () => {
@@ -61,11 +63,11 @@ export function SiteHeader(): React.ReactElement {
   };
 
   return (
-    <header className="flex h-16 shrink-0 items-center">
-      <div className="flex items-center gap-2 px-4 justify-between w-full">
+    <header className="sticky top-0 z-10 flex h-18 shrink-0 items-center border-b border-border/70 bg-background/70 backdrop-blur-xl">
+      <div className="flex w-full items-center justify-between gap-3 px-5 py-3 md:px-6">
         <SidebarTrigger />
-        <Separator orientation="vertical" className="h-6" />
-        <div className="flex w-full justify-between items-center">
+        <Separator orientation="vertical" className="h-7" />
+        <div className="flex w-full items-center justify-between">
           <Breadcrumbs />
           <ButtonTheme />
         </div>

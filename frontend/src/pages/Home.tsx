@@ -10,7 +10,7 @@ const Home: React.FC = (): React.ReactElement => {
   const pumps = useAppStore((state: AppStoreState) => state.settings.pumps);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4 animate-in fade-in zoom-in">
+    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-8">
       <section className="container flex gap-6 px-6">
         <div className="flex">
           <PumpControl pumps={pumps} />

@@ -1,19 +1,18 @@
 import React from 'react';
-
-import { Controller, SubmitHandler, useForm, ControllerRenderProps } from 'react-hook-form';
+import { Controller, ControllerRenderProps, SubmitHandler, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-
-import { Input } from '@/components/ui/input.tsx';
-import { Button } from '@/components/ui/button.tsx';
-import { Label } from '@/components/ui/label';
-import { Toggle } from '@/components/ui/toggle';
-
-import { ScheduleState, PumpCalibrationState, PumpState, SCHEDULE_MODE } from '@/lib/api.ts';
-import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
+import { CalendarClock, Check, Clock3, LoaderCircle, Repeat, Waves } from 'lucide-react';
 import { toast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx';
-import { Check, LoaderCircle } from 'lucide-react';
+
+import { Button } from '@/components/ui/button.tsx';
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field';
+import { Input } from '@/components/ui/input.tsx';
+import { Toggle } from '@/components/ui/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { cn } from '@/lib/utils';
+import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
+import { PumpCalibrationState, PumpState, ScheduleState, SCHEDULE_MODE } from '@/lib/api.ts';
 
 type FormData = {
   id: number;
@@ -48,24 +47,33 @@ const FormSchema = z.object({
   }),
 });
 
-export interface ScheduleFormProps {
+type ScheduleFormProps = {
   pump: PumpState;
   success?: () => void;
-}
+};
+
+const hours = Array.from(Array(24).keys());
+const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const modeMeta = {
+  [SCHEDULE_MODE.OFF]: {
+    label: 'Off',
+    description: 'Disable all automatic dosing for this pump.',
+    icon: Clock3,
+  },
+  [SCHEDULE_MODE.PERIODIC]: {
+    label: 'Periodic',
+    description: 'Dose on selected weekdays and hours using a daily target volume.',
+    icon: CalendarClock,
+  },
+  [SCHEDULE_MODE.CONTINUOUS]: {
+    label: 'Continuous',
+    description: 'Run at a constant speed until you switch the schedule mode.',
+    icon: Waves,
+  },
+} as const;
 
 const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement => {
-  const {
-    id,
-    state,
-    name,
-    direction,
-    tank_full_vol,
-    tank_current_vol,
-    tank_concentration_total,
-    tank_concentration_active,
-    schedule,
-    calibration,
-  } = pump;
   const updatePump = useAppStore((state: AppStoreState) => state.updatePump);
 
   const {
@@ -78,204 +86,239 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
   } = useForm<FormData>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      id: id,
-      state: state,
-      name: name,
-      direction: direction,
-      tank_full_vol: tank_full_vol,
-      tank_current_vol: tank_current_vol,
-      tank_concentration_total: tank_concentration_total,
-      tank_concentration_active: tank_concentration_active,
-      schedule: schedule,
-      calibration: calibration,
+      id: pump.id,
+      state: pump.state,
+      name: pump.name,
+      direction: pump.direction,
+      tank_full_vol: pump.tank_full_vol,
+      tank_current_vol: pump.tank_current_vol,
+      tank_concentration_total: pump.tank_concentration_total,
+      tank_concentration_active: pump.tank_concentration_active,
+      schedule: pump.schedule,
+      calibration: pump.calibration,
     },
   });
 
   const modeActual = watch('schedule.mode');
-  const hours = Array.from(Array(24).keys());
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const modeDetails = modeMeta[modeActual];
 
-  const toggleHour = async (field: ControllerRenderProps<FormData, 'schedule.work_hours'>, hour: number) => {
-    let value: any[];
-    if (!field.value.includes(hour)) {
-      value = [...field.value, hour];
-    } else {
-      value = field.value.filter((item: number) => item !== hour);
-    }
-    field.onChange(value);
+  const toggleHour = (field: ControllerRenderProps<FormData, 'schedule.work_hours'>, hour: number) => {
+    const value = field.value.includes(hour) ? field.value.filter((item: number) => item !== hour) : [...field.value, hour];
+    field.onChange(value.sort((a, b) => a - b));
   };
 
-  const toggleDay = async (field: ControllerRenderProps<FormData, 'schedule.weekdays'>, day: string) => {
-    let value: any[];
-    const id = days.indexOf(day);
-    if (!field.value.includes(id)) {
-      value = [...field.value, id];
-    } else {
-      value = field.value.filter((item: number) => item !== id);
-    }
-    field.onChange(value);
+  const toggleDay = (field: ControllerRenderProps<FormData, 'schedule.weekdays'>, dayIndex: number) => {
+    const value = field.value.includes(dayIndex)
+      ? field.value.filter((item: number) => item !== dayIndex)
+      : [...field.value, dayIndex];
+    field.onChange(value.sort((a, b) => a - b));
   };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     if (await updatePump(data, true)) {
       reset(data);
-      toast.success('Pumps settings saved.');
-      if (success) {
-        success();
-      }
-    } else {
-      toast.error('Pumps settings not saved.');
+      toast.success('Schedule settings saved.');
+      success?.();
+      return;
     }
+
+    toast.error('Schedule settings not saved.');
   };
 
   return (
-    <React.Fragment>
-      <div className="flex flex-col xl:flex-row xl:gap-6">
-        <form
-          id="pump-form"
-          className="flex flex-col w-full"
-          onSubmit={handleSubmit(onSubmit, (errors) => console.log(errors))}
-        >
-          <div className="flex flex-row gap-4 mb-4 justify-between items-center h-[38px]">
-            <Label className="text-base">Schedule settings</Label>
-          </div>
-          <div className="flex flex-row items-center justify-between gap-4 mb-6">
-            <div className="text-gray-500 text-sm pb-1">
-              <Label>Mode</Label>
+    <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
+      <FieldGroup className="gap-5">
+        <section className="rounded-2xl border border-white/45 bg-gradient-to-br from-card via-card to-accent/10 p-4 shadow-sm">
+          <div className="mb-4 flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-background shadow-xs">
+              <modeDetails.icon className="text-primary" />
             </div>
-            <Controller
-              name="schedule.mode"
-              control={control}
-              render={({ field }) => (
-                <Select onValueChange={(value) => field.onChange(Number(value))} defaultValue={String(field.value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">Off</SelectItem>
-                    <SelectItem value="1">Periodic</SelectItem>
-                    <SelectItem value="2">Continuous</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
+            <div className="flex flex-col gap-1">
+              <FieldTitle className="text-base">Schedule mode</FieldTitle>
+              <FieldDescription>{modeDetails.description}</FieldDescription>
+            </div>
           </div>
 
-          {/* Periodic: hours */}
-          {modeActual === SCHEDULE_MODE.PERIODIC ? (
-            <React.Fragment>
-              <div className="text-gray-500 text-sm pb-1">
-                <Label>Hours</Label>
-              </div>
-              <div className="flex flex-row flex-wrap items-center justify-between gap-1 mb-6">
-                <Controller
-                  name="schedule.work_hours"
-                  control={control}
-                  render={({ field }) => (
-                    <>
-                      {hours.map((item, index) => (
-                        <Toggle
-                          key={index}
-                          pressed={field.value.includes(item)}
-                          onClick={() => toggleHour(field, item)}
-                          className="w-10 sm:w-8 sm:h-7"
-                        >
-                          {item}
-                        </Toggle>
-                      ))}
-                    </>
-                  )}
-                />
-              </div>
-            </React.Fragment>
-          ) : null}
+          <Controller
+            name="schedule.mode"
+            control={control}
+            render={({ field }) => (
+              <div className="rounded-[1.75rem] bg-foreground/[0.06] p-1.5">
+                <ToggleGroup
+                  type="single"
+                  spacing={3}
+                  className="grid w-full grid-cols-3"
+                  value={String(field.value)}
+                  onValueChange={(value) => {
+                    if (value !== '') {
+                      field.onChange(Number(value));
+                    }
+                  }}
+                >
+                  {Object.entries(modeMeta).map(([value, meta]) => {
+                    const selected = field.value === Number(value);
 
-          {/* Periodic: weekdays */}
-          {modeActual === SCHEDULE_MODE.PERIODIC ? (
-            <React.Fragment>
-              <div className="text-gray-500 text-sm pb-1">
-                <Label>Weekdays</Label>
+                    return (
+                      <ToggleGroupItem
+                        key={value}
+                        value={value}
+                        className={cn(
+                          'h-11 rounded-[1.35rem] border border-transparent bg-background/88 px-3 text-sm font-medium shadow-xs transition-all',
+                          'hover:bg-background',
+                          selected
+                            ? 'border-primary/25 bg-primary text-primary-foreground shadow-sm'
+                            : 'text-foreground/80'
+                        )}
+                      >
+                        {meta.label}
+                      </ToggleGroupItem>
+                    );
+                  })}
+                </ToggleGroup>
               </div>
-              <div className="flex flex-row flex-wrap items-center justify-start gap-1 mb-6">
-                <Controller
-                  name="schedule.weekdays"
-                  control={control}
-                  render={({ field }) => (
-                    <>
-                      {days.map((item, index) => (
-                        <Toggle
-                          key={index}
-                          pressed={field.value.includes(index)}
-                          onClick={() => toggleDay(field, item)}
-                          className="w-10 sm:w-10 sm:h-7"
-                        >
-                          {item}
-                        </Toggle>
-                      ))}
-                    </>
-                  )}
-                />
-              </div>
-            </React.Fragment>
-          ) : null}
+            )}
+          />
 
-          {modeActual !== SCHEDULE_MODE.OFF ? (
-            <div className="flex flex-row gap-4 mb-4 justify-between">
-              <div className={modeActual === SCHEDULE_MODE.PERIODIC ? 'w-[50%]' : 'w-full'}>
-                <div className="text-gray-500 text-sm pb-1">
-                  <Label>Speed [rpm]</Label>
-                </div>
-                <Input
-                  type="number"
-                  placeholder="RPM"
-                  min="0.1"
-                  step="0.1"
-                  {...register('schedule.speed', { valueAsNumber: true })}
-                />
-                {errors.schedule?.speed && (
-                  <p role="alert" className="text-sm text-red-600">
-                    {errors.schedule?.speed?.message}
-                  </p>
-                )}
+          <div className="mt-4 rounded-2xl border border-white/45 bg-background/70 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                <modeDetails.icon className="size-4" />
               </div>
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-medium">{modeDetails.label} mode</div>
+                <p className="text-sm leading-relaxed text-muted-foreground">{modeDetails.description}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {modeActual === SCHEDULE_MODE.PERIODIC ? (
+          <section className="rounded-2xl border border-white/45 bg-card/85 p-4 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Repeat className="size-4 text-primary" />
+              <FieldTitle className="text-base">Periodic timing</FieldTitle>
+            </div>
+
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel>Hours</FieldLabel>
+                <FieldContent>
+                  <FieldDescription>Choose the hours when this pump is allowed to dose.</FieldDescription>
+                  <Controller
+                    name="schedule.work_hours"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
+                        {hours.map((hour) => (
+                          <Toggle
+                            key={hour}
+                            pressed={field.value.includes(hour)}
+                            onClick={() => toggleHour(field, hour)}
+                            className="h-9 rounded-xl text-xs"
+                          >
+                            {hour}
+                          </Toggle>
+                        ))}
+                      </div>
+                    )}
+                  />
+                </FieldContent>
+              </Field>
+
+              <Field>
+                <FieldLabel>Weekdays</FieldLabel>
+                <FieldContent>
+                  <FieldDescription>Limit dosing to the weekdays that match your routine.</FieldDescription>
+                  <Controller
+                    name="schedule.weekdays"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                        {weekdays.map((day, index) => (
+                          <Toggle
+                            key={day}
+                            pressed={field.value.includes(index)}
+                            onClick={() => toggleDay(field, index)}
+                            className="h-9 rounded-xl text-xs"
+                          >
+                            {day}
+                          </Toggle>
+                        ))}
+                      </div>
+                    )}
+                  />
+                </FieldContent>
+              </Field>
+            </FieldGroup>
+          </section>
+        ) : null}
+
+        {modeActual !== SCHEDULE_MODE.OFF ? (
+          <section className="rounded-2xl border border-white/45 bg-card/85 p-4 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Clock3 className="size-4 text-primary" />
+              <FieldTitle className="text-base">
+                {modeActual === SCHEDULE_MODE.CONTINUOUS ? 'Continuous output' : 'Dose target'}
+              </FieldTitle>
+            </div>
+
+            <div className={cn('grid gap-4', modeActual === SCHEDULE_MODE.PERIODIC ? 'md:grid-cols-2' : 'md:grid-cols-1')}>
+              <Field>
+                <FieldLabel htmlFor={`speed-${pump.id}`}>Speed [rpm]</FieldLabel>
+                <FieldContent>
+                  <Input
+                    id={`speed-${pump.id}`}
+                    type="number"
+                    placeholder="1"
+                    min="0.1"
+                    step="0.1"
+                    {...register('schedule.speed', { valueAsNumber: true })}
+                    aria-invalid={!!errors.schedule?.speed}
+                  />
+                  <FieldDescription>
+                    {modeActual === SCHEDULE_MODE.CONTINUOUS
+                      ? 'Target motor speed while the pump remains in continuous mode.'
+                      : 'Target speed used during the scheduled dosing windows.'}
+                  </FieldDescription>
+                  <FieldError errors={[errors.schedule?.speed]} />
+                </FieldContent>
+              </Field>
 
               {modeActual === SCHEDULE_MODE.PERIODIC ? (
-                <React.Fragment>
-                  <div className="w-[50%]">
-                    <div className="text-gray-500 text-sm pb-1">
-                      <Label>Volume [ml]</Label>
-                    </div>
+                <Field>
+                  <FieldLabel htmlFor={`volume-${pump.id}`}>Daily volume [ml]</FieldLabel>
+                  <FieldContent>
                     <Input
+                      id={`volume-${pump.id}`}
                       type="number"
-                      placeholder="ml/day"
+                      placeholder="10"
                       min="0.1"
                       step="0.1"
                       {...register('schedule.volume', { valueAsNumber: true })}
+                      aria-invalid={!!errors.schedule?.volume}
                     />
-                    {errors.schedule?.volume && (
-                      <p role="alert" className="text-sm text-red-600">
-                        {errors.schedule?.volume?.message}
-                      </p>
-                    )}
-                  </div>
-                </React.Fragment>
+                    <FieldDescription>Total target volume distributed across the selected schedule.</FieldDescription>
+                    <FieldError errors={[errors.schedule?.volume]} />
+                  </FieldContent>
+                </Field>
               ) : null}
             </div>
-          ) : null}
-          <Button size="icon" type="submit" className="cursor-pointer w-full" disabled={!isDirty}>
-            {isSubmitting ? (
-              <>
-                <LoaderCircle size={20} className="animate-spin" /> Saving
-              </>
-            ) : (
-              <>
-                <Check size={20} /> Apply
-              </>
-            )}
-          </Button>
-        </form>
-      </div>
-    </React.Fragment>
+          </section>
+        ) : null}
+
+        <Button type="submit" className="w-full" disabled={!isDirty}>
+          {isSubmitting ? (
+            <>
+              <LoaderCircle className="animate-spin" data-icon="inline-start" /> Saving
+            </>
+          ) : (
+            <>
+              <Check data-icon="inline-start" /> Apply schedule
+            </>
+          )}
+        </Button>
+      </FieldGroup>
+    </form>
   );
 };
 

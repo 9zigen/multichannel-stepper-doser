@@ -23,7 +23,7 @@ const formatBytes = (bytes: number): string => {
   return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
 };
 
-const GeneralPage: React.FC = (): React.ReactElement => {
+const FirmwarePage: React.FC = (): React.ReactElement => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number>(0);
@@ -84,12 +84,12 @@ const GeneralPage: React.FC = (): React.ReactElement => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center">
+    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-8">
       <section className="container flex gap-6 px-6">
         <Card className="w-full shadow-none animate-in fade-in zoom-in">
           <CardHeader>
-            <CardTitle>General</CardTitle>
-            <CardDescription>Firmware update, device settings, and maintenance actions.</CardDescription>
+            <CardTitle>Firmware</CardTitle>
+            <CardDescription>Manual firmware upload for direct device updates on the local network.</CardDescription>
           </CardHeader>
           <CardContent>
             <FieldGroup className="gap-6">
@@ -137,7 +137,11 @@ const GeneralPage: React.FC = (): React.ReactElement => {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-start gap-3">
                             <div className="flex size-10 items-center justify-center rounded-lg bg-background shadow-xs">
-                              {isUploaded ? <CheckCircle2 className="text-primary" /> : <FileArchive className="text-muted-foreground" />}
+                              {isUploaded ? (
+                                <CheckCircle2 className="text-primary" />
+                              ) : (
+                                <FileArchive className="text-muted-foreground" />
+                              )}
                             </div>
                             <div className="flex flex-col gap-1">
                               <span className="font-medium">{file.name}</span>
@@ -193,4 +197,4 @@ const GeneralPage: React.FC = (): React.ReactElement => {
   );
 };
 
-export default GeneralPage;
+export default FirmwarePage;
