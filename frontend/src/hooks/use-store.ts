@@ -16,6 +16,10 @@ import {
 } from '@/lib/api.ts';
 import { http } from '@/lib/http.ts';
 
+function cloneSettings<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export type AppStoreState = {
   isAuthenticated: boolean;
   status: StatusState;
@@ -108,6 +112,7 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
   },
 
   logout: () => {
+    delete http.defaults.headers.common.Authorization;
     set(() => ({ isAuthenticated: false }));
     localStorage.removeItem('user-token');
   },
@@ -142,48 +147,32 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
 
   saveSettings: async (entity: string | string[] | null, data: Partial<SettingsState>) => {
     try {
-      const message: Partial<SettingsState> = {};
-      const settings = get().settings as Partial<SettingsState>;
+      let message: Partial<SettingsState>;
 
-      // if (entity === null) {
-      //     message = {
-      //         networks: settings.networks,
-      //         services: settings.services,
-      //         pumps: settings.pumps,
-      //         time: settings.time,
-      //     };
-      // } else {
-      //     if (Array.isArray(entity)) {
-      //         entity.forEach(i => {
-      //             Object.keys(settings).forEach(key => {
-      //                 if (key === i) {
-      //                     const value:any = settings[key as keyof SettingsState];
-      //                     message[key as keyof SettingsState] = value;
-      //                 }
-      //             });
-      //         });
-      //     } else {
-      //         Object.keys(settings).forEach(key => {
-      //             if (key === entity) {
-      //                 const value:any = settings[key as keyof SettingsState];
-      //                 message[key as keyof SettingsState] = value;
-      //             }
-      //         });
-      //     }
-      // }
+      if (entity === null) {
+        message = cloneSettings(data);
+      } else if (Array.isArray(entity)) {
+        message = entity.reduce<Partial<SettingsState>>((acc, key) => {
+          const value = data[key as keyof SettingsState];
+          if (value !== undefined) {
+            acc[key as keyof SettingsState] = cloneSettings(value) as never;
+          }
+          return acc;
+        }, {});
+      } else {
+        const value = data[entity as keyof SettingsState];
+        message = value !== undefined ? { [entity]: cloneSettings(value) } : {};
+      }
 
-      console.log({ entity, settings, data });
-      return true;
-      const response = await setSettings(message);
-      console.log({ message, response });
-      return true;
+      const response = (await setSettings(message)) as SettingsSaveResponse;
+      return response.success;
     } catch (e) {
       set(() => ({ error: 'Failed to load Status' }));
       return false;
     }
   },
 
-  addNetwork: (data: Partial<NetworkState>) => {
+  addNetwork: async (data: Partial<NetworkState>) => {
     if (!data) {
       return false;
     }
@@ -196,15 +185,18 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       throw new Error('This connection already exists');
     }
 
-    data.id = networks?.length ?? 0;
-    const d = [...networks, ...[data]];
+    const nextNetwork = { ...cloneSettings(data), id: networks.length ?? 0 } as NetworkState;
+    const nextNetworks = [...networks, nextNetwork];
+
     set({
       settings: {
         ...get().settings,
-        networks: d as NetworkState[],
+        networks: nextNetworks,
       },
     });
-    console.log(get());
+
+    const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
+    return response.success;
   },
 
   updateNetwork: async (data: NetworkState): Promise<boolean> => {
@@ -215,15 +207,15 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     const networks = get().settings.networks;
     const idx = networks.findIndex((x) => x.id === data.id);
     if (idx != -1) {
-      const d = [...networks];
-      d[idx] = data;
+      const nextNetworks = [...networks];
+      nextNetworks[idx] = cloneSettings(data);
       set({
         settings: {
           ...get().settings,
-          networks: d,
+          networks: nextNetworks,
         },
       });
-      const response = (await setSettings({ networks: networks })) as SettingsSaveResponse;
+      const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
       return response.success;
     }
 
@@ -237,16 +229,16 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       throw new Error('This connection already exists');
     }
 
-    const d = [...networks];
-    d.splice(idx, 1);
+    const nextNetworks = [...networks];
+    nextNetworks.splice(idx, 1);
 
     set({
       settings: {
         ...get().settings,
-        networks: d,
+        networks: nextNetworks,
       },
     });
-    const response = (await setSettings({ networks: networks })) as SettingsSaveResponse;
+    const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
     return response.success;
   },
 
@@ -255,13 +247,14 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       return false;
     }
 
+    const nextServices = cloneSettings(data);
     set({
       settings: {
         ...get().settings,
-        services: data,
+        services: nextServices,
       },
     });
-    const response = (await setSettings({ services: data })) as SettingsSaveResponse;
+    const response = (await setSettings({ services: nextServices })) as SettingsSaveResponse;
     return response.success;
   },
 
@@ -269,17 +262,20 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     if (!data) {
       return false;
     }
-    data.calibration.sort((a, b) => a.speed - b.speed);
+
+    const nextPump = cloneSettings(data);
+    nextPump.calibration = [...nextPump.calibration].sort((a, b) => a.speed - b.speed);
 
     const pumps = get().settings.pumps;
-    const idx = pumps.findIndex((x) => x.id === data.id);
+    const idx = pumps.findIndex((x) => x.id === nextPump.id);
     if (idx != -1) {
-      pumps[idx] = data;
+      const nextPumps = [...pumps];
+      nextPumps[idx] = nextPump;
       set((state) => ({
-        settings: { ...state.settings, pumps: pumps },
+        settings: { ...state.settings, pumps: nextPumps },
       }));
       if (persist) {
-        const response = (await setSettings({ pumps: pumps })) as SettingsSaveResponse;
+        const response = (await setSettings({ pumps: nextPumps })) as SettingsSaveResponse;
         return response.success;
       }
       return true;
