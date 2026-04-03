@@ -6,7 +6,7 @@ import PumpForm from '@/components/pump-form.tsx';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer.tsx';
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Cog, Cylinder, RotateCcw, RotateCw } from 'lucide-react';
+import { Cog, Cylinder } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile.ts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx';
 import { Button } from '@/components/ui/button.tsx';
@@ -29,18 +29,18 @@ const PumpsPage: React.FC = (): React.ReactElement => {
   }, [settings]);
 
   const renderRotation = (state: PumpState) => {
-    return state.direction ? <RotateCw size={16} /> : <RotateCcw size={16} />;
+    return state.direction ? 'CW' : 'CCW';
   };
 
   return (
     <div className="flex flex-col items-center justify-center gap-6">
-      <section className="flex flex-col sm:flex-row sm:flex-wrap justify-center gap-6 w-full">
+      <section className="container flex flex-wrap gap-6 px-6">
         {pumps?.map((pump) => {
           const percentage = (pump.tank_current_vol / pump.tank_full_vol) * 100;
           return (
             <Card
               key={pump.id}
-              className="w-full sm:w-[calc(50%-(--spacing(6)))] xl:w-[calc(30%-(--spacing(24)))] 2xl:w-[calc(25%-(--spacing(24)))] shadow-none animate-in fade-in zoom-in"
+              className="w-full sm:w-[calc(50%-(--spacing(6)))] xl:w-[calc(50%-(--spacing(24)))] 2xl:w-[calc(35%-(--spacing(24)))] shadow-none animate-in fade-in zoom-in"
             >
               <CardHeader>
                 <CardTitle>
@@ -68,10 +68,19 @@ const PumpsPage: React.FC = (): React.ReactElement => {
               </CardHeader>
 
               <CardContent>
-                <div className="flex items-center gap-2">Rotation: {renderRotation(pump)}</div>
-                <div className="flex items-center gap-2">Calibration Points: {pump.calibration.length}</div>
-                <div className="flex items-center gap-2">Tank Volume: {pump.tank_current_vol.toFixed(2)} ml</div>
-                <div className="flex items-center gap-2">Tank Full Volume: {pump.tank_full_vol.toFixed(2)} ml</div>
+                <div className="grid grid-cols-2 gap-1 [&>div:nth-child(2n)]:font-semibold">
+                  <div>Rotation:</div>
+                  <div>{renderRotation(pump)}</div>
+                  
+                  <div>Calibration Points:</div>
+                  <div>{pump.calibration.length}</div>
+                  
+                  <div>Tank Volume:</div>
+                  <div>{pump.tank_current_vol.toFixed(2)} ml</div>
+                  
+                  <div>Tank Full Volume:</div>
+                  <div>{pump.tank_full_vol.toFixed(2)} ml</div>
+                </div>
               </CardContent>
             </Card>
           );

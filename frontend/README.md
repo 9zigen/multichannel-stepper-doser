@@ -7,14 +7,14 @@ To run the UI against a device on your local network, provide `VITE_DEVICE_IP` w
 Examples:
 
 ```bash
-VITE_DEVICE_IP=192.168.1.199 yarn dev:device
-VITE_DEVICE_IP=http://192.168.1.199 yarn dev:device
+VITE_DEVICE_IP=192.168.1.199 pnpm dev:device
+VITE_DEVICE_IP=http://192.168.1.199 pnpm dev:device
 ```
 
 To produce a build hard-wired to a device IP:
 
 ```bash
-VITE_DEVICE_IP=192.168.1.199 yarn build:device
+VITE_DEVICE_IP=192.168.1.199 pnpm build:device
 ```
 
 Notes:

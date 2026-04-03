@@ -28,7 +28,7 @@ const NetworkPage: React.FC = (): React.ReactElement => {
 
   return (
     <div className="flex flex-col items-center justify-center">
-      <section className="flex flex-col items-center justify-center gap-6 w-full sm:w-[400px] xl:w-[600px]">
+      <section className="container flex gap-6 px-6">
         <Card className="w-full shadow-none animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Network</CardTitle>

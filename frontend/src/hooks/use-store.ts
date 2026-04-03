@@ -60,6 +60,7 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     ntp_service: { enabled: true, sync: true },
     firmware_version: '',
     firmware_date: '',
+    hardware_version: '',
   },
   settings: {
     services: {
