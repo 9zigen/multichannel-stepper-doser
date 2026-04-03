@@ -3,7 +3,7 @@ import React from 'react';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import SoftwareInfo, { SoftwareInfoProps } from '@/components/home/software-info.tsx';
 import HardwareInfo, { HardwareInfoProps } from '@/components/home/hardware-info.tsx';
-import PumpControl from '@/components/pump-control.tsx';
+import PumpControl from '@/components/home/pump-control.tsx';
 
 const Home: React.FC = (): React.ReactElement => {
   const deviceStatus = useAppStore((state: AppStoreState) => state.status);
