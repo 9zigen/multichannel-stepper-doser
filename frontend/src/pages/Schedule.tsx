@@ -13,7 +13,7 @@ const Schedule: React.FC = (): React.ReactElement => {
 
   return (
     <div className="flex flex-col items-center justify-center gap-6">
-      <section className="flex flex-col sm:flex-row sm:flex-wrap justify-center gap-6 w-full">
+      <section className="container flex gap-6 px-6">
         {pumps?.map((pump) => {
           const percentage = (pump.tank_current_vol / pump.tank_full_vol) * 100;
           return (

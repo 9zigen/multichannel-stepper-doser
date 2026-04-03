@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/sidebar';
 
 type NavMainProps = {
+  title: string;
   items: {
     name: string;
     url: string;
@@ -22,12 +23,12 @@ type NavMainItem = {
   url: string;
   icon: LucideIcon;
 };
-export const NavMain = (props: NavMainProps) => {
-  const { items } = props;
+export const NavFlat = (props: NavMainProps) => {
+  const { title, items } = props;
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Main</SidebarGroupLabel>
+      <SidebarGroupLabel>{title}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item: NavMainItem) => (
           <SidebarMenuItem key={item.name}>

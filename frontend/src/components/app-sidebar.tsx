@@ -11,7 +11,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
-import { NavMain } from '@/components/nav-main.tsx';
+import { NavFlat } from '@/components/nav-flat.tsx';
 
 const navigation = {
   navMain: [
@@ -83,8 +83,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props}>
       <SidebarContent>
-        <NavMain items={navigation.navMain} />
-        <NavMain items={navigation.navSettings} />
+        <NavFlat items={navigation.navMain} title="Main"/>
+        <NavFlat items={navigation.navSettings} title="Settings"/>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
