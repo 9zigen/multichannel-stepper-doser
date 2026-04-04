@@ -31,6 +31,15 @@ static const char *TAG = "WEBSERVER";
 
 esp_err_t upgrade_firmware(void);
 
+static uint32_t calibration_to_100ml_units(const pump_t *pump)
+{
+    if (pump->calibration_count == 0 || pump->calibration[0].flow <= 0.0f) {
+        return 0;
+    }
+
+    return (uint32_t)((100.0f / pump->calibration[0].flow) * 60.0f);
+}
+
 static void send_unauthorized(httpd_req_t *req)
 {
     httpd_resp_set_status(req, "401 Unauthorized!");
@@ -310,7 +319,9 @@ esp_err_t schedule_post_handler(httpd_req_t *req)
 
         for (uint8_t i = 0; i < MAX_SCHEDULE; i++) {
             schedule_t *schedule_config = get_schedule_config(i);
-            schedule_config->active = false;
+            memset(schedule_config, 0, sizeof(*schedule_config));
+            schedule_config->pump_id = i;
+            schedule_config->mode = SCHEDULE_MODE_OFF;
         }
 
         uint8_t id = 0;
@@ -320,13 +331,15 @@ esp_err_t schedule_post_handler(httpd_req_t *req)
             schedule_t *schedule_config = get_schedule_config(id);
 
             cJSON *pump_id = cJSON_GetObjectItem(schedule_item, "pump_id");
+            cJSON *mode = cJSON_GetObjectItem(schedule_item, "mode");
             cJSON *work_hours = cJSON_GetObjectItem(schedule_item, "work_hours");
             cJSON *weekdays = cJSON_GetObjectItem(schedule_item, "weekdays");
             cJSON *speed = cJSON_GetObjectItem(schedule_item, "speed");
-            cJSON *day_volume = cJSON_GetObjectItem(schedule_item, "day_volume");
-            cJSON *active = cJSON_GetObjectItem(schedule_item, "active");
+            cJSON *run_time = cJSON_GetObjectItem(schedule_item, "time");
+            cJSON *volume = cJSON_GetObjectItem(schedule_item, "volume");
 
             schedule_config->pump_id = pump_id->valueint;
+            schedule_config->mode = mode != NULL ? mode->valueint : SCHEDULE_MODE_OFF;
 
             if (cJSON_IsArray(work_hours)) {
                 schedule_config->work_hours = 0;
@@ -345,8 +358,9 @@ esp_err_t schedule_post_handler(httpd_req_t *req)
             }
 
             schedule_config->speed = speed->valueint;
-            schedule_config->day_volume = day_volume->valueint;
-            schedule_config->active = active->valueint;
+            schedule_config->time = run_time != NULL ? run_time->valueint : 0;
+            schedule_config->day_volume = volume != NULL ? volume->valueint : 0;
+            schedule_config->active = schedule_config->mode != SCHEDULE_MODE_OFF;
 
             id++;
         }
@@ -394,85 +408,191 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             cJSON *pump_item;
             cJSON_ArrayForEach(pump_item, pump_channels) {
                 cJSON *id = cJSON_GetObjectItem(pump_item, "id");
+                cJSON *enabled = cJSON_GetObjectItem(pump_item, "state");
                 cJSON *name = cJSON_GetObjectItem(pump_item, "name");
-                cJSON *calibration = cJSON_GetObjectItem(pump_item, "calibration");
+                cJSON *direction = cJSON_GetObjectItem(pump_item, "direction");
+                cJSON *running_hours = cJSON_GetObjectItem(pump_item, "running_hours");
                 cJSON *tank_full_volume = cJSON_GetObjectItem(pump_item, "tank_full_vol");
                 cJSON *tank_concentration_total = cJSON_GetObjectItem(pump_item, "tank_concentration_total");
                 cJSON *tank_concentration_active = cJSON_GetObjectItem(pump_item, "tank_concentration_active");
                 cJSON *tank_current_volume = cJSON_GetObjectItem(pump_item, "tank_current_vol");
-                cJSON *state = cJSON_GetObjectItem(pump_item, "state");
+                cJSON *calibration = cJSON_GetObjectItem(pump_item, "calibration");
+                cJSON *schedule = cJSON_GetObjectItem(pump_item, "schedule");
 
                 pump_t *pump_config = get_pump_config(id->valueint);
+                schedule_t *schedule_config = get_schedule_config(id->valueint);
 
                 if (cJSON_IsString(name) && (name->valuestring != NULL)) {
                     strlcpy(pump_config->name, name->valuestring, 32);
                 }
 
-                pump_config->calibration_100ml_units = calibration->valueint;
+                pump_config->direction = cJSON_IsTrue(direction);
+                pump_config->running_hours = cJSON_IsNumber(running_hours) ? running_hours->valuedouble : 0;
                 pump_config->tank_full_vol = tank_full_volume->valueint;
                 pump_config->tank_concentration_total = tank_concentration_total->valueint;
                 pump_config->tank_concentration_active = tank_concentration_active->valueint;
                 pump_config->tank_current_vol = tank_current_volume->valuedouble;
-                pump_config->state = state->valueint;
+                pump_config->state = cJSON_IsTrue(enabled);
+
+                pump_config->calibration_count = 0;
+                if (cJSON_IsArray(calibration)) {
+                    cJSON *point;
+                    cJSON_ArrayForEach(point, calibration) {
+                        if (pump_config->calibration_count >= MAX_PUMP_CALIBRATION_POINTS) {
+                            break;
+                        }
+
+                        cJSON *speed = cJSON_GetObjectItem(point, "speed");
+                        cJSON *flow = cJSON_GetObjectItem(point, "flow");
+                        if (cJSON_IsNumber(speed) && cJSON_IsNumber(flow)) {
+                            uint8_t point_id = pump_config->calibration_count++;
+                            pump_config->calibration[point_id].speed = speed->valuedouble;
+                            pump_config->calibration[point_id].flow = flow->valuedouble;
+                        }
+                    }
+                }
+                pump_config->calibration_100ml_units = calibration_to_100ml_units(pump_config);
+
+                if (cJSON_IsObject(schedule)) {
+                    cJSON *mode = cJSON_GetObjectItem(schedule, "mode");
+                    cJSON *work_hours = cJSON_GetObjectItem(schedule, "work_hours");
+                    cJSON *weekdays = cJSON_GetObjectItem(schedule, "weekdays");
+                    cJSON *speed = cJSON_GetObjectItem(schedule, "speed");
+                    cJSON *time = cJSON_GetObjectItem(schedule, "time");
+                    cJSON *volume = cJSON_GetObjectItem(schedule, "volume");
+
+                    schedule_config->pump_id = pump_config->id;
+                    schedule_config->mode = cJSON_IsNumber(mode) ? mode->valueint : SCHEDULE_MODE_OFF;
+                    schedule_config->work_hours = 0;
+                    schedule_config->week_days = 0;
+
+                    if (cJSON_IsArray(work_hours)) {
+                        cJSON *hour_item;
+                        cJSON_ArrayForEach(hour_item, work_hours) {
+                            schedule_config->work_hours |= 1 << (uint8_t)hour_item->valueint;
+                        }
+                    }
+
+                    if (cJSON_IsArray(weekdays)) {
+                        cJSON *weekday_item;
+                        cJSON_ArrayForEach(weekday_item, weekdays) {
+                            schedule_config->week_days |= 1 << (uint8_t)weekday_item->valueint;
+                        }
+                    }
+
+                    schedule_config->speed = cJSON_IsNumber(speed) ? speed->valuedouble : 0;
+                    schedule_config->time = cJSON_IsNumber(time) ? time->valueint : 0;
+                    schedule_config->day_volume = cJSON_IsNumber(volume) ? volume->valueint : 0;
+                    schedule_config->active = schedule_config->mode != SCHEDULE_MODE_OFF;
+                }
             }
 
             save_pump();
+            save_schedule();
             backup_eeprom_tank_status();
         }
 
         cJSON *networks = cJSON_GetObjectItem(root, "networks");
         if (cJSON_IsArray(networks)) {
-            if (cJSON_GetArraySize(networks) > 0) {
-                for (uint8_t i = 0; i < MAX_NETWORKS; i++) {
-                    network_t *network_config = get_networks_config(i);
-                    network_config->active = false;
+            for (uint8_t i = 0; i < MAX_NETWORKS; i++) {
+                network_t *network_config = get_networks_config(i);
+                memset(network_config, 0, sizeof(*network_config));
+                network_config->id = i;
+                network_config->type = i;
+                network_config->dhcp = true;
+                network_config->channel = 13;
+                network_config->force_dataset = true;
+            }
+
+            cJSON *network_item;
+            uint8_t network_id = 0;
+            cJSON_ArrayForEach(network_item, networks) {
+                if (network_id >= MAX_NETWORKS) {
+                    break;
                 }
 
-                cJSON *network_item;
-                uint8_t network_id = 0;
-                cJSON_ArrayForEach(network_item, networks) {
-                    network_t *network_config = get_networks_config(network_id);
+                network_t *network_config = get_networks_config(network_id);
+                cJSON *type = cJSON_GetObjectItem(network_item, "type");
+                cJSON *is_dirty = cJSON_GetObjectItem(network_item, "is_dirty");
+                cJSON *id = cJSON_GetObjectItem(network_item, "id");
 
-                    cJSON *ssid = cJSON_GetObjectItem(network_item, "ssid");
-                    if (cJSON_IsString(ssid) && (ssid->valuestring != NULL)) {
-                        strlcpy(network_config->ssid, ssid->valuestring, 32);
-                    }
+                network_config->id = cJSON_IsNumber(id) ? id->valueint : network_id;
+                network_config->type = cJSON_IsNumber(type) ? type->valueint : NETWORK_TYPE_WIFI;
+                network_config->is_dirty = cJSON_IsTrue(is_dirty);
 
-                    cJSON *password = cJSON_GetObjectItem(network_item, "password");
-                    if (cJSON_IsString(password) && (password->valuestring != NULL)) {
-                        strlcpy(network_config->password, password->valuestring, 64);
-                    }
-
-                    cJSON *ip_address = cJSON_GetObjectItem(network_item, "ip_address");
-                    if (cJSON_IsString(ip_address) && (ip_address->valuestring != NULL)) {
-                        string_to_ip(ip_address->valuestring, network_config->ip_address);
-                    }
-
-                    cJSON *mask = cJSON_GetObjectItem(network_item, "mask");
-                    if (cJSON_IsString(mask) && (mask->valuestring != NULL)) {
-                        string_to_ip(mask->valuestring, network_config->mask);
-                    }
-
-                    cJSON *gateway = cJSON_GetObjectItem(network_item, "gateway");
-                    if (cJSON_IsString(gateway) && (gateway->valuestring != NULL)) {
-                        string_to_ip(gateway->valuestring, network_config->gateway);
-                    }
-
-                    cJSON *dns = cJSON_GetObjectItem(network_item, "dns");
-                    if (cJSON_IsString(dns) && (dns->valuestring != NULL)) {
-                        string_to_ip(dns->valuestring, network_config->dns);
-                    }
-
-                    cJSON *dhcp = cJSON_GetObjectItem(network_item, "dhcp");
-                    network_config->dhcp = cJSON_IsTrue(dhcp);
-                    network_config->active = true;
-                    network_id++;
+                cJSON *ssid = cJSON_GetObjectItem(network_item, "ssid");
+                if (cJSON_IsString(ssid) && (ssid->valuestring != NULL)) {
+                    strlcpy(network_config->ssid, ssid->valuestring, sizeof(network_config->ssid));
                 }
-            } else {
-                for (uint8_t i = 0; i < MAX_NETWORKS; i++) {
-                    network_t *network_config = get_networks_config(i);
-                    network_config->active = false;
+
+                cJSON *password = cJSON_GetObjectItem(network_item, "password");
+                if (cJSON_IsString(password) && (password->valuestring != NULL)) {
+                    strlcpy(network_config->password, password->valuestring, sizeof(network_config->password));
                 }
+
+                cJSON *ip_address = cJSON_GetObjectItem(network_item, "ip_address");
+                if (cJSON_IsString(ip_address) && (ip_address->valuestring != NULL)) {
+                    string_to_ip(ip_address->valuestring, network_config->ip_address);
+                }
+
+                cJSON *mask = cJSON_GetObjectItem(network_item, "mask");
+                if (cJSON_IsString(mask) && (mask->valuestring != NULL)) {
+                    string_to_ip(mask->valuestring, network_config->mask);
+                }
+
+                cJSON *gateway = cJSON_GetObjectItem(network_item, "gateway");
+                if (cJSON_IsString(gateway) && (gateway->valuestring != NULL)) {
+                    string_to_ip(gateway->valuestring, network_config->gateway);
+                }
+
+                cJSON *dns = cJSON_GetObjectItem(network_item, "dns");
+                if (cJSON_IsString(dns) && (dns->valuestring != NULL)) {
+                    string_to_ip(dns->valuestring, network_config->dns);
+                }
+
+                cJSON *dhcp = cJSON_GetObjectItem(network_item, "dhcp");
+                network_config->dhcp = cJSON_IsTrue(dhcp);
+
+                cJSON *channel = cJSON_GetObjectItem(network_item, "channel");
+                if (cJSON_IsNumber(channel)) {
+                    network_config->channel = channel->valueint;
+                }
+
+                cJSON *network_name = cJSON_GetObjectItem(network_item, "network_name");
+                if (cJSON_IsString(network_name) && (network_name->valuestring != NULL)) {
+                    strlcpy(network_config->network_name, network_name->valuestring, sizeof(network_config->network_name));
+                }
+
+                cJSON *network_key = cJSON_GetObjectItem(network_item, "network_key");
+                if (cJSON_IsString(network_key) && (network_key->valuestring != NULL)) {
+                    strlcpy(network_config->network_key, network_key->valuestring, sizeof(network_config->network_key));
+                }
+
+                cJSON *pan_id = cJSON_GetObjectItem(network_item, "pan_id");
+                if (cJSON_IsString(pan_id) && (pan_id->valuestring != NULL)) {
+                    strlcpy(network_config->pan_id, pan_id->valuestring, sizeof(network_config->pan_id));
+                }
+
+                cJSON *ext_pan_id = cJSON_GetObjectItem(network_item, "ext_pan_id");
+                if (cJSON_IsString(ext_pan_id) && (ext_pan_id->valuestring != NULL)) {
+                    strlcpy(network_config->ext_pan_id, ext_pan_id->valuestring, sizeof(network_config->ext_pan_id));
+                }
+
+                cJSON *pskc = cJSON_GetObjectItem(network_item, "pskc");
+                if (cJSON_IsString(pskc) && (pskc->valuestring != NULL)) {
+                    strlcpy(network_config->pskc, pskc->valuestring, sizeof(network_config->pskc));
+                }
+
+                cJSON *mesh_local_prefix = cJSON_GetObjectItem(network_item, "mesh_local_prefix");
+                if (cJSON_IsString(mesh_local_prefix) && (mesh_local_prefix->valuestring != NULL)) {
+                    strlcpy(network_config->mesh_local_prefix, mesh_local_prefix->valuestring,
+                            sizeof(network_config->mesh_local_prefix));
+                }
+
+                cJSON *force_dataset = cJSON_GetObjectItem(network_item, "force_dataset");
+                network_config->force_dataset = cJSON_IsTrue(force_dataset);
+                network_config->active = true;
+                network_id++;
             }
 
             save_network();
@@ -489,12 +609,12 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
             cJSON *ota_url = cJSON_GetObjectItem(services, "ota_url");
             if (cJSON_IsString(ota_url) && (ota_url->valuestring != NULL)) {
-                strlcpy(service_config->ota_url, ota_url->valuestring, 64);
+                strlcpy(service_config->ota_url, ota_url->valuestring, sizeof(service_config->ota_url));
             }
 
             cJSON *ntp_server = cJSON_GetObjectItem(services, "ntp_server");
             if (cJSON_IsString(ntp_server) && (hostname->valuestring != NULL)) {
-                strlcpy(service_config->ntp_server, ntp_server->valuestring, 20);
+                strlcpy(service_config->ntp_server, ntp_server->valuestring, sizeof(service_config->ntp_server));
             }
 
             cJSON *utc_offset = cJSON_GetObjectItem(services, "utc_offset");
@@ -511,16 +631,18 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             cJSON *mqtt_port = cJSON_GetObjectItem(services, "mqtt_port");
             if (cJSON_IsNumber(mqtt_port)) {
                 service_config->mqtt_port = mqtt_port->valueint;
+            } else if (cJSON_IsString(mqtt_port) && mqtt_port->valuestring != NULL) {
+                service_config->mqtt_port = (uint16_t)atoi(mqtt_port->valuestring);
             }
 
             cJSON *mqtt_user = cJSON_GetObjectItem(services, "mqtt_user");
             if (cJSON_IsString(mqtt_user) && (mqtt_user->valuestring != NULL)) {
-                strlcpy(service_config->mqtt_user, mqtt_user->valuestring, 16);
+                strlcpy(service_config->mqtt_user, mqtt_user->valuestring, sizeof(service_config->mqtt_user));
             }
 
             cJSON *mqtt_password = cJSON_GetObjectItem(services, "mqtt_password");
             if (cJSON_IsString(mqtt_password) && (mqtt_password->valuestring != NULL)) {
-                strlcpy(service_config->mqtt_password, mqtt_password->valuestring, 16);
+                strlcpy(service_config->mqtt_password, mqtt_password->valuestring, sizeof(service_config->mqtt_password));
             }
 
             cJSON *mqtt_qos = cJSON_GetObjectItem(services, "mqtt_qos");
@@ -537,22 +659,37 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
         cJSON *time = cJSON_GetObjectItem(root, "time");
         if (cJSON_IsObject(time)) {
-            cJSON *year = cJSON_GetObjectItem(time, "year");
-            cJSON *month = cJSON_GetObjectItem(time, "month");
-            cJSON *day = cJSON_GetObjectItem(time, "day");
-            cJSON *weekday = cJSON_GetObjectItem(time, "weekday");
-            cJSON *hour = cJSON_GetObjectItem(time, "hour");
-            cJSON *minute = cJSON_GetObjectItem(time, "minute");
-            cJSON *second = cJSON_GetObjectItem(time, "second");
+            datetime_t datetime = {0};
+            cJSON *date = cJSON_GetObjectItem(time, "date");
+            cJSON *clock = cJSON_GetObjectItem(time, "time");
+            cJSON *time_zone = cJSON_GetObjectItem(time, "time_zone");
 
-            datetime_t datetime;
-            datetime.year = year->valueint;
-            datetime.month = month->valueint;
-            datetime.day = day->valueint;
-            datetime.weekday = weekday->valueint;
-            datetime.hour = hour->valueint;
-            datetime.min = minute->valueint;
-            datetime.sec = second->valueint;
+            if (cJSON_IsString(date) && date->valuestring != NULL) {
+                int year = 2000;
+                int month = 1;
+                int day = 1;
+                if (sscanf(date->valuestring, "%d-%d-%d", &year, &month, &day) == 3) {
+                    datetime.year = (uint8_t)(year - 2000);
+                    datetime.month = (uint8_t)month;
+                    datetime.day = (uint8_t)day;
+                }
+            }
+            if (cJSON_IsString(clock) && clock->valuestring != NULL) {
+                int hour = 0;
+                int minute = 0;
+                int second = 0;
+                if (sscanf(clock->valuestring, "%d:%d:%d", &hour, &minute, &second) == 3) {
+                    datetime.hour = (uint8_t)hour;
+                    datetime.min = (uint8_t)minute;
+                    datetime.sec = (uint8_t)second;
+                }
+            }
+            if (cJSON_IsString(time_zone) && time_zone->valuestring != NULL) {
+                int offset = 0;
+                if (sscanf(time_zone->valuestring, "UTC%d", &offset) == 1) {
+                    get_service_config()->utc_offset = offset;
+                }
+            }
 
 #if defined(USE_MCP7940)
             mcp7940_set_datetime(&datetime);
