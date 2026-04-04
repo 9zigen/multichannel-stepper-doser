@@ -9,6 +9,7 @@
 #include "esp_log.h"
 
 #include "auth.h"
+#include "app_settings.h"
 #include "web_server.h"
 
 #include "app_http_backend_priv.h"

@@ -18,6 +18,7 @@
 
 #include "app_settings.h"
 #include "auth.h"
+#include "web_server.h"
 #include "eeprom.h"
 #include "mcp7940.h"
 #include "mqtt.h"
