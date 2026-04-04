@@ -125,6 +125,11 @@ typedef struct {
     char token[65];
 } auth_t;
 
+typedef struct {
+    uint32_t day_stamp;
+    float running_hours[MAX_PUMP];
+} pump_aging_state_t;
+
 void init_settings(void);
 void set_default_network(void);
 void set_default_service(void);
@@ -137,6 +142,9 @@ void save_service(void);
 void save_pump(void);
 void save_schedule(void);
 void save_auth(void);
+void load_pump_aging_state(void);
+void save_pump_aging_state(uint32_t day_stamp);
+uint32_t get_pump_aging_day_stamp(void);
 
 void erase_settings(void);
 

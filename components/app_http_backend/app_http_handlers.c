@@ -206,17 +206,27 @@ esp_err_t run_post_handler(httpd_req_t *req)
         buf[total_len] = '\0';
 
         cJSON *root = cJSON_Parse(buf);
-        cJSON *channel = cJSON_GetObjectItem(root, "channel");
-        cJSON *timeout = cJSON_GetObjectItem(root, "volume");
-        cJSON *action = cJSON_GetObjectItem(root, "action");
+        cJSON *id = cJSON_GetObjectItem(root, "id");
+        cJSON *speed = cJSON_GetObjectItem(root, "speed");
+        cJSON *direction = cJSON_GetObjectItem(root, "direction");
+        cJSON *time = cJSON_GetObjectItem(root, "time");
 
-        uint8_t channel_id = channel->valueint;
-        uint16_t run_volume = timeout->valueint;
-        uint16_t run_action = action->valueint;
-        ESP_LOGI(TAG, "run_post_handler channel %d timeout %d action %d",
-                 channel_id, run_volume, run_action);
+        uint8_t pump_id = cJSON_IsNumber(id) ? id->valueint : 0;
+        float rpm = cJSON_IsNumber(speed) ? speed->valuedouble : 0.0f;
+        bool dir = cJSON_IsTrue(direction);
+        int32_t time_minutes = cJSON_IsNumber(time) ? time->valueint : 0;
 
-        run_pump_on_volume(channel_id, run_volume, 100);
+        ESP_LOGI(TAG, "run_post_handler id=%u speed=%.2f dir=%u time=%ld",
+                 pump_id, rpm, dir, (long)time_minutes);
+
+        if (time_minutes < 0) {
+            run_pump_calibration(pump_id, true, rpm, dir);
+        } else if (run_pump_manual(pump_id, rpm, dir, time_minutes) != ESP_OK) {
+            cJSON_Delete(root);
+            free(buf);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pump run request");
+            return ESP_FAIL;
+        }
 
         cJSON_Delete(root);
 
@@ -260,23 +270,21 @@ esp_err_t calibrate_post_handler(httpd_req_t *req)
         cJSON *channel = cJSON_GetObjectItem(root, "channel");
         cJSON *action = cJSON_GetObjectItem(root, "action");
         cJSON *speed = cJSON_GetObjectItem(root, "speed");
-        cJSON *volume = cJSON_GetObjectItem(root, "volume");
+        cJSON *direction = cJSON_GetObjectItem(root, "direction");
 
-        if (cJSON_IsNumber(speed) && cJSON_IsNumber(volume) &&
-            cJSON_IsBool(action) && cJSON_IsNumber(channel)) {
+        if (cJSON_IsNumber(speed) && cJSON_IsBool(action) && cJSON_IsNumber(channel)) {
             uint8_t channel_id = channel->valueint;
             bool act = action->valueint;
-            uint16_t spd = speed->valueint;
-            uint16_t vol = volume->valueint;
+            float spd = speed->valuedouble;
+            bool dir = cJSON_IsTrue(direction);
 
             ESP_LOGI(TAG, "calibrate_post_handler\n"
                           "channel: %u\n"
-                          "volume : %u\n"
-                          "speed  : %u\n"
+                          "speed  : %.2f\n"
                           "is %s",
-                     channel_id, vol, spd, act ? "start" : "stop");
+                     channel_id, spd, act ? "start" : "stop");
 
-            run_pump_calibration(channel_id, act);
+            run_pump_calibration(channel_id, act, spd, dir);
             response = app_http_success_response_json(true);
         } else {
             response = app_http_success_response_json(false);
@@ -488,6 +496,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             }
 
             save_pump();
+            save_pump_aging_state(get_pump_aging_day_stamp());
             save_schedule();
             backup_eeprom_tank_status();
         }

@@ -6,15 +6,29 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 #include <esp_log.h>
+#include <string.h>
 #include "driver/i2c.h"
 
 #include "board.h"
 #include "i2c_driver.h"
 #include "mcp7940.h"
 
-//static const char *TAG="MCP7940";
+static bool mcp7940_available = false;
 
 const uint8_t dev_address = 0x6f;
+
+esp_err_t mcp7940_probe(void)
+{
+  uint8_t value = 0;
+  esp_err_t err = i2c_read_reg_data(dev_address, MCP7940_RTCSEC, &value, 1);
+  mcp7940_available = (err == ESP_OK);
+  return err;
+}
+
+bool mcp7940_is_available(void)
+{
+  return mcp7940_available;
+}
 
 static uint8_t read_register(uint8_t reg_address)
 {
@@ -47,6 +61,10 @@ static bool is_set_bit(uint8_t reg_address, uint8_t bit)
 
 void mcp7940_init(void)
 {
+  if (mcp7940_probe() != ESP_OK) {
+    return;
+  }
+
   /* Check if oscillator is running */
   if (!is_set_bit(MCP7940_RTCWKDAY, MCP7940_OSCRUN))
   {
@@ -67,6 +85,11 @@ void mcp7940_init(void)
 
 void mcp7940_get_datetime(datetime_t *datetime)
 {
+  if (!mcp7940_available) {
+    memset(datetime, 0, sizeof(*datetime));
+    return;
+  }
+
   uint8_t data[7];
 
   /* Read REGs 0x00 - 0x06 */
@@ -135,6 +158,10 @@ static uint8_t dec2bcd(uint8_t num)
 
 void mcp7940_set_datetime(datetime_t *datetime)
 {
+  if (!mcp7940_available) {
+    return;
+  }
+
   uint8_t data[8];
 
   /* Read REGs 0x00 - 0x06 */
@@ -209,6 +236,9 @@ void mcp7940_set_datetime(datetime_t *datetime)
 
 esp_err_t mcp7940_read_ram(uint8_t offset, uint8_t *buf, uint8_t len)
 {
+  if (!mcp7940_available) {
+    return ESP_ERR_NOT_FOUND;
+  }
   if (offset + len > MCP7940_RAM_BYTES)
     return ESP_ERR_NO_MEM;
 
@@ -217,6 +247,9 @@ esp_err_t mcp7940_read_ram(uint8_t offset, uint8_t *buf, uint8_t len)
 
 esp_err_t mcp7940_write_ram(uint8_t offset, uint8_t *buf, uint8_t len)
 {
+  if (!mcp7940_available) {
+    return ESP_ERR_NOT_FOUND;
+  }
   if (offset + len > MCP7940_RAM_BYTES)
     return ESP_ERR_NO_MEM;
 

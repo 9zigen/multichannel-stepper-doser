@@ -71,6 +71,8 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     rx_packets: 0,
     reboot_count: 0,
     last_reboot_reason: '',
+    storage_backend: '',
+    rtc_backend: '',
   },
   settings: {
     services: {

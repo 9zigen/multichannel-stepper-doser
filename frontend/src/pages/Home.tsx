@@ -192,6 +192,14 @@ const Home: React.FC = (): React.ReactElement => {
                     <span className="text-muted-foreground">Uptime</span>
                     <span className="font-medium">{deviceStatus.up_time}</span>
                   </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Storage backend</span>
+                    <span className="font-medium">{deviceStatus.storage_backend || 'Unknown'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">RTC source</span>
+                    <span className="font-medium">{deviceStatus.rtc_backend || 'Unknown'}</span>
+                  </div>
                 </CardContent>
               </Card>
             </div>

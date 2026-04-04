@@ -23,12 +23,14 @@ static SemaphoreHandle_t nvs_lock = NULL;
 #define APP_SETTINGS_NVS_KEY_MAX_LEN    16
 #define APP_SETTINGS_PUMP_CFG_KEY_FMT   "PUMP%u_CFG"
 #define APP_SETTINGS_PUMP_CAL_KEY_FMT   "PUMP%u_CAL%u"
+#define APP_SETTINGS_PUMP_AGING_KEY     "PUMP_AGING"
 
 network_t network[MAX_NETWORKS];
 services_t service;
 pump_t pump[MAX_PUMP];
 schedule_t schedule[MAX_SCHEDULE];
 auth_t auth;
+static pump_aging_state_t pump_aging_state;
 
 typedef struct {
     uint8_t id;
@@ -36,7 +38,6 @@ typedef struct {
     uint32_t calibration_100ml_units;
     uint8_t calibration_count;
     bool direction;
-    float running_hours;
     uint32_t tank_full_vol;
     uint32_t tank_concentration_total;
     uint32_t tank_concentration_active;
@@ -119,7 +120,6 @@ static void app_settings_pump_to_storage(const pump_t *src, pump_storage_t *dst)
     dst->calibration_100ml_units = src->calibration_100ml_units;
     dst->calibration_count = src->calibration_count;
     dst->direction = src->direction;
-    dst->running_hours = src->running_hours;
     dst->tank_full_vol = src->tank_full_vol;
     dst->tank_concentration_total = src->tank_concentration_total;
     dst->tank_concentration_active = src->tank_concentration_active;
@@ -136,7 +136,6 @@ static void app_settings_storage_to_pump(const pump_storage_t *src, pump_t *dst)
                                  ? MAX_PUMP_CALIBRATION_POINTS
                                  : src->calibration_count;
     dst->direction = src->direction;
-    dst->running_hours = src->running_hours;
     dst->tank_full_vol = src->tank_full_vol;
     dst->tank_concentration_total = src->tank_concentration_total;
     dst->tank_concentration_active = src->tank_concentration_active;
@@ -224,6 +223,38 @@ static esp_err_t app_settings_save_single_pump(uint8_t pump_id)
     nvs_close(handle);
     xSemaphoreGive(nvs_lock);
     return ret;
+}
+
+void load_pump_aging_state(void)
+{
+    size_t required_size = sizeof(pump_aging_state);
+    esp_err_t ret = app_settings_get_blob(APP_SETTINGS_PUMP_AGING_KEY, &pump_aging_state, &required_size);
+    if (ret != ESP_OK) {
+        memset(&pump_aging_state, 0, sizeof(pump_aging_state));
+        save_pump_aging_state(0);
+    }
+
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        pump[i].running_hours = pump_aging_state.running_hours[i];
+    }
+}
+
+void save_pump_aging_state(uint32_t day_stamp)
+{
+    pump_aging_state.day_stamp = day_stamp;
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        pump_aging_state.running_hours[i] = pump[i].running_hours;
+    }
+
+    esp_err_t err = app_settings_set_blob(APP_SETTINGS_PUMP_AGING_KEY, &pump_aging_state, sizeof(pump_aging_state), true);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save pump aging state.");
+    }
+}
+
+uint32_t get_pump_aging_day_stamp(void)
+{
+    return pump_aging_state.day_stamp;
 }
 
 static esp_err_t app_settings_get_blob(const char *key, void *data, size_t *data_len)
@@ -395,6 +426,7 @@ void init_settings()
     if (pump_defaults_required) {
         save_pump();
     }
+    load_pump_aging_state();
 
     /* Read Schedule */
     required_size = sizeof(schedule_t) * MAX_SCHEDULE;

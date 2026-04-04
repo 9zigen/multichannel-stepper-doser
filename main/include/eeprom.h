@@ -5,10 +5,16 @@
 #ifndef TFT_DOSER_EEPROM_H
 #define TFT_DOSER_EEPROM_H
 
+#include <stdbool.h>
+#include "esp_err.h"
+
 /* FRAM MAP */
 #define EEPROM_SCHEDULE_STATUS_ADDR 0x32
 #define EEPROM_TANK_STATUS_ADDR 0x64
 #define EEPROM_MAGIC 0x82
+
+const char *eeprom_backend_name(void);
+bool eeprom_using_fallback(void);
 
 //void i2c_scan_bus();
 

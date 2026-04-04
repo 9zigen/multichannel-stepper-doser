@@ -1,6 +1,7 @@
 #pragma once
+#include <stdbool.h>
+#include <stdint.h>
 #include "tmc2209.h"
 
-esp_err_t stepper_task_control(uint8_t id, uint32_t rpm, uint32_t direction, uint32_t loops);
+esp_err_t stepper_task_control(uint8_t id, float rpm, bool direction, int32_t duration_ms);
 void stepper_task(void *pvParameter);
-

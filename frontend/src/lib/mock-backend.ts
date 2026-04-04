@@ -199,6 +199,8 @@ const initialState: MockState = {
     rx_packets: 418907,
     reboot_count: 14,
     last_reboot_reason: 'ESP_RST_POWERON',
+    storage_backend: 'NVS fallback',
+    rtc_backend: 'NTP fallback',
   },
   time: {
     time_zone: 'UTC+1',

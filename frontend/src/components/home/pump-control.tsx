@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { PumpRunResponse, runPump } from '@/lib/api.ts';
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx';
+import { AlertTriangle, Square } from 'lucide-react';
 
 export interface PumpControlState {
   id: number;
@@ -34,11 +35,18 @@ const FormSchema = z.object({
 
 export default function PumpControl(props: PumpControlProps) {
   const { pumps } = props;
-  const [pumpIsRunning, setPumpIsRunning] = React.useState(false);
+  const [activeRun, setActiveRun] = React.useState<{
+    pumpId: number;
+    pumpName: string;
+    speed: number;
+    time: number;
+  } | null>(null);
+  const runTimeoutRef = React.useRef<number | null>(null);
   const {
     control,
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(FormSchema),
@@ -49,6 +57,26 @@ export default function PumpControl(props: PumpControlProps) {
       time: 1,
     },
   });
+
+  React.useEffect(() => {
+    return () => {
+      if (runTimeoutRef.current !== null) {
+        window.clearTimeout(runTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const pumpId = watch('pump_id');
+  const pumpIsRunning = activeRun !== null;
+  const selectedPumpName = pumps.find((pump) => pump.id === pumpId)?.name ?? 'Selected pump';
+
+  const clearRunningState = () => {
+    if (runTimeoutRef.current !== null) {
+      window.clearTimeout(runTimeoutRef.current);
+      runTimeoutRef.current = null;
+    }
+    setActiveRun(null);
+  };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     try {
@@ -61,11 +89,23 @@ export default function PumpControl(props: PumpControlProps) {
       const response = (await runPump(action)) as PumpRunResponse;
       if (response.success) {
         toast.success('Pump started.');
-        setPumpIsRunning(true);
-        setTimeout(
+        const pumpName = pumps.find((pump) => pump.id === data.pump_id)?.name ?? `Pump ${data.pump_id}`;
+        setActiveRun({
+          pumpId: data.pump_id,
+          pumpName,
+          speed: data.speed,
+          time: data.time,
+        });
+        runTimeoutRef.current = window.setTimeout(
           () => {
-            setPumpIsRunning(false);
-            toast.success(`Pump finished in ${data.time} min. Speed: ${data.speed} rpm`);
+            setActiveRun((current) => {
+              if (current?.pumpId === data.pump_id) {
+                toast.success(`${pumpName} finished in ${data.time} min at ${data.speed} rpm.`);
+                return null;
+              }
+              return current;
+            });
+            runTimeoutRef.current = null;
           },
           data.time * 60 * 1000
         );
@@ -78,6 +118,31 @@ export default function PumpControl(props: PumpControlProps) {
     }
   };
 
+  const emergencyStop = async () => {
+    if (activeRun === null) {
+      return;
+    }
+
+    try {
+      const response = (await runPump({
+        id: activeRun.pumpId,
+        direction: true,
+        speed: activeRun.speed,
+        time: 0,
+      })) as PumpRunResponse;
+
+      if (response.success) {
+        clearRunningState();
+        toast.error(`${activeRun.pumpName} stopped.`);
+      } else {
+        toast.error('Emergency stop failed.');
+      }
+    } catch (e) {
+      toast.error('Emergency stop failed.');
+      console.error(e);
+    }
+  };
+
   if (pumps.length === 0) {
     return null;
   }
@@ -86,10 +151,21 @@ export default function PumpControl(props: PumpControlProps) {
     <Card className="w-full shadow-none">
       <CardHeader>
         <CardTitle>Pump Control</CardTitle>
-        <CardDescription>Manual control of pumps. This action cannot be stopped.</CardDescription>
+        <CardDescription>Manual control of pumps with immediate emergency stop support.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-row gap-4">
+        <div className="flex flex-col gap-4">
+          {activeRun ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+              <div className="mb-1 flex items-center gap-2 font-medium text-destructive">
+                <AlertTriangle className="size-4" />
+                Manual run active
+              </div>
+              <div className="text-muted-foreground">
+                {activeRun.pumpName} is running at {activeRun.speed} rpm for up to {activeRun.time} min.
+              </div>
+            </div>
+          ) : null}
           <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-row gap-4">
               <div className="w-[50%] mb-2">
@@ -100,7 +176,11 @@ export default function PumpControl(props: PumpControlProps) {
                   name="pump_id"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={(value) => field.onChange(Number(value))} defaultValue={String(field.value)}>
+                    <Select
+                      onValueChange={(value) => field.onChange(Number(value))}
+                      defaultValue={String(field.value)}
+                      disabled={pumpIsRunning}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pump" />
                       </SelectTrigger>
@@ -127,8 +207,9 @@ export default function PumpControl(props: PumpControlProps) {
                   control={control}
                   render={({ field }) => (
                     <Select
-                      onValueChange={(value) => field.onChange(Boolean(value))}
+                      onValueChange={(value) => field.onChange(value === 'true')}
                       defaultValue={String(field.value)}
+                      disabled={pumpIsRunning}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pump" />
@@ -154,6 +235,7 @@ export default function PumpControl(props: PumpControlProps) {
                   placeholder="RPM"
                   step="0.1"
                   defaultValue={1}
+                  disabled={pumpIsRunning}
                   {...register('speed', { valueAsNumber: true })}
                 />
                 {errors.speed && <p role="alert">{errors.speed?.message}</p>}
@@ -168,20 +250,28 @@ export default function PumpControl(props: PumpControlProps) {
                   placeholder="minutes"
                   step="1"
                   defaultValue={1}
+                  disabled={pumpIsRunning}
                   {...register('time', { valueAsNumber: true })}
                 />
                 {errors.time && <p role="alert">{errors.time?.message}</p>}
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              variant={pumpIsRunning ? 'destructive' : 'default'}
-              disabled={pumpIsRunning}
-            >
-              {pumpIsRunning ? 'Running...' : 'Run'}
-            </Button>
+            <div className="flex flex-row gap-3">
+              <Button type="submit" className="w-full" variant="default" disabled={pumpIsRunning}>
+                Run {selectedPumpName}
+              </Button>
+              <Button
+                type="button"
+                className="w-full"
+                variant="destructive"
+                disabled={!pumpIsRunning}
+                onClick={emergencyStop}
+              >
+                <Square data-icon="inline-start" />
+                Emergency Stop
+              </Button>
+            </div>
           </form>
         </div>
       </CardContent>

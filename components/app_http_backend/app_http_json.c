@@ -13,6 +13,7 @@
 
 #include "app_settings.h"
 #include "auth.h"
+#include "eeprom.h"
 #include "mcp7940.h"
 #include "monitor.h"
 #include "mqtt.h"
@@ -68,6 +69,8 @@ char *get_status_json(void)
     cJSON_AddItemToObject(status, "rx_packets", cJSON_CreateNumber(0));
     cJSON_AddItemToObject(status, "reboot_count", cJSON_CreateNumber(0));
     cJSON_AddItemToObject(status, "last_reboot_reason", cJSON_CreateString("unknown"));
+    cJSON_AddItemToObject(status, "storage_backend", cJSON_CreateString(eeprom_backend_name()));
+    cJSON_AddItemToObject(status, "rtc_backend", cJSON_CreateString(get_rtc_backend_name()));
 
     cJSON *mqtt_status = cJSON_CreateObject();
     switch (get_mqtt_status()) {

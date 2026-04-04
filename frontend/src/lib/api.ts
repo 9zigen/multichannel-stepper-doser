@@ -162,6 +162,8 @@ export type StatusState = {
   rx_packets: number;
   reboot_count: number;
   last_reboot_reason: string;
+  storage_backend: string;
+  rtc_backend: string;
 };
 
 export type PumpRunState = {

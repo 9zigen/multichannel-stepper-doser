@@ -5,6 +5,9 @@
 #ifndef ESP32_CC_LED_DRIVER_MCP7940_H
 #define ESP32_CC_LED_DRIVER_MCP7940_H
 
+#include <stdbool.h>
+#include "esp_err.h"
+
 #define MCP7940_ADDRESS           0x6F //Device address, fixed value
 #define MCP7940_RTCSEC            0x00 //Timekeeping, RTCSEC Register address
 #define MCP7940_RTCMIN            0x01 //Timekeeping, RTCMIN Register address
@@ -72,6 +75,8 @@ typedef struct {
 } datetime_t ;
 
 void mcp7940_init(void);
+esp_err_t mcp7940_probe(void);
+bool mcp7940_is_available(void);
 void mcp7940_get_datetime(datetime_t *datetime);
 void mcp7940_set_datetime(datetime_t *datetime);
 esp_err_t mcp7940_read_ram(uint8_t offset, uint8_t *buf, uint8_t len);

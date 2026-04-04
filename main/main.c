@@ -94,8 +94,8 @@ void app_main() {
 //  /* Buttons */
 //  init_buttons();
 //
-//  /* i2c */
-//  init_i2c();
+    /* i2c */
+    init_i2c();
 //
 //  /* MCP7940 */
 //  mcp7940_init();
@@ -107,14 +107,14 @@ void app_main() {
 //  eeprom_write_byte(0x50, 0x400, write_byte);
 //  ESP_LOGI(TAG, "[APP] FRAM TEST read %d", read_byte);
 //
-//  /* RTC Setup */
-//  init_clock();
-//
-//  /* Monitor Task */
-//  init_monitor();
-//
+    /* RTC Setup */
+    init_clock();
+
+    /* Monitor Task */
+    init_monitor();
+
     /* Pumps */
-//    init_pumps();
+    init_pumps();
 
     /* web server */
     start_webserver();

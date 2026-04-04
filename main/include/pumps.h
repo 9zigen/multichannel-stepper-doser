@@ -14,15 +14,19 @@
 #define PUMP_TIMER_INTERVAL ((1000/PUMP_TIMER_UNIT_IN_SEC)/portTICK_RATE_MS) /* 10 ms timer, 100 tik every second of pump work */
 
 typedef enum {
-  PUMP_OFF, PUMP_ON, PUMP_CAL
+  PUMP_OFF,
+  PUMP_ON,
+  PUMP_CONTINUOUS,
+  PUMP_CAL
 } pump_state_t;
 
 typedef struct {
-  uint32_t time; /* */
+  uint32_t time;
   double volume;
   double flow_per_unit;
+  float rpm;
+  bool direction;
   pump_state_t state;
-  gpio_num_t motor_pin;
   gpio_num_t led_pin;
 } pumps_status_t;
 
@@ -40,8 +44,9 @@ typedef struct {
 /* public */
 int64_t get_tank_volume(uint8_t pump_id);
 void run_pump_with_timeout(uint8_t pump_id, uint32_t timeout_ms, uint8_t speed);
-void run_pump_on_volume(uint8_t pump_id, double volume_ml, uint8_t speed);
-void run_pump_calibration(uint8_t pump_id, uint8_t is_start);
+void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm);
+esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t time_minutes);
+void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direction);
 
 int init_pumps(void);
 void task_schedule(void *pvParameter);

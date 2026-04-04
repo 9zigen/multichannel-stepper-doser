@@ -26,6 +26,8 @@
 static const char *TAG = "RTC";
 
 uint8_t ntp_sync = 0;
+static const char *rtc_backend = "System clock";
+static bool rtc_fallback = true;
 
 static void time_sync_notification_cb(struct timeval *tv)
 {
@@ -93,31 +95,36 @@ void init_clock()
     ESP_LOGI(TAG, "new TZ is: %s", getenv("TZ"));
 
 
-    /* Get time from mcp7940 rtc */
-    datetime_t datetime;
-    mcp7940_get_datetime(&datetime);
+    datetime_t datetime = {0};
+    bool rtc_chip_available = (mcp7940_probe() == ESP_OK);
+    if (rtc_chip_available) {
+        mcp7940_get_datetime(&datetime);
 
-    timeinfo.tm_year = datetime.year + 2000 - 1900;  /* stm return only last two dig of year */
-    timeinfo.tm_mon  = datetime.month - 1;
-    timeinfo.tm_mday = datetime.day;
-    timeinfo.tm_wday = datetime.weekday - 1;
-    timeinfo.tm_hour = datetime.hour;
-    timeinfo.tm_min  = datetime.min;
-    timeinfo.tm_sec  = datetime.sec;
+        timeinfo.tm_year = datetime.year + 2000 - 1900;
+        timeinfo.tm_mon  = datetime.month - 1;
+        timeinfo.tm_mday = datetime.day;
+        timeinfo.tm_wday = datetime.weekday - 1;
+        timeinfo.tm_hour = datetime.hour;
+        timeinfo.tm_min  = datetime.min;
+        timeinfo.tm_sec  = datetime.sec;
 
-    time_t stm_time = mktime(&timeinfo);
-    struct timeval stm_now = { .tv_sec = stm_time };
+        time_t stm_time = mktime(&timeinfo);
+        struct timeval stm_now = { .tv_sec = stm_time };
+        settimeofday(&stm_now, NULL);
 
-    /* Set time from STM RTC */
-    settimeofday(&stm_now, NULL);
+        strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+        ESP_LOGI(TAG, "The current date/time is: %s", strftime_buf);
 
-    /* Print time from STM RTC */
-    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-    ESP_LOGI(TAG, "The current date/time is: %s", strftime_buf);
+        if (timeinfo.tm_year < (2020 - 1900)) {
+            ESP_LOGI(TAG, "Time is not set yet.");
+        }
 
-    // Is time set? If not, tm_year will be (1970 - 1900).
-    if (timeinfo.tm_year < (2020 - 1900)) {
-        ESP_LOGI(TAG, "Time is not set yet.");
+        rtc_backend = "MCP7940 RTC";
+        rtc_fallback = false;
+    } else {
+        ESP_LOGW(TAG, "MCP7940 not detected. Falling back to network/system time.");
+        rtc_backend = services->enable_ntp ? "NTP fallback" : "System clock";
+        rtc_fallback = true;
     }
 
     if (services->enable_ntp)
@@ -143,12 +150,19 @@ void init_clock()
             datetime.min = timeinfo.tm_min;
             datetime.sec = timeinfo.tm_sec;
 
-            mcp7940_set_datetime(&datetime);
+            if (rtc_chip_available) {
+                mcp7940_set_datetime(&datetime);
+                rtc_backend = "MCP7940 RTC";
+                rtc_fallback = false;
+            } else {
+                rtc_backend = "NTP fallback";
+                rtc_fallback = true;
+            }
         }
     }
     else
     {
-        ESP_LOGI(TAG, "NTP Disabled. Will use time from MCP7940 rtc.");
+        ESP_LOGI(TAG, "NTP Disabled. Will use local available time source.");
     }
 
     /* update local time */
@@ -205,4 +219,14 @@ void det_time_string_since_boot(char * time_string)
 uint8_t get_ntp_sync_status()
 {
     return ntp_sync;
+}
+
+const char *get_rtc_backend_name(void)
+{
+    return rtc_backend;
+}
+
+bool rtc_using_fallback(void)
+{
+    return rtc_fallback;
 }
