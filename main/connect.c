@@ -1,6 +1,7 @@
 /***
 ** Created by Aleksey Volkov on 16.07.2020.
 ***/
+#include <ctype.h>
 #include "string.h"
 #include "sdkconfig.h"
 #include "esp_event.h"
@@ -46,6 +47,7 @@ static void wifi_try_next_station_profile(void);
 static void wifi_configure_ap(wifi_config_t *wifi_config);
 static void wifi_configure_sta(wifi_config_t *wifi_config, const network_t *config);
 static void vApFallbackTimerCallback(TimerHandle_t pxTimer);
+static void build_mdns_hostname(const char *source, char *target, size_t target_size);
 
 static const char *TAG = "CONNECT";
 static esp_netif_t *wifi_sta_netif = NULL;
@@ -207,14 +209,6 @@ static void wifi_configure_ap(wifi_config_t *wifi_config)
     memcpy(wifi_config->ap.password, AP_WIFI_PASSWORD, strlen(AP_WIFI_PASSWORD));
     wifi_config->ap.max_connection = 2;
     wifi_config->ap.authmode = strlen(AP_WIFI_PASSWORD) == 0 ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA2_PSK;
-
-    services_t *services = get_service_config();
-    size_t ssid_len = strlen(services->hostname);
-    if (ssid_len > 0 && ssid_len < sizeof(wifi_config->ap.ssid)) {
-        memset(wifi_config->ap.ssid, 0, sizeof(wifi_config->ap.ssid));
-        memcpy(wifi_config->ap.ssid, services->hostname, ssid_len);
-        wifi_config->ap.ssid_len = ssid_len;
-    }
 }
 
 static void wifi_configure_sta(wifi_config_t *wifi_config, const network_t *config)
@@ -532,15 +526,57 @@ void disable_power_save(void)
     // esp_wifi_set_ps(WIFI_PS_NONE);
 }
 
+static void build_mdns_hostname(const char *source, char *target, size_t target_size)
+{
+    size_t write_index = 0;
+    bool last_was_dash = false;
+
+    if (target == NULL || target_size == 0) {
+        return;
+    }
+
+    memset(target, 0, target_size);
+
+    for (size_t read_index = 0; source != NULL && source[read_index] != '\0' && write_index + 1 < target_size; ++read_index) {
+        unsigned char ch = (unsigned char)source[read_index];
+
+        if (isalnum(ch)) {
+            target[write_index++] = (char)tolower(ch);
+            last_was_dash = false;
+            continue;
+        }
+
+        if ((ch == '-' || ch == '_' || ch == ' ') && write_index > 0 && !last_was_dash) {
+            target[write_index++] = '-';
+            last_was_dash = true;
+        }
+    }
+
+    while (write_index > 0 && target[write_index - 1] == '-') {
+        target[--write_index] = '\0';
+    }
+
+    if (write_index == 0) {
+        strlcpy(target, "dosing", target_size);
+    }
+}
+
 /* initialize mDNS */
 static void initialise_mdns(void)
 {
     services_t *services = get_service_config();
+    char mdns_hostname[sizeof(services->hostname)];
+    const char *instance_name = services->hostname;
+
+    build_mdns_hostname(services->hostname, mdns_hostname, sizeof(mdns_hostname));
+    if (instance_name == NULL || instance_name[0] == '\0') {
+        instance_name = AP_WIFI_SSID;
+    }
 
     ESP_ERROR_CHECK(mdns_init());
-    ESP_ERROR_CHECK(mdns_hostname_set(services->hostname));
-    ESP_LOGI(TAG, "mdns hostname set to: [%s]", services->hostname);
+    ESP_ERROR_CHECK(mdns_hostname_set(mdns_hostname));
+    ESP_LOGI(TAG, "mdns hostname set to: [%s]", mdns_hostname);
 
-    ESP_ERROR_CHECK(mdns_instance_name_set("ESP32 Dosing Pump"));
+    ESP_ERROR_CHECK(mdns_instance_name_set(instance_name));
     mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
 }
