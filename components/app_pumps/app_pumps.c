@@ -24,6 +24,7 @@ static TimerHandle_t xScheduleTimer;
 static pumps_status_t pumps[MAX_PUMP];
 static uint32_t last_run_schedule_hour[MAX_SCHEDULE];
 static const app_pumps_backend_t *s_backend;
+static bool runtime_event_dirty[MAX_PUMP];
 
 uint8_t tank_volume_changed = 0;
 
@@ -128,6 +129,29 @@ static void dispatch_pump_runtime_event(uint8_t pump_id)
     app_events_dispatch_system(PUMP_RUNTIME_DATA, &event, sizeof(event));
 }
 
+static void mark_pump_runtime_dirty(uint8_t pump_id)
+{
+    if (pump_id >= MAX_PUMP) {
+        return;
+    }
+
+    runtime_event_dirty[pump_id] = true;
+}
+
+static void runtime_event_flush_callback(void *arg)
+{
+    (void)arg;
+
+    for (uint8_t pump_id = 0; pump_id < MAX_PUMP; ++pump_id) {
+        if (!runtime_event_dirty[pump_id]) {
+            continue;
+        }
+
+        runtime_event_dirty[pump_id] = false;
+        dispatch_pump_runtime_event(pump_id);
+    }
+}
+
 static void run_timer_callback(void *arg)
 {
     (void)arg;
@@ -146,16 +170,16 @@ static void run_timer_callback(void *arg)
                 pumps[pump_id].state = PUMP_OFF;
                 stop_pump(pump_id);
             }
-            dispatch_pump_runtime_event(pump_id);
+            mark_pump_runtime_dirty(pump_id);
         } else if (pumps[pump_id].state == PUMP_CONTINUOUS) {
             pumps[pump_id].volume += pumps[pump_id].flow_per_unit;
             pump_config->tank_current_vol = clamp_positive(pump_config->tank_current_vol - pumps[pump_id].flow_per_unit);
             pump_config->running_hours += 1.0f / (float)(PUMP_TIMER_UNIT_IN_SEC * 3600.0f);
             tank_volume_changed = 1;
-            dispatch_pump_runtime_event(pump_id);
+            mark_pump_runtime_dirty(pump_id);
         } else if (pumps[pump_id].state == PUMP_CAL) {
             pumps[pump_id].time++;
-            dispatch_pump_runtime_event(pump_id);
+            mark_pump_runtime_dirty(pump_id);
         }
     }
 }
@@ -202,7 +226,7 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
         if (pumps[pump_id].state == PUMP_CONTINUOUS && !continuous_mode[pump_id]) {
             pumps[pump_id].state = PUMP_OFF;
             stop_pump(pump_id);
-            dispatch_pump_runtime_event(pump_id);
+            mark_pump_runtime_dirty(pump_id);
         }
     }
 
@@ -224,7 +248,7 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
                 if (start_pump(schedule->pump_id, schedule->speed, pumps[schedule->pump_id].direction) != ESP_OK) {
                     pumps[schedule->pump_id].state = PUMP_OFF;
                 }
-                dispatch_pump_runtime_event(schedule->pump_id);
+                mark_pump_runtime_dirty(schedule->pump_id);
             }
             continue;
         }
@@ -312,7 +336,7 @@ void run_pump_with_timeout(uint8_t pump_id, uint32_t timeout_ms, uint8_t speed)
     if (start_pump(pump_id, (float)speed, pumps[pump_id].direction) != ESP_OK) {
         pumps[pump_id].state = PUMP_OFF;
     }
-    dispatch_pump_runtime_event(pump_id);
+    mark_pump_runtime_dirty(pump_id);
 }
 
 void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm)
@@ -350,7 +374,7 @@ void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm)
     if (start_pump(pump_id, rpm, pumps[pump_id].direction) != ESP_OK) {
         pumps[pump_id].state = PUMP_OFF;
     }
-    dispatch_pump_runtime_event(pump_id);
+    mark_pump_runtime_dirty(pump_id);
 }
 
 esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t time_minutes)
@@ -363,7 +387,7 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
         stop_pump(pump_id);
         pumps[pump_id].state = PUMP_OFF;
         pumps[pump_id].time = 0;
-        dispatch_pump_runtime_event(pump_id);
+        mark_pump_runtime_dirty(pump_id);
         return ESP_OK;
     }
 
@@ -385,7 +409,7 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
     if (err != ESP_OK) {
         pumps[pump_id].state = PUMP_OFF;
     }
-    dispatch_pump_runtime_event(pump_id);
+    mark_pump_runtime_dirty(pump_id);
     return err;
 }
 
@@ -405,11 +429,11 @@ void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direct
         if (start_pump(pump_id, rpm, direction) != ESP_OK) {
             pumps[pump_id].state = PUMP_OFF;
         }
-        dispatch_pump_runtime_event(pump_id);
+        mark_pump_runtime_dirty(pump_id);
     } else {
         pumps[pump_id].state = PUMP_OFF;
         stop_pump(pump_id);
-        dispatch_pump_runtime_event(pump_id);
+        mark_pump_runtime_dirty(pump_id);
     }
 }
 
@@ -437,6 +461,7 @@ int init_pumps(void)
         pumps[i].rpm = 0;
         pumps[i].direction = get_pump_config(i)->direction;
         pumps[i].state = PUMP_OFF;
+        runtime_event_dirty[i] = false;
     }
 
     if (eeprom_read_byte(0x50, 0x31) == 0x82) {
@@ -456,10 +481,17 @@ int init_pumps(void)
         .callback = &run_timer_callback,
         .name = "run_timer_callback",
     };
+    const esp_timer_create_args_t runtime_event_timer_args = {
+        .callback = &runtime_event_flush_callback,
+        .name = "pump_runtime_event_flush",
+    };
 
     esp_timer_handle_t run_timer;
+    esp_timer_handle_t runtime_event_timer;
     ESP_ERROR_CHECK(esp_timer_create(&run_timer_args, &run_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(run_timer, 10000));
+    ESP_ERROR_CHECK(esp_timer_create(&runtime_event_timer_args, &runtime_event_timer));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(runtime_event_timer, 500000));
 
     xScheduleTimer = xTimerCreate("scheduleTimer", (60 * 1000 / portTICK_PERIOD_MS), pdTRUE, 0, vScheduleTimerHandler);
     if (xScheduleTimer == NULL || xTimerStart(xScheduleTimer, 100 / portTICK_PERIOD_MS) != pdPASS) {
