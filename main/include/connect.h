@@ -14,6 +14,7 @@ extern EventGroupHandle_t wifi_event_group;
 
 void initialise_wifi(void *arg);
 void disable_power_save(void);
+void connect_on_network_settings_updated(void);
 const char *connect_get_station_ssid(void);
 bool connect_station_is_connected(void);
 uint8_t connect_get_ap_client_count(void);

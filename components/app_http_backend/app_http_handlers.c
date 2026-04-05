@@ -19,6 +19,7 @@
 
 #include "app_settings.h"
 #include "auth.h"
+#include "connect.h"
 #include "web_server.h"
 #include "app_settings_storage.h"
 #include "mcp7940.h"
@@ -696,6 +697,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             }
 
             save_network();
+            connect_on_network_settings_updated();
         }
 
         cJSON *services = cJSON_GetObjectItem(root, "services");

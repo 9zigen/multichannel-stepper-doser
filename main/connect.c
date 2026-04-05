@@ -54,6 +54,7 @@ static esp_event_handler_instance_t instance_got_ip;
 static bool wifi_manager_ready = false;
 static bool station_connected = false;
 static bool ap_fallback_active = false;
+static bool booted_without_networks = false;
 static uint8_t ap_client_count = 0;
 static uint8_t wifi_profile_ids[MAX_NETWORKS];
 static uint8_t wifi_profile_count = 0;
@@ -83,6 +84,29 @@ uint8_t connect_get_ap_client_count(void)
 bool connect_ap_fallback_is_active(void)
 {
     return ap_fallback_active;
+}
+
+void connect_on_network_settings_updated(void)
+{
+    wifi_collect_profiles();
+
+    if (!wifi_manager_ready) {
+        return;
+    }
+
+    if (!wifi_has_profiles()) {
+        return;
+    }
+
+    network_t *profile = wifi_get_active_profile();
+    if (!booted_without_networks &&
+        station_connected &&
+        !ap_fallback_active &&
+        ap_client_count == 0 &&
+        (profile == NULL || !profile->keep_ap_active)) {
+        ESP_LOGI(TAG, "Network settings updated: disabling AP without reboot");
+        wifi_start_current_mode();
+    }
 }
 
 static bool wifi_has_profiles(void)
@@ -208,6 +232,10 @@ static bool wifi_should_keep_ap_enabled(void)
 
     network_t *config = wifi_get_active_profile();
     if (config != NULL && config->keep_ap_active) {
+        return true;
+    }
+
+    if (booted_without_networks) {
         return true;
     }
 
@@ -402,12 +430,21 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        network_t *profile = wifi_get_active_profile();
         ESP_LOGI(TAG, "got station ip:" IPSTR, IP2STR(&event->ip_info.ip));
         station_connected = true;
         current_profile_attempts = 0;
         tested_profiles_in_cycle = 1;
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         set_led_mode(LED_INDICATE_OK, LED_SLOW_BLINK, 255);
+
+        if (!booted_without_networks &&
+            !ap_fallback_active &&
+            ap_client_count == 0 &&
+            (profile == NULL || !profile->keep_ap_active)) {
+            ESP_LOGI(TAG, "Station connected on a normal boot, disabling AP");
+            wifi_start_current_mode();
+        }
         return;
     }
 
@@ -428,7 +465,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "AP client " MACSTR " left, AID=%d, clients=%u",
                  MAC2STR(event->mac), event->aid, (unsigned)ap_client_count);
         wifi_arm_ap_timeout_if_needed();
-        if (ap_client_count == 0 && !ap_fallback_active) {
+        if (ap_client_count == 0 && !ap_fallback_active && !booted_without_networks) {
             network_t *profile = wifi_get_active_profile();
             if (wifi_has_profiles() && (profile == NULL || !profile->keep_ap_active)) {
                 wifi_start_current_mode();
@@ -466,6 +503,7 @@ void initialise_wifi(void *arg)
 
     initialise_mdns();
     wifi_collect_profiles();
+    booted_without_networks = !wifi_has_profiles();
 
     if (wifi_has_profiles()) {
         active_profile_cursor = 0;
