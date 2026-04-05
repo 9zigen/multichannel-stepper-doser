@@ -7,7 +7,7 @@
 
 #include "esp_event.h"
 
-ESP_EVENT_DECLARE_BASE(APP_EVENTS);
+ESP_EVENT_DECLARE_BASE(APP_SYSTEM_EVENTS);
 
 
 typedef enum {
