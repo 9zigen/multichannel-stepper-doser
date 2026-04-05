@@ -122,10 +122,9 @@ void app_main()
 
     /* Wait WiFi */
     xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
-//
-//  /* MQTT Task */
-//  xTaskCreate(&task_mqtt, "mqtt_task", 2048, NULL, 5, NULL);
-//
+
+    /* MQTT Task */
+    xTaskCreate(&app_mqtt_task, "mqtt_task", 6144, NULL, 5, NULL);
 }
 
 

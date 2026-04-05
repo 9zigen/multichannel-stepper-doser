@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { Home, Network, CalendarClock, LogOut, Cpu, Play, Disc } from 'lucide-react';
+import { Home, Network, CalendarClock, LogOut, Cpu, Play, Disc, BookText } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -46,6 +46,11 @@ const navigation = {
       name: 'Pumps',
       url: '/settings/pumps',
       icon: Disc,
+    },
+    {
+      name: 'API',
+      url: '/settings/api',
+      icon: BookText,
     },
   ],
   // navSettings: [

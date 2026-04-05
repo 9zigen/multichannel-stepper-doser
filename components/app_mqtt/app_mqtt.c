@@ -1,0 +1,522 @@
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/timers.h"
+
+#include "cJSON.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "esp_app_desc.h"
+#include "esp_system.h"
+#include "mqtt_client.h"
+
+#include "app_events.h"
+#include "app_monitor.h"
+#include "app_mqtt_discovery.h"
+#include "app_pumps.h"
+#include "app_settings.h"
+#include "app_time.h"
+#include "app_mqtt.h"
+
+static const char *TAG = "APP_MQTT";
+static const char *MQTT_DISCOVERY_PREFIX = "homeassistant";
+
+typedef struct {
+    uint8_t pump_id;
+    bool active;
+    const char *state;
+    float speed;
+    bool direction;
+    uint32_t remaining_ticks;
+    double remaining_seconds;
+    double volume_ml;
+    double tank_current_vol;
+    double tank_full_vol;
+    double running_hours;
+    const char *name;
+} mqtt_pump_snapshot_t;
+
+static esp_mqtt_client_handle_t s_client;
+static esp_event_handler_instance_t s_pump_runtime_event_ctx;
+static TimerHandle_t s_status_timer;
+static bool s_mqtt_enabled;
+static bool s_mqtt_connected;
+static bool s_discovery_published;
+static char s_broker_uri[96];
+static char s_availability_topic[96];
+
+static const char *pump_state_to_string(pump_state_t state)
+{
+    switch (state) {
+        case PUMP_ON:
+            return "timed";
+        case PUMP_CONTINUOUS:
+            return "continuous";
+        case PUMP_CAL:
+            return "calibration";
+        case PUMP_OFF:
+        default:
+            return "off";
+    }
+}
+
+static void build_topic_base(char *buffer, size_t size)
+{
+    services_t *services = get_service_config();
+    strlcpy(buffer, services->hostname, size);
+}
+
+static bool mqtt_is_server_configured(const services_t *services)
+{
+    if (services == NULL || !services->enable_mqtt || services->mqtt_port == 0) {
+        return false;
+    }
+
+    return services->mqtt_ip_address[0] != 0 || services->mqtt_ip_address[1] != 0 ||
+           services->mqtt_ip_address[2] != 0 || services->mqtt_ip_address[3] != 0;
+}
+
+static void build_broker_uri(const services_t *services, char *buffer, size_t size)
+{
+    snprintf(buffer, size, "mqtt://%u.%u.%u.%u:%u",
+             services->mqtt_ip_address[0],
+             services->mqtt_ip_address[1],
+             services->mqtt_ip_address[2],
+             services->mqtt_ip_address[3],
+             services->mqtt_port);
+}
+
+static void publish_string_topic(const char *topic, const char *payload, int qos, int retain)
+{
+    if (!s_mqtt_enabled || !s_mqtt_connected || s_client == NULL || topic == NULL || payload == NULL) {
+        return;
+    }
+
+    esp_mqtt_client_publish(s_client, topic, payload, 0, qos, retain);
+}
+
+static void publish_json_topic(const char *topic, cJSON *root, int qos, int retain)
+{
+    char *payload = cJSON_PrintUnformatted(root);
+    if (payload == NULL) {
+        cJSON_Delete(root);
+        return;
+    }
+
+    publish_string_topic(topic, payload, qos, retain);
+    free(payload);
+    cJSON_Delete(root);
+}
+
+static mqtt_pump_snapshot_t build_pump_snapshot(uint8_t pump_id)
+{
+    const pumps_status_t *runtime = get_pumps_runtime_status();
+    pump_t *pump_config = get_pump_config(pump_id);
+
+    mqtt_pump_snapshot_t snapshot = {
+        .pump_id = pump_id,
+        .active = runtime[pump_id].state != PUMP_OFF,
+        .state = pump_state_to_string(runtime[pump_id].state),
+        .speed = runtime[pump_id].rpm,
+        .direction = runtime[pump_id].direction,
+        .remaining_ticks = runtime[pump_id].time,
+        .remaining_seconds = (double)runtime[pump_id].time / (double)PUMP_TIMER_UNIT_IN_SEC,
+        .volume_ml = runtime[pump_id].volume,
+        .tank_current_vol = pump_config->tank_current_vol,
+        .tank_full_vol = pump_config->tank_full_vol,
+        .running_hours = pump_config->running_hours,
+        .name = pump_config->name,
+    };
+
+    return snapshot;
+}
+
+static void publish_availability(const char *payload)
+{
+    services_t *services = get_service_config();
+    char topic[96];
+    char topic_base[48];
+
+    build_topic_base(topic_base, sizeof(topic_base));
+    snprintf(topic, sizeof(topic), "%s/availability", topic_base);
+    publish_string_topic(topic, payload, services->mqtt_qos, services->mqtt_retain);
+}
+
+static void publish_status(void)
+{
+    if (!s_mqtt_connected) {
+        return;
+    }
+
+    services_t *services = get_service_config();
+    system_status_t *system_status = get_system_status();
+    const esp_app_desc_t *app_description = esp_app_get_description();
+    char topic_base[48];
+    char topic[96];
+    char time_string[32];
+    cJSON *root = cJSON_CreateObject();
+
+    build_topic_base(topic_base, sizeof(topic_base));
+    snprintf(topic, sizeof(topic), "%s/status", topic_base);
+
+    det_time_string_since_boot(time_string);
+    cJSON_AddStringToObject(root, "up_time", time_string);
+
+    get_time_string(time_string);
+    cJSON_AddStringToObject(root, "local_time", time_string);
+
+    cJSON_AddStringToObject(root, "device_id", topic_base);
+    cJSON_AddStringToObject(root, "hostname", services->hostname);
+    cJSON_AddNumberToObject(root, "free_heap", (double)system_status->free_heap);
+    cJSON_AddStringToObject(root, "wifi_mode", system_status->wifi_mode);
+    cJSON_AddStringToObject(root, "ip_address", system_status->net_address);
+    cJSON_AddStringToObject(root, "station_ssid", system_status->station_ssid);
+    cJSON_AddBoolToObject(root, "station_connected", system_status->station_connected);
+    cJSON_AddNumberToObject(root, "ap_clients", system_status->ap_clients);
+    cJSON_AddNumberToObject(root, "wifi_disconnects", system_status->wifi_disconnects);
+    cJSON_AddNumberToObject(root, "reboot_count", system_status->reboot_count);
+    cJSON_AddStringToObject(root, "last_reboot_reason", system_status->last_reboot_reason);
+    cJSON_AddStringToObject(root, "firmware_version", app_description->version);
+    cJSON_AddStringToObject(root, "firmware_date", app_description->date);
+    cJSON_AddStringToObject(root, "hardware_version", HARDWARE_VERSION);
+    cJSON_AddStringToObject(root, "state", "online");
+
+    publish_json_topic(topic, root, services->mqtt_qos, services->mqtt_retain);
+}
+
+static void publish_pump_state(uint8_t pump_id)
+{
+    if (!s_mqtt_connected || pump_id >= MAX_PUMP) {
+        return;
+    }
+
+    services_t *services = get_service_config();
+    char topic_base[48];
+    char topic[128];
+    mqtt_pump_snapshot_t snapshot = build_pump_snapshot(pump_id);
+    cJSON *root = cJSON_CreateObject();
+
+    build_topic_base(topic_base, sizeof(topic_base));
+    snprintf(topic, sizeof(topic), "%s/pumps/%u/state", topic_base, pump_id);
+
+    cJSON_AddNumberToObject(root, "id", snapshot.pump_id);
+    cJSON_AddStringToObject(root, "name", snapshot.name);
+    cJSON_AddBoolToObject(root, "active", snapshot.active);
+    cJSON_AddStringToObject(root, "state", snapshot.state);
+    cJSON_AddNumberToObject(root, "speed", snapshot.speed);
+    cJSON_AddBoolToObject(root, "direction", snapshot.direction);
+    cJSON_AddNumberToObject(root, "remaining_ticks", snapshot.remaining_ticks);
+    cJSON_AddNumberToObject(root, "remaining_seconds", snapshot.remaining_seconds);
+    cJSON_AddNumberToObject(root, "volume_ml", snapshot.volume_ml);
+    cJSON_AddNumberToObject(root, "tank_current_vol", snapshot.tank_current_vol);
+    cJSON_AddNumberToObject(root, "tank_full_vol", snapshot.tank_full_vol);
+    cJSON_AddNumberToObject(root, "running_hours", snapshot.running_hours);
+
+    publish_json_topic(topic, root, services->mqtt_qos, services->mqtt_retain);
+}
+
+static void publish_all_pump_states(void)
+{
+    for (uint8_t pump_id = 0; pump_id < MAX_PUMP; ++pump_id) {
+        publish_pump_state(pump_id);
+    }
+}
+
+static void publish_discovery_if_needed(void)
+{
+    if (!s_mqtt_connected || s_discovery_published) {
+        return;
+    }
+
+    const esp_app_desc_t *app_description = esp_app_get_description();
+    services_t *services = get_service_config();
+    char topic_base[48];
+    discovery_settings_t discovery = {
+        .device_id = services->hostname,
+        .device_model = HARDWARE_MODEL,
+        .device_name = services->hostname,
+        .device_manufacturer = HARDWARE_MANUFACTURER,
+        .device_sw_version = app_description->version,
+        .device_hw_version = HARDWARE_VERSION,
+        .hass_prefix = MQTT_DISCOVERY_PREFIX,
+        .topic_base = NULL,
+    };
+
+    build_topic_base(topic_base, sizeof(topic_base));
+    discovery.topic_base = topic_base;
+
+    if (hass_mqtt_discovery_init(&discovery) == ESP_OK) {
+        hass_mqtt_discovery_configure_device(s_client, services->mqtt_qos, services->mqtt_retain);
+        hass_mqtt_discovery_deinit();
+        s_discovery_published = true;
+    }
+}
+
+static void status_timer_callback(TimerHandle_t timer)
+{
+    (void)timer;
+    publish_status();
+}
+
+static void handle_restart_command(void)
+{
+    ESP_LOGI(TAG, "MQTT restart command received");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_restart();
+}
+
+static void handle_pump_run_command(uint8_t pump_id, const char *payload)
+{
+    cJSON *root = cJSON_Parse(payload);
+    if (root == NULL) {
+        ESP_LOGW(TAG, "invalid run payload for pump %u", (unsigned)pump_id);
+        return;
+    }
+
+    const cJSON *speed = cJSON_GetObjectItem(root, "speed");
+    const cJSON *time = cJSON_GetObjectItem(root, "time");
+    const cJSON *direction = cJSON_GetObjectItem(root, "direction");
+
+    float rpm = cJSON_IsNumber(speed) ? (float)speed->valuedouble : 0.0f;
+    int32_t minutes = cJSON_IsNumber(time) ? time->valueint : 0;
+    bool dir = cJSON_IsBool(direction) ? cJSON_IsTrue(direction) : true;
+
+    if (run_pump_manual(pump_id, rpm, dir, minutes) != ESP_OK) {
+        ESP_LOGW(TAG, "failed to start pump %u from MQTT command", (unsigned)pump_id);
+    }
+
+    cJSON_Delete(root);
+}
+
+static void handle_pump_calibration_command(uint8_t pump_id, bool start, const char *payload)
+{
+    float rpm = 1.0f;
+    bool direction = true;
+
+    if (payload != NULL && payload[0] == '{') {
+        cJSON *root = cJSON_Parse(payload);
+        if (root != NULL) {
+            const cJSON *speed = cJSON_GetObjectItem(root, "speed");
+            const cJSON *dir = cJSON_GetObjectItem(root, "direction");
+            if (cJSON_IsNumber(speed)) {
+                rpm = (float)speed->valuedouble;
+            }
+            if (cJSON_IsBool(dir)) {
+                direction = cJSON_IsTrue(dir);
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    run_pump_calibration(pump_id, start, rpm, direction);
+}
+
+static void handle_incoming_message(esp_mqtt_event_handle_t event)
+{
+    char topic[192];
+    char data[256];
+    services_t *services = get_service_config();
+    char topic_base[48];
+    char expected[192];
+    unsigned int pump_id = 0;
+
+    snprintf(topic, sizeof(topic), "%.*s", event->topic_len, event->topic);
+    snprintf(data, sizeof(data), "%.*s", event->data_len, event->data);
+    build_topic_base(topic_base, sizeof(topic_base));
+
+    snprintf(expected, sizeof(expected), "%s/command/restart", topic_base);
+    if (strcmp(topic, expected) == 0) {
+        if (strcmp(data, "restart") == 0 || strcmp(data, "1") == 0 || strcmp(data, "true") == 0) {
+            handle_restart_command();
+        }
+        return;
+    }
+
+    snprintf(expected, sizeof(expected), "%s/pumps/%%u/run", topic_base);
+    if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
+        handle_pump_run_command((uint8_t)pump_id, data);
+        return;
+    }
+
+    snprintf(expected, sizeof(expected), "%s/pumps/%%u/stop", topic_base);
+    if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
+        pump_t *pump_config = get_pump_config((uint8_t)pump_id);
+        run_pump_manual((uint8_t)pump_id, 1.0f, pump_config->direction, 0);
+        return;
+    }
+
+    snprintf(expected, sizeof(expected), "%s/pumps/%%u/calibration/start", topic_base);
+    if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
+        handle_pump_calibration_command((uint8_t)pump_id, true, data);
+        return;
+    }
+
+    snprintf(expected, sizeof(expected), "%s/pumps/%%u/calibration/stop", topic_base);
+    if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
+        handle_pump_calibration_command((uint8_t)pump_id, false, data);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Unhandled MQTT topic: %s (qos=%u retain=%u)", topic, services->mqtt_qos, services->mqtt_retain);
+}
+
+static void subscribe_topics(void)
+{
+    services_t *services = get_service_config();
+    char topic_base[48];
+    char topic[128];
+
+    build_topic_base(topic_base, sizeof(topic_base));
+
+    snprintf(topic, sizeof(topic), "%s/command/#", topic_base);
+    esp_mqtt_client_subscribe(s_client, topic, services->mqtt_qos);
+
+    snprintf(topic, sizeof(topic), "%s/pumps/+/+", topic_base);
+    esp_mqtt_client_subscribe(s_client, topic, services->mqtt_qos);
+
+    snprintf(topic, sizeof(topic), "%s/pumps/+/calibration/+", topic_base);
+    esp_mqtt_client_subscribe(s_client, topic, services->mqtt_qos);
+}
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    (void)handler_args;
+    (void)base;
+    esp_mqtt_event_handle_t event = event_data;
+
+    switch ((esp_mqtt_event_id_t)event_id) {
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI(TAG, "MQTT connected");
+            s_mqtt_connected = true;
+            s_discovery_published = false;
+            app_events_dispatch_system(MQTT_CONNECTED, NULL, 0);
+            subscribe_topics();
+            publish_availability("online");
+            publish_discovery_if_needed();
+            publish_status();
+            publish_all_pump_states();
+            if (s_status_timer != NULL) {
+                xTimerStart(s_status_timer, 0);
+            }
+            break;
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGW(TAG, "MQTT disconnected");
+            s_mqtt_connected = false;
+            app_events_dispatch_system(MQTT_DISCONNECTED, NULL, 0);
+            if (s_status_timer != NULL) {
+                xTimerStop(s_status_timer, 0);
+            }
+            break;
+        case MQTT_EVENT_DATA:
+            handle_incoming_message(event);
+            break;
+        case MQTT_EVENT_ERROR:
+            ESP_LOGW(TAG, "MQTT error event");
+            break;
+        default:
+            break;
+    }
+}
+
+static void on_pump_runtime_event(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_base;
+
+    if (event_id != PUMP_RUNTIME_DATA || event_data == NULL) {
+        return;
+    }
+
+    const pump_runtime_event_t *runtime = (const pump_runtime_event_t *)event_data;
+    publish_pump_state(runtime->pump_id);
+}
+
+static esp_err_t create_client(void)
+{
+    services_t *services = get_service_config();
+    char topic_base[48];
+    esp_mqtt_client_config_t mqtt_cfg = {0};
+
+    if (!mqtt_is_server_configured(services)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    build_broker_uri(services, s_broker_uri, sizeof(s_broker_uri));
+    build_topic_base(topic_base, sizeof(topic_base));
+    snprintf(s_availability_topic, sizeof(s_availability_topic), "%s/availability", topic_base);
+
+    mqtt_cfg.broker.address.uri = s_broker_uri;
+    mqtt_cfg.session.keepalive = 60;
+    mqtt_cfg.session.last_will.topic = s_availability_topic;
+    mqtt_cfg.session.last_will.msg = "offline";
+    mqtt_cfg.session.last_will.retain = services->mqtt_retain;
+    mqtt_cfg.session.last_will.qos = services->mqtt_qos;
+
+    if (services->mqtt_user[0] != '\0') {
+        mqtt_cfg.credentials.username = services->mqtt_user;
+    }
+    if (services->mqtt_password[0] != '\0') {
+        mqtt_cfg.credentials.authentication.password = services->mqtt_password;
+    }
+
+    s_client = esp_mqtt_client_init(&mqtt_cfg);
+    if (s_client == NULL) {
+        return ESP_FAIL;
+    }
+
+    esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    return esp_mqtt_client_start(s_client);
+}
+
+void app_mqtt_task(void *pvParameters)
+{
+    (void)pvParameters;
+    services_t *services = get_service_config();
+
+    s_mqtt_enabled = services->enable_mqtt;
+    s_mqtt_connected = false;
+    s_discovery_published = false;
+
+    if (!mqtt_is_server_configured(services)) {
+        ESP_LOGI(TAG, "MQTT disabled or broker is not configured");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    s_status_timer = xTimerCreate("mqtt_status_timer",
+                                  pdMS_TO_TICKS(30000),
+                                  pdTRUE,
+                                  NULL,
+                                  status_timer_callback);
+    app_events_register_handler(PUMP_RUNTIME_DATA, NULL, on_pump_runtime_event, &s_pump_runtime_event_ctx);
+
+    if (create_client() != ESP_OK) {
+        ESP_LOGE(TAG, "failed to start MQTT client");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+mqtt_service_status_t get_mqtt_status(void)
+{
+    services_t *services = get_service_config();
+    bool enabled = services != NULL && services->enable_mqtt;
+
+    if (enabled && s_mqtt_connected) {
+        return MQTT_ENABLED_CONNECTED;
+    }
+
+    if (enabled) {
+        return MQTT_ENABLED_NOT_CONNECTED;
+    }
+
+    return MQTT_DISABLED;
+}

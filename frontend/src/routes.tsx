@@ -8,6 +8,7 @@ import Services from './pages/Settings.Services';
 import Pumps from './pages/Settings.Pumps';
 import NotFound from './pages/NotFound';
 import Schedule from '@/pages/Schedule.tsx';
+import ApiDocsPage from '@/pages/Settings.Api.tsx';
 
 export default (
   <Routes>
@@ -18,6 +19,7 @@ export default (
     <Route path="/settings/network" element={<Network />} />
     <Route path="/settings/services" element={<Services />} />
     <Route path="/settings/pumps" element={<Pumps />} />
+    <Route path="/settings/api" element={<ApiDocsPage />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );

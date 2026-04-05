@@ -27,6 +27,7 @@ export function SiteHeader(): React.ReactElement {
     { path: '/settings/network', name: 'Network' },
     { path: '/settings/services', name: 'Services' },
     { path: '/settings/pumps', name: 'Pumps' },
+    { path: '/settings/api', name: 'API' },
   ];
 
   const Breadcrumbs: React.FC = () => {
