@@ -32,7 +32,6 @@
 #include "led.h"
 #include "ota.h"
 #include "rtc.h"
-#include "auth.h"
 #include "pumps.h"
 #include "buttons.h"
 #include "app_settings.h"
@@ -40,7 +39,7 @@
 #include "connect.h"
 #include "web_server.h"
 #include "mqtt.h"
-#include "eeprom.h"
+#include "app_settings_storage.h"
 #include "monitor.h"
 #include "i2c_driver.h"
 #include "stepper_task.h"
@@ -65,9 +64,6 @@ void app_main() {
 
     /* Stepper */
     xTaskCreatePinnedToCore(&stepper_task,"Stepper Task",4096,NULL,5,NULL,1);
-
-    /* PWM */
-//  init_pwm_driver();
 
     /* WiFi + Web server */
     initialise_wifi(NULL);
@@ -115,6 +111,7 @@ void app_main() {
 
     /* Pumps */
     init_pumps();
+    return;
 
     /* web server */
     start_webserver();

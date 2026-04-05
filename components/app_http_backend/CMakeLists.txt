@@ -1,4 +1,5 @@
 set(SOURCES
+    "app_http_auth.c"
     "app_http_backend.c"
     "app_http_handlers.c"
     "app_http_json.c")
@@ -14,5 +15,5 @@ idf_component_register(
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "../../main/include"
     EMBED_FILES ${WEB_FILES}
-    REQUIRES esp_http_server app_settings json ota mqtt esp_timer esp_system esp_app_format esp_hw_support
+    REQUIRES esp_http_server app_settings json ota mqtt esp_timer esp_system esp_app_format esp_hw_support mbedtls
 )

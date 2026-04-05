@@ -136,6 +136,7 @@ static esp_err_t read_register(tms2209_t *cfg, uint8_t *datagram)
     else
     {
         ESP_LOGE(TAG, "UART read error len: %ld", received);
+        free(data);
         return ESP_FAIL;
     }
     free(data);
@@ -191,23 +192,34 @@ uint32_t read_datagram(tms2209_t *cfg, uint8_t address, uint8_t reg)
     esp_err_t ret;
     uint32_t data = 0;
     uint8_t *request_datagram = malloc(TMC2209_REG_REQ_LEN);
-    uint8_t *response_datagram = malloc(TMC2209_REG_REQ_LEN);
+    uint8_t *response_datagram = malloc(TMC2209_REG_DATA_LEN);
+
+    if (request_datagram == NULL || response_datagram == NULL) {
+        ESP_LOGE(TAG, "Memory allocation error for read_datagram");
+        free(request_datagram);
+        free(response_datagram);
+        return 0;
+    }
 
     request_datagram[0] = SYNC;     // sync + reserved
     request_datagram[1] = address;  // 8 bit slave address (0-3)
     request_datagram[2] = reg;      // 7 bit register and read bit (0)
-    calc_crc(request_datagram, 4);  // CRC
+    calc_crc(request_datagram, TMC2209_REG_REQ_LEN);  // CRC
 
     ret = write_register(cfg, request_datagram, TMC2209_REG_REQ_LEN);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "write_register error %d", ret);
-        return ESP_FAIL;
+        free(request_datagram);
+        free(response_datagram);
+        return 0;
     }
 
     ret = read_register(cfg, response_datagram);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "read_register error %d", ret);
-        return ESP_FAIL;
+        free(request_datagram);
+        free(response_datagram);
+        return 0;
     }
 
     ESP_LOGD(TAG, "read_datagram addr: %u reg: %u", address, reg);
@@ -226,6 +238,8 @@ uint32_t read_datagram(tms2209_t *cfg, uint8_t address, uint8_t reg)
         ESP_LOGE(TAG, "CRC incorrect %u %u", response_datagram[7], response_datagram_crc);
     }
 
+    free(request_datagram);
+    free(response_datagram);
     return data;
 }
 

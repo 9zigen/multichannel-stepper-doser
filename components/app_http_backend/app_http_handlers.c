@@ -19,7 +19,7 @@
 #include "app_settings.h"
 #include "auth.h"
 #include "web_server.h"
-#include "eeprom.h"
+#include "app_settings_storage.h"
 #include "mcp7940.h"
 #include "mqtt.h"
 #include "pumps.h"

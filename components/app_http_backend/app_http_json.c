@@ -13,7 +13,7 @@
 
 #include "app_settings.h"
 #include "auth.h"
-#include "eeprom.h"
+#include "app_settings_storage.h"
 #include "mcp7940.h"
 #include "monitor.h"
 #include "mqtt.h"

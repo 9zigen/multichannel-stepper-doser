@@ -12,7 +12,8 @@
 #include "driver/i2c.h"
 #include "nvs.h"
 
-#include "eeprom.h"
+#include "app_settings_storage.h"
+#include "i2c_driver.h"
 
 #define WRITE_BIT I2C_MASTER_WRITE
 #define READ_BIT I2C_MASTER_READ
@@ -109,6 +110,12 @@ static esp_err_t eeprom_probe_i2c(uint8_t deviceaddress)
 static eeprom_backend_t eeprom_detect_backend(uint8_t deviceaddress)
 {
     if (eeprom_backend != EEPROM_BACKEND_UNKNOWN) {
+        return eeprom_backend;
+    }
+
+    if (!i2c_is_supported() || !i2c_is_initialized()) {
+        eeprom_backend = EEPROM_BACKEND_NVS;
+        ESP_LOGW(TAG, "I2C not supported. Using NVS fallback for EEPROM.");
         return eeprom_backend;
     }
 
@@ -258,7 +265,7 @@ esp_err_t eeprom_read(uint8_t deviceaddress, uint16_t eeaddress, uint8_t *data, 
         if (size > 1) {
             i2c_master_read(cmd, data, size - 1, I2C_MASTER_ACK);
         }
-        i2c_master_read_byte(cmd, data + size - 1, I2C_MASTER_LAST_NACK);
+        i2c_master_read_byte(cmd, &data[size - 1], I2C_MASTER_LAST_NACK);
         i2c_master_stop(cmd);
         err = i2c_master_cmd_begin(i2c_master_port, cmd, 1000 / portTICK_PERIOD_MS);
         i2c_cmd_link_delete(cmd);

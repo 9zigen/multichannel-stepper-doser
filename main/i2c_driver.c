@@ -23,16 +23,33 @@
 #include "i2c_driver.h"
 
 #define TAG "I2C"
-#define I2C_SDA 41
-#define I2C_SCL 40
+#define I2C_SDA (-1)
+#define I2C_SCL (-1)
 
 static void i2c_scanner();
+static bool i2c_initialized = false;
 
 i2c_port_t i2c_master_port = I2C_NUM_0;
 SemaphoreHandle_t i2c_semaphore;
 
+bool i2c_is_supported(void)
+{
+  return  (I2C_SDA != I2C_SCL) && (I2C_SDA >= 0) && (I2C_SCL >= 0);
+}
+
+bool i2c_is_initialized(void)
+{
+  return i2c_initialized;
+}
+
 void init_i2c()
 {
+  if (!i2c_is_supported()) {
+    ESP_LOGW(TAG, "I2C disabled: SDA=%d SCL=%d. Falling back to non-I2C backends.", I2C_SDA, I2C_SCL);
+    i2c_initialized = false;
+    return;
+  }
+
   i2c_semaphore = xSemaphoreCreateMutex();
 
   i2c_config_t conf;
@@ -46,6 +63,7 @@ void init_i2c()
 
   ESP_ERROR_CHECK(i2c_driver_install(i2c_master_port, I2C_MODE_MASTER, 0, 0, 0));
   ESP_ERROR_CHECK(i2c_param_config(i2c_master_port, &conf));
+  i2c_initialized = true;
 
   i2c_scanner();
 }

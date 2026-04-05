@@ -22,6 +22,7 @@
 #include "main.h"
 #include "connect.h"
 #include "app_settings.h"
+#include "i2c_driver.h"
 
 static const char *TAG = "RTC";
 
@@ -96,7 +97,8 @@ void init_clock()
 
 
     datetime_t datetime = {0};
-    bool rtc_chip_available = (mcp7940_probe() == ESP_OK);
+    bool i2c_available = i2c_is_supported() && i2c_is_initialized();
+    bool rtc_chip_available = i2c_available && (mcp7940_probe() == ESP_OK);
     if (rtc_chip_available) {
         mcp7940_get_datetime(&datetime);
 
@@ -121,6 +123,10 @@ void init_clock()
 
         rtc_backend = "MCP7940 RTC";
         rtc_fallback = false;
+    } else if (!i2c_available) {
+        ESP_LOGW(TAG, "I2C not supported. Falling back to network/system time.");
+        rtc_backend = services->enable_ntp ? "NTP fallback" : "System clock";
+        rtc_fallback = true;
     } else {
         ESP_LOGW(TAG, "MCP7940 not detected. Falling back to network/system time.");
         rtc_backend = services->enable_ntp ? "NTP fallback" : "System clock";

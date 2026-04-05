@@ -27,7 +27,6 @@ typedef struct {
   float rpm;
   bool direction;
   pump_state_t state;
-  gpio_num_t led_pin;
 } pumps_status_t;
 
 typedef struct {

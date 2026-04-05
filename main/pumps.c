@@ -15,7 +15,7 @@
 #include <driver/gpio.h>
 
 #include "app_settings.h"
-#include "eeprom.h"
+#include "app_settings_storage.h"
 #include "pumps.h"
 #include "stepper_task.h"
 #include "tools.h"
@@ -83,22 +83,15 @@ static double pump_flow_ml_per_min(const pump_t *pump_config, float rpm)
     return points[pump_config->calibration_count - 1].flow;
 }
 
-static void set_pump_led(uint8_t pump_id, bool active)
-{
-    gpio_set_level(pumps[pump_id].led_pin, active ? 0 : 1);
-}
-
 static esp_err_t start_pump(uint8_t pump_id, float rpm, bool direction)
 {
     ESP_LOGI(TAG, "start pump:%u rpm=%.2f dir=%u", (unsigned)pump_id, rpm, direction);
-    set_pump_led(pump_id, true);
     return stepper_task_control(pump_id, rpm, direction, -1);
 }
 
 static void stop_pump(uint8_t pump_id)
 {
     ESP_LOGI(TAG, "stop pump:%u", (unsigned)pump_id);
-    set_pump_led(pump_id, false);
     stepper_task_control(pump_id, 0.0f, false, 0);
 }
 
@@ -189,7 +182,6 @@ void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm)
 
     if (start_pump(pump_id, rpm, pumps[pump_id].direction) != ESP_OK) {
         pumps[pump_id].state = PUMP_OFF;
-        set_pump_led(pump_id, false);
     }
 }
 
@@ -370,12 +362,6 @@ int init_pumps(void)
         pumps[i].rpm = 0;
         pumps[i].direction = get_pump_config(i)->direction;
         pumps[i].state = PUMP_OFF;
-        pumps[i].led_pin = GPIO_NUM_1 + i;
-
-        gpio_set_direction(pumps[i].led_pin, GPIO_MODE_OUTPUT);
-        gpio_set_level(pumps[i].led_pin, 0);
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-        gpio_set_level(pumps[i].led_pin, 1);
     }
 
     if (eeprom_read_byte(0x50, 0x31) == 0x82) {
