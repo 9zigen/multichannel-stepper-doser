@@ -65,6 +65,8 @@ static uint8_t current_profile_attempts = 0;
 TimerHandle_t xApFallbackTimer = NULL;
 EventGroupHandle_t wifi_event_group;
 
+static bool wifi_has_profiles(void);
+
 const char *connect_get_station_ssid(void)
 {
     network_t *config = wifi_get_active_profile();
@@ -431,6 +433,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         network_t *profile = wifi_get_active_profile();
+        wifi_mode_t mode = WIFI_MODE_NULL;
         ESP_LOGI(TAG, "got station ip:" IPSTR, IP2STR(&event->ip_info.ip));
         station_connected = true;
         current_profile_attempts = 0;
@@ -438,9 +441,14 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         set_led_mode(LED_INDICATE_OK, LED_SLOW_BLINK, 255);
 
+        if (esp_wifi_get_mode(&mode) != ESP_OK) {
+            mode = WIFI_MODE_NULL;
+        }
+
         if (!booted_without_networks &&
             !ap_fallback_active &&
             ap_client_count == 0 &&
+            mode != WIFI_MODE_STA &&
             (profile == NULL || !profile->keep_ap_active)) {
             ESP_LOGI(TAG, "Station connected on a normal boot, disabling AP");
             wifi_start_current_mode();
