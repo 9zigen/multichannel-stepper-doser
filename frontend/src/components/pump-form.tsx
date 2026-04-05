@@ -14,7 +14,9 @@ import { PumpCalibrationState, PumpState, ScheduleState } from '@/lib/api.ts';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { toast } from 'sonner';
 import PumpCalibration from '@/components/pump-calibration.tsx';
-import { Check, LoaderCircle } from 'lucide-react';
+import { Check, FlaskConical, LoaderCircle, Square } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx';
+import { usePumpRuntime } from '@/components/pump-runtime-provider.tsx';
 
 type FormData = {
   id: number;
@@ -71,6 +73,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
     calibration,
   } = pump;
   const updatePump = useAppStore((state: AppStoreState) => state.updatePump);
+  const { runtime, stopCalibrationSession } = usePumpRuntime();
 
   const {
     control,
@@ -104,6 +107,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
 
   const direction_actual = watch('direction');
   const unsaved = isDirty || calibrationChanged;
+  const activeCalibration = runtime.find((entry) => entry.id === id && entry.state === 'calibration') ?? null;
 
   useEffect(() => {
     setPumpCalibrations(calibration);
@@ -165,7 +169,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
             </div>
             <div className="flex flex-row gap-4 mb-4 justify-between">
               <div className="w-[50%]">
-                <div className="text-gray-500 text-sm pb-1">
+                <div className="pb-1 text-sm text-muted-foreground">
                   <label>Name</label>
                 </div>
                 <Input type="text" placeholder="Name" {...register('name')} />
@@ -177,7 +181,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
               </div>
 
               <div className="flex flex-col items-center justify-between pb-2">
-                <div className="text-gray-500 text-sm pb-1">
+                <div className="pb-1 text-sm text-muted-foreground">
                   <Label htmlFor="pump-direction">{direction_actual ? 'CW' : 'CCW'}</Label>
                 </div>
                 <Controller
@@ -194,7 +198,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
               </div>
 
               <div className="flex flex-col items-center justify-between pb-2">
-                <div className="text-gray-500 text-sm pb-1">
+                <div className="pb-1 text-sm text-muted-foreground">
                   <Label htmlFor="pump-state">Enabled</Label>
                 </div>
                 <Controller
@@ -213,7 +217,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
 
             <div className="flex flex-row gap-4 mb-6 justify-between">
               <div className="w-[50%]">
-                <div className="text-gray-500 text-sm pb-1">
+                <div className="pb-1 text-sm text-muted-foreground">
                   <label>Tank full volume</label>
                 </div>
                 <Input type="number" placeholder="900" {...register('tank_full_vol', { valueAsNumber: true })} />
@@ -225,7 +229,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
               </div>
 
               <div className="w-[50%]">
-                <div className="text-gray-500 text-sm pb-1">
+                <div className="pb-1 text-sm text-muted-foreground">
                   <label>Tank current volume</label>
                 </div>
                 <Input type="number" placeholder="900" {...register('tank_current_vol', { valueAsNumber: true })} />
@@ -240,7 +244,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
             <span className="text-base">Notes</span>
             <div className="flex flex-row gap-4 mb-6 justify-between">
               <div className="w-[50%]">
-                <div className="text-gray-500 text-sm pb-1">
+                <div className="pb-1 text-sm text-muted-foreground">
                   <label>Solution concentration</label>
                 </div>
                 <Input
@@ -256,7 +260,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
               </div>
 
               <div className="w-[50%]">
-                <div className="text-gray-500 text-sm pb-1">
+                <div className="pb-1 text-sm text-muted-foreground">
                   <label>Element concentration</label>
                 </div>
                 <Input
@@ -274,6 +278,32 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
           </form>
 
           <div className="flex flex-col xl:w-[50%]">
+            {activeCalibration ? (
+              <Alert className="mb-4 border-amber-500/25 bg-amber-500/8">
+                <FlaskConical className="size-4" />
+                <AlertTitle>Calibration in progress</AlertTitle>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  <span>The motor is still running for this pump. You can continue or stop it here.</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={async () => {
+                      const success = await stopCalibrationSession(id);
+                      if (success) {
+                        toast.success(`${name} calibration stopped.`);
+                      } else {
+                        toast.error('Failed to stop calibration.');
+                      }
+                    }}
+                  >
+                    <Square className="size-4" />
+                    Stop
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <PumpCalibration pump={pump} success={(cal) => addCalibration(cal)} />
             {errors.calibration && (
               <p role="alert" className="text-sm text-red-600">

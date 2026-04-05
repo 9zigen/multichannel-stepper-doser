@@ -5,6 +5,7 @@ import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { ThemeProvider } from '@/components/theme-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { RealtimeProvider } from '@/components/realtime-provider.tsx';
+import { PumpRuntimeProvider } from '@/components/pump-runtime-provider.tsx';
 
 const App = (): React.ReactElement => {
   const isAuthenticated = useAppStore((state: AppStoreState) => state.isAuthenticated);
@@ -24,7 +25,9 @@ const App = (): React.ReactElement => {
     <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
       <TooltipProvider>
         <RealtimeProvider>
-          <Layout>{routes}</Layout>
+          <PumpRuntimeProvider>
+            <Layout>{routes}</Layout>
+          </PumpRuntimeProvider>
         </RealtimeProvider>
       </TooltipProvider>
     </ThemeProvider>

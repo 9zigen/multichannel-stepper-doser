@@ -28,6 +28,7 @@
 #include "board.h"
 #include "main.h"
 #include "adc.h"
+#include "app_events.h"
 #include "mcp7940.h"
 #include "led.h"
 #include "ota.h"
@@ -42,6 +43,7 @@
 #include "app_settings_storage.h"
 #include "monitor.h"
 #include "i2c_driver.h"
+#include "pump_backend_stepper.h"
 #include "stepper_task.h"
 #include "driver/rmt.h"
 #include "tmc2209.h"
@@ -58,12 +60,14 @@ TaskHandle_t pvTask2 = NULL;
 /**********************
  *   APPLICATION MAIN
  **********************/
-void app_main() {
-    /* NVM settings */
+void app_main()
+{
+    /* Base */
     init_settings();
+    init_events();
 
     /* Stepper */
-    xTaskCreatePinnedToCore(&stepper_task,"Stepper Task",4096,NULL,5,NULL,1);
+    xTaskCreatePinnedToCore(&stepper_task,"Stepper Task",4096, NULL,5, NULL,1);
 
     /* WiFi + Web server */
     initialise_wifi(NULL);
@@ -110,7 +114,8 @@ void app_main() {
     init_monitor();
 
     /* Pumps */
-    init_pumps();
+    ESP_ERROR_CHECK(register_stepper_pump_backend());
+    ESP_ERROR_CHECK(init_pumps());
 
     /* web server */
     start_webserver();

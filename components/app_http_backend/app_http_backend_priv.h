@@ -22,6 +22,7 @@ void app_http_ws_unregister_client(int sockfd);
 void app_http_ws_touch_client(int sockfd);
 esp_err_t app_http_ws_send_json_to_client(httpd_handle_t handle, int sockfd, const char *payload);
 esp_err_t app_http_ws_broadcast_json(const char *payload);
+void app_http_ws_init_event_bridge(void);
 
 esp_err_t index_get_handler(httpd_req_t *req);
 esp_err_t favicon_get_handler(httpd_req_t *req);

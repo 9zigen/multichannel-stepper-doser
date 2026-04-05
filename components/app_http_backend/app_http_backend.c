@@ -10,9 +10,10 @@
 #include "esp_timer.h"
 
 #include "auth.h"
+#include "app_events.h"
 #include "app_settings.h"
 #include "web_server.h"
-
+#include "app_pumps.h"
 #include "app_http_backend_priv.h"
 
 static const char *TAG = "WEBSERVER";
@@ -26,6 +27,7 @@ typedef struct {
 } app_http_ws_client_t;
 
 static app_http_ws_client_t ws_clients[APP_HTTP_MAX_WS_CLIENTS];
+static esp_event_handler_instance_t ws_pump_runtime_event_ctx;
 
 static int app_http_ws_find_client_slot(int sockfd)
 {
@@ -36,6 +38,54 @@ static int app_http_ws_find_client_slot(int sockfd)
     }
 
     return -1;
+}
+
+static const char *app_http_ws_pump_state_to_string(pump_state_t state)
+{
+    switch (state) {
+        case PUMP_ON:
+            return "timed";
+        case PUMP_CONTINUOUS:
+            return "continuous";
+        case PUMP_CAL:
+            return "calibration";
+        case PUMP_OFF:
+        default:
+            return "off";
+    }
+}
+
+static void app_http_ws_pump_runtime_event_handler(void* arg, esp_event_base_t event_base,
+                                                   int32_t event_id, void* event_data)
+{
+    (void)arg;
+    (void)event_base;
+
+    if (event_id != PUMP_RUNTIME_DATA || event_data == NULL) {
+        return;
+    }
+
+    const pump_runtime_event_t *pump_event = (const pump_runtime_event_t *)event_data;
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "type", "pump_runtime");
+    cJSON *pump = cJSON_CreateObject();
+    cJSON_AddItemToObject(pump, "id", cJSON_CreateNumber(pump_event->pump_id));
+    cJSON_AddItemToObject(pump, "active", cJSON_CreateBool(pump_event->state != PUMP_OFF));
+    cJSON_AddItemToObject(pump, "state", cJSON_CreateString(app_http_ws_pump_state_to_string(pump_event->state)));
+    cJSON_AddItemToObject(pump, "speed", cJSON_CreateNumber(pump_event->rpm));
+    cJSON_AddItemToObject(pump, "direction", cJSON_CreateBool(pump_event->direction));
+    cJSON_AddItemToObject(pump, "remaining_ticks", cJSON_CreateNumber(pump_event->time));
+    cJSON_AddItemToObject(pump, "remaining_seconds",
+                          cJSON_CreateNumber((double)pump_event->time / (double)PUMP_TIMER_UNIT_IN_SEC));
+    cJSON_AddItemToObject(pump, "volume_ml", cJSON_CreateNumber(pump_event->volume));
+    cJSON_AddItemToObject(root, "pump", pump);
+
+    char *payload = cJSON_PrintUnformatted(root);
+    if (payload != NULL) {
+        app_http_ws_broadcast_json(payload);
+        free(payload);
+    }
+    cJSON_Delete(root);
 }
 
 extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
@@ -206,6 +256,17 @@ esp_err_t app_http_ws_broadcast_json(const char *payload)
     return last_error;
 }
 
+void app_http_ws_init_event_bridge(void)
+{
+    static bool initialized = false;
+    if (initialized) {
+        return;
+    }
+
+    app_events_register_handler(PUMP_RUNTIME_DATA, NULL, app_http_ws_pump_runtime_event_handler, &ws_pump_runtime_event_ctx);
+    initialized = true;
+}
+
 esp_err_t favicon_get_handler(httpd_req_t *req)
 {
     const size_t size = (favicon_ico_end - favicon_ico_start);
@@ -316,6 +377,7 @@ httpd_handle_t start_webserver(void)
     }
 
     if (httpd_start(&server, &config) == ESP_OK) {
+        app_http_ws_init_event_bridge();
         httpd_uri_t global_options = {
             .uri = "/*",
             .method = HTTP_OPTIONS,

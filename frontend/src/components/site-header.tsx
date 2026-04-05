@@ -13,6 +13,7 @@ import { useTheme } from '@/components/theme-provider';
 import { Button } from '@/components/ui/button.tsx';
 import { Moon, Sun } from 'lucide-react';
 import { BackendConnectionIndicator } from '@/components/backend-connection-indicator.tsx';
+import { CalibrationStatusIndicator } from '@/components/calibration-status-indicator.tsx';
 
 export function SiteHeader(): React.ReactElement {
   const location = useLocation();
@@ -71,6 +72,7 @@ export function SiteHeader(): React.ReactElement {
         <div className="flex w-full items-center justify-between">
           <Breadcrumbs />
           <div className="flex items-center gap-2">
+            <CalibrationStatusIndicator />
             <BackendConnectionIndicator />
             <ButtonTheme />
           </div>

@@ -7,25 +7,23 @@
 #include <time.h>
 
 #include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include <freertos/timers.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_timer.h>
-#include <driver/gpio.h>
 
+#include "app_events.h"
+#include "app_pumps.h"
 #include "app_settings.h"
 #include "app_settings_storage.h"
-#include "pumps.h"
-#include "stepper_task.h"
-#include "tools.h"
 
-static const char *TAG = "PUMPS";
+static const char *TAG = "APP_PUMPS";
 
-TimerHandle_t xBackupTimer;
-TimerHandle_t xScheduleTimer;
-pumps_status_t pumps[MAX_PUMP];
-uint32_t last_run_schedule_hour[MAX_SCHEDULE];
+static TimerHandle_t xBackupTimer;
+static TimerHandle_t xScheduleTimer;
+static pumps_status_t pumps[MAX_PUMP];
+static uint32_t last_run_schedule_hour[MAX_SCHEDULE];
+static const app_pumps_backend_t *s_backend;
 
 uint8_t tank_volume_changed = 0;
 
@@ -83,16 +81,51 @@ static double pump_flow_ml_per_min(const pump_t *pump_config, float rpm)
     return points[pump_config->calibration_count - 1].flow;
 }
 
-static esp_err_t start_pump(uint8_t pump_id, float rpm, bool direction)
+static esp_err_t start_pump(uint8_t pump_id, float speed, bool direction)
 {
-    ESP_LOGI(TAG, "start pump:%u rpm=%.2f dir=%u", (unsigned)pump_id, rpm, direction);
-    return stepper_task_control(pump_id, rpm, direction, -1);
+    if (s_backend == NULL || s_backend->start == NULL) {
+        ESP_LOGE(TAG, "pump backend is not registered");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "backend=%s start pump:%u speed=%.2f dir=%u",
+             s_backend->name != NULL ? s_backend->name : "unknown",
+             (unsigned)pump_id,
+             speed,
+             direction);
+    return s_backend->start(pump_id, speed, direction, -1);
 }
 
 static void stop_pump(uint8_t pump_id)
 {
-    ESP_LOGI(TAG, "stop pump:%u", (unsigned)pump_id);
-    stepper_task_control(pump_id, 0.0f, false, 0);
+    if (s_backend == NULL || s_backend->stop == NULL) {
+        ESP_LOGW(TAG, "pump backend is not registered");
+        return;
+    }
+
+    ESP_LOGI(TAG, "backend=%s stop pump:%u",
+             s_backend->name != NULL ? s_backend->name : "unknown",
+             (unsigned)pump_id);
+    s_backend->stop(pump_id);
+}
+
+static void dispatch_pump_runtime_event(uint8_t pump_id)
+{
+    if (pump_id >= MAX_PUMP) {
+        return;
+    }
+
+    pump_runtime_event_t event = {
+        .pump_id = pump_id,
+        .time = pumps[pump_id].time,
+        .volume = pumps[pump_id].volume,
+        .flow_per_unit = pumps[pump_id].flow_per_unit,
+        .rpm = pumps[pump_id].rpm,
+        .direction = pumps[pump_id].direction,
+        .state = pumps[pump_id].state,
+    };
+
+    app_events_dispatch_system(PUMP_RUNTIME_DATA, &event, sizeof(event));
 }
 
 static void run_timer_callback(void *arg)
@@ -113,137 +146,18 @@ static void run_timer_callback(void *arg)
                 pumps[pump_id].state = PUMP_OFF;
                 stop_pump(pump_id);
             }
+            dispatch_pump_runtime_event(pump_id);
         } else if (pumps[pump_id].state == PUMP_CONTINUOUS) {
             pumps[pump_id].volume += pumps[pump_id].flow_per_unit;
             pump_config->tank_current_vol = clamp_positive(pump_config->tank_current_vol - pumps[pump_id].flow_per_unit);
             pump_config->running_hours += 1.0f / (float)(PUMP_TIMER_UNIT_IN_SEC * 3600.0f);
             tank_volume_changed = 1;
+            dispatch_pump_runtime_event(pump_id);
         } else if (pumps[pump_id].state == PUMP_CAL) {
             pumps[pump_id].time++;
+            dispatch_pump_runtime_event(pump_id);
         }
     }
-}
-
-void run_pump_with_timeout(uint8_t pump_id, uint32_t timeout_ms, uint8_t speed)
-{
-    if (pump_id >= MAX_PUMP || speed == 0) {
-        return;
-    }
-
-    pump_t *pump_config = get_pump_config(pump_id);
-    double flow_ml_per_min = pump_flow_ml_per_min(pump_config, (float)speed);
-    if (flow_ml_per_min <= 0.0) {
-        return;
-    }
-
-    pumps[pump_id].time = (uint32_t)llround(((double)timeout_ms / 1000.0) * PUMP_TIMER_UNIT_IN_SEC);
-    if (pumps[pump_id].time == 0) {
-        pumps[pump_id].time = 1;
-    }
-    pumps[pump_id].flow_per_unit = flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0;
-    pumps[pump_id].volume = 0;
-    pumps[pump_id].rpm = (float)speed;
-    pumps[pump_id].direction = pump_config->direction;
-    pumps[pump_id].state = PUMP_ON;
-    start_pump(pump_id, (float)speed, pumps[pump_id].direction);
-}
-
-void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm)
-{
-    if (pump_id >= MAX_PUMP) {
-        return;
-    }
-
-    pump_t *pump_config = get_pump_config(pump_id);
-    double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
-    if (flow_ml_per_min <= 0.0) {
-        ESP_LOGE(TAG, "pump calibration not set for pump %u at %.2f rpm", (unsigned)pump_id, rpm);
-        return;
-    }
-
-    double run_time_seconds = (volume_ml / flow_ml_per_min) * 60.0;
-    uint32_t run_units = (uint32_t)llround(run_time_seconds * PUMP_TIMER_UNIT_IN_SEC);
-    if (run_units == 0) {
-        run_units = 1;
-    }
-
-    pumps[pump_id].time = run_units;
-    pumps[pump_id].flow_per_unit = flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0;
-    pumps[pump_id].volume = 0;
-    pumps[pump_id].rpm = rpm;
-    pumps[pump_id].direction = pump_config->direction;
-    pumps[pump_id].state = PUMP_ON;
-
-    ESP_LOGI(TAG, "run pump:%u volume=%.2f rpm=%.2f runtime=%.2fs",
-             (unsigned)pump_id,
-             volume_ml,
-             rpm,
-             run_time_seconds);
-
-    if (start_pump(pump_id, rpm, pumps[pump_id].direction) != ESP_OK) {
-        pumps[pump_id].state = PUMP_OFF;
-    }
-}
-
-esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t time_minutes)
-{
-    if (pump_id >= MAX_PUMP) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    if (time_minutes <= 0) {
-        stop_pump(pump_id);
-        pumps[pump_id].state = PUMP_OFF;
-        pumps[pump_id].time = 0;
-        return ESP_OK;
-    }
-
-    if (rpm <= 0.0f) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    pump_t *pump_config = get_pump_config(pump_id);
-    double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
-
-    pumps[pump_id].time = (uint32_t)time_minutes * 60U * PUMP_TIMER_UNIT_IN_SEC;
-    pumps[pump_id].flow_per_unit =
-        flow_ml_per_min > 0.0 ? flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0 : 0.0;
-    pumps[pump_id].volume = 0;
-    pumps[pump_id].rpm = rpm;
-    pumps[pump_id].direction = direction;
-    pumps[pump_id].state = PUMP_ON;
-
-    return start_pump(pump_id, rpm, direction);
-}
-
-void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direction)
-{
-    if (pump_id >= MAX_PUMP) {
-        return;
-    }
-
-    if (is_start) {
-        pumps[pump_id].state = PUMP_CAL;
-        pumps[pump_id].time = 0;
-        pumps[pump_id].flow_per_unit = 0;
-        pumps[pump_id].volume = 0;
-        pumps[pump_id].rpm = rpm;
-        pumps[pump_id].direction = direction;
-        start_pump(pump_id, rpm, direction);
-    } else {
-        pumps[pump_id].state = PUMP_OFF;
-        stop_pump(pump_id);
-    }
-}
-
-int64_t get_tank_volume(uint8_t pump_id)
-{
-    return (int64_t)get_pump_config(pump_id)->tank_current_vol;
-}
-
-const pumps_status_t *get_pumps_runtime_status(void)
-{
-    return pumps;
 }
 
 static void restore_eeprom_tank_status(void)
@@ -257,17 +171,7 @@ static void restore_eeprom_tank_status(void)
     }
 }
 
-void backup_eeprom_tank_status(void)
-{
-    tank_status_t tank;
-    for (int i = 0; i < MAX_PUMP; ++i) {
-        tank.tank_current_vol[i] = get_pump_config(i)->tank_current_vol;
-    }
-    tank.magic = EEPROM_MAGIC;
-    eeprom_write(0x50, EEPROM_TANK_STATUS_ADDR, (uint8_t *)&tank, sizeof(tank_status_t));
-}
-
-void vBackupTimerHandler(TimerHandle_t pxTimer)
+static void vBackupTimerHandler(TimerHandle_t pxTimer)
 {
     (void)pxTimer;
 
@@ -277,7 +181,7 @@ void vBackupTimerHandler(TimerHandle_t pxTimer)
     }
 }
 
-void vScheduleTimerHandler(TimerHandle_t pxTimer)
+static void vScheduleTimerHandler(TimerHandle_t pxTimer)
 {
     (void)pxTimer;
 
@@ -298,6 +202,7 @@ void vScheduleTimerHandler(TimerHandle_t pxTimer)
         if (pumps[pump_id].state == PUMP_CONTINUOUS && !continuous_mode[pump_id]) {
             pumps[pump_id].state = PUMP_OFF;
             stop_pump(pump_id);
+            dispatch_pump_runtime_event(pump_id);
         }
     }
 
@@ -319,6 +224,7 @@ void vScheduleTimerHandler(TimerHandle_t pxTimer)
                 if (start_pump(schedule->pump_id, schedule->speed, pumps[schedule->pump_id].direction) != ESP_OK) {
                     pumps[schedule->pump_id].state = PUMP_OFF;
                 }
+                dispatch_pump_runtime_event(schedule->pump_id);
             }
             continue;
         }
@@ -356,8 +262,174 @@ void vScheduleTimerHandler(TimerHandle_t pxTimer)
     }
 }
 
+esp_err_t app_pumps_register_backend(const app_pumps_backend_t *backend)
+{
+    if (backend == NULL || backend->start == NULL || backend->stop == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    s_backend = backend;
+    ESP_LOGI(TAG, "registered pump backend: %s", backend->name != NULL ? backend->name : "unknown");
+    return ESP_OK;
+}
+
+const app_pumps_backend_t *app_pumps_get_backend(void)
+{
+    return s_backend;
+}
+
+int64_t get_tank_volume(uint8_t pump_id)
+{
+    return (int64_t)get_pump_config(pump_id)->tank_current_vol;
+}
+
+const pumps_status_t *get_pumps_runtime_status(void)
+{
+    return pumps;
+}
+
+void run_pump_with_timeout(uint8_t pump_id, uint32_t timeout_ms, uint8_t speed)
+{
+    if (pump_id >= MAX_PUMP || speed == 0) {
+        return;
+    }
+
+    pump_t *pump_config = get_pump_config(pump_id);
+    double flow_ml_per_min = pump_flow_ml_per_min(pump_config, (float)speed);
+    if (flow_ml_per_min <= 0.0) {
+        return;
+    }
+
+    pumps[pump_id].time = (uint32_t)llround(((double)timeout_ms / 1000.0) * PUMP_TIMER_UNIT_IN_SEC);
+    if (pumps[pump_id].time == 0) {
+        pumps[pump_id].time = 1;
+    }
+    pumps[pump_id].flow_per_unit = flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0;
+    pumps[pump_id].volume = 0;
+    pumps[pump_id].rpm = (float)speed;
+    pumps[pump_id].direction = pump_config->direction;
+    pumps[pump_id].state = PUMP_ON;
+    if (start_pump(pump_id, (float)speed, pumps[pump_id].direction) != ESP_OK) {
+        pumps[pump_id].state = PUMP_OFF;
+    }
+    dispatch_pump_runtime_event(pump_id);
+}
+
+void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm)
+{
+    if (pump_id >= MAX_PUMP) {
+        return;
+    }
+
+    pump_t *pump_config = get_pump_config(pump_id);
+    double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
+    if (flow_ml_per_min <= 0.0) {
+        ESP_LOGE(TAG, "pump calibration not set for pump %u at %.2f speed", (unsigned)pump_id, rpm);
+        return;
+    }
+
+    double run_time_seconds = (volume_ml / flow_ml_per_min) * 60.0;
+    uint32_t run_units = (uint32_t)llround(run_time_seconds * PUMP_TIMER_UNIT_IN_SEC);
+    if (run_units == 0) {
+        run_units = 1;
+    }
+
+    pumps[pump_id].time = run_units;
+    pumps[pump_id].flow_per_unit = flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0;
+    pumps[pump_id].volume = 0;
+    pumps[pump_id].rpm = rpm;
+    pumps[pump_id].direction = pump_config->direction;
+    pumps[pump_id].state = PUMP_ON;
+
+    ESP_LOGI(TAG, "run pump:%u volume=%.2f speed=%.2f runtime=%.2fs",
+             (unsigned)pump_id,
+             volume_ml,
+             rpm,
+             run_time_seconds);
+
+    if (start_pump(pump_id, rpm, pumps[pump_id].direction) != ESP_OK) {
+        pumps[pump_id].state = PUMP_OFF;
+    }
+    dispatch_pump_runtime_event(pump_id);
+}
+
+esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t time_minutes)
+{
+    if (pump_id >= MAX_PUMP) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (time_minutes <= 0) {
+        stop_pump(pump_id);
+        pumps[pump_id].state = PUMP_OFF;
+        pumps[pump_id].time = 0;
+        dispatch_pump_runtime_event(pump_id);
+        return ESP_OK;
+    }
+
+    if (rpm <= 0.0f) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    pump_t *pump_config = get_pump_config(pump_id);
+    double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
+
+    pumps[pump_id].time = (uint32_t)time_minutes * 60U * PUMP_TIMER_UNIT_IN_SEC;
+    pumps[pump_id].flow_per_unit =
+        flow_ml_per_min > 0.0 ? flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0 : 0.0;
+    pumps[pump_id].volume = 0;
+    pumps[pump_id].rpm = rpm;
+    pumps[pump_id].direction = direction;
+    pumps[pump_id].state = PUMP_ON;
+    esp_err_t err = start_pump(pump_id, rpm, direction);
+    if (err != ESP_OK) {
+        pumps[pump_id].state = PUMP_OFF;
+    }
+    dispatch_pump_runtime_event(pump_id);
+    return err;
+}
+
+void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direction)
+{
+    if (pump_id >= MAX_PUMP) {
+        return;
+    }
+
+    if (is_start) {
+        pumps[pump_id].state = PUMP_CAL;
+        pumps[pump_id].time = 0;
+        pumps[pump_id].flow_per_unit = 0;
+        pumps[pump_id].volume = 0;
+        pumps[pump_id].rpm = rpm;
+        pumps[pump_id].direction = direction;
+        if (start_pump(pump_id, rpm, direction) != ESP_OK) {
+            pumps[pump_id].state = PUMP_OFF;
+        }
+        dispatch_pump_runtime_event(pump_id);
+    } else {
+        pumps[pump_id].state = PUMP_OFF;
+        stop_pump(pump_id);
+        dispatch_pump_runtime_event(pump_id);
+    }
+}
+
+void backup_eeprom_tank_status(void)
+{
+    tank_status_t tank;
+    for (int i = 0; i < MAX_PUMP; ++i) {
+        tank.tank_current_vol[i] = get_pump_config(i)->tank_current_vol;
+    }
+    tank.magic = EEPROM_MAGIC;
+    eeprom_write(0x50, EEPROM_TANK_STATUS_ADDR, (uint8_t *)&tank, sizeof(tank_status_t));
+}
+
 int init_pumps(void)
 {
+    if (s_backend == NULL) {
+        ESP_LOGE(TAG, "pump backend must be registered before init_pumps()");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     for (int i = 0; i < MAX_PUMP; ++i) {
         pumps[i].time = 0;
         pumps[i].volume = 0;
@@ -390,17 +462,14 @@ int init_pumps(void)
     ESP_ERROR_CHECK(esp_timer_start_periodic(run_timer, 10000));
 
     xScheduleTimer = xTimerCreate("scheduleTimer", (60 * 1000 / portTICK_PERIOD_MS), pdTRUE, 0, vScheduleTimerHandler);
-    CHECK_TIMER(xTimerStart(xScheduleTimer, 100 / portTICK_PERIOD_MS));
+    if (xScheduleTimer == NULL || xTimerStart(xScheduleTimer, 100 / portTICK_PERIOD_MS) != pdPASS) {
+        return ESP_FAIL;
+    }
 
     xBackupTimer = xTimerCreate("backupTimer", (1000 / portTICK_PERIOD_MS), pdTRUE, 0, vBackupTimerHandler);
-    xTimerStart(xBackupTimer, 100 / portTICK_PERIOD_MS);
+    if (xBackupTimer == NULL || xTimerStart(xBackupTimer, 100 / portTICK_PERIOD_MS) != pdPASS) {
+        return ESP_FAIL;
+    }
 
-    return ESP_OK;
-}
-
-esp_err_t pumps_calibration(uint8_t pump_id, uint8_t is_start, uint16_t speed, uint16_t volume)
-{
-    (void)volume;
-    run_pump_calibration(pump_id, is_start != 0, (float)speed, get_pump_config(pump_id)->direction);
     return ESP_OK;
 }

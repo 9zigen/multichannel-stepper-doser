@@ -23,6 +23,21 @@ function cloneSettings<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function roundToHundredths(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function normalizePump(pump: PumpState): PumpState {
+  return {
+    ...pump,
+    tank_current_vol: roundToHundredths(pump.tank_current_vol),
+  };
+}
+
+function normalizePumps(pumps: PumpState[]): PumpState[] {
+  return pumps.map((pump) => normalizePump(pump));
+}
+
 export type AppStoreState = {
   isAuthenticated: boolean;
   status: StatusState;
@@ -173,17 +188,21 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
   loadSettings: async () => {
     try {
       const response = (await getSettings()) as SettingsState;
+      const normalizedPumps = normalizePumps(response.pumps);
       set({
         settings: {
           auth: response.auth,
           services: response.services,
           networks: response.networks,
-          pumps: response.pumps,
+          pumps: normalizedPumps,
           time: response.time,
         },
         error: null,
       });
-      return response;
+      return {
+        ...response,
+        pumps: normalizedPumps,
+      };
     } catch (e) {
       set({ error: 'Failed to load Settings' });
       return null;
@@ -352,7 +371,7 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       return false;
     }
 
-    const nextPump = cloneSettings(data);
+    const nextPump = normalizePump(cloneSettings(data));
     nextPump.calibration = [...nextPump.calibration].sort((a, b) => a.speed - b.speed);
 
     const pumps = get().settings.pumps;

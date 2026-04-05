@@ -43,29 +43,29 @@ esp_err_t init_events()
       .queue_size = 10,
       .task_name = "app_events",
       .task_priority = 5,
-      .task_stack_size = 2048
+      .task_stack_size = 4096
   };
 
   /* Create the event loops */
   ESP_ERROR_CHECK(esp_event_loop_create(&app_loop_args, &app_event_loop));
 
   /* Register the handler */
-  ESP_ERROR_CHECK(esp_event_handler_instance_register_with(app_event_loop, APP_SYSTEM_EVENTS, LIGHT_CHANGE_EVENT, app_event_handler, app_event_loop, NULL));
+  // ESP_ERROR_CHECK(esp_event_handler_instance_register_with(app_event_loop, APP_SYSTEM_EVENTS, LIGHT_CHANGE_EVENT, app_event_handler, app_event_loop, NULL));
 
   return ESP_OK;
 }
 
-void app_events_register_handler(app_event_t event, void* arg, app_event_handler_t handler, esp_event_handler_instance_t ctx)
+void app_events_register_handler(app_event_t event, void* arg, app_event_handler_t handler, esp_event_handler_instance_t *ctx)
 {
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(app_event_loop,
                                                              APP_SYSTEM_EVENTS,
                                                              event,
                                                              handler,
-                                                             app_event_loop,
+                                                             arg,
                                                              ctx));
 }
 
-void notify_app(app_event_t event, const void* event_data, size_t event_data_size)
+void app_events_dispatch_system(app_event_t event, const void* event_data, size_t event_data_size)
 {
-  ESP_ERROR_CHECK(esp_event_post_to(app_event_loop, APP_SYSTEM_EVENTS, event, event_data, event_data_size, portMAX_DELAY));
+    ESP_ERROR_CHECK(esp_event_post_to(app_event_loop, APP_SYSTEM_EVENTS, event, event_data, event_data_size, portMAX_DELAY));
 }

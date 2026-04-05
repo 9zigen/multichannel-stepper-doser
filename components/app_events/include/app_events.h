@@ -15,7 +15,8 @@ typedef enum {
     MQTT_CONNECTED,
     MQTT_DISCONNECTED,
     TEMPERATURE_CHANGE_EVENT,
-    LIGHT_CHANGE_EVENT
+    LIGHT_CHANGE_EVENT,
+    PUMP_RUNTIME_DATA
 } app_event_t;
 
 typedef void (*app_event_handler_t)(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
@@ -23,6 +24,7 @@ typedef void (*app_event_handler_t)(void* arg, esp_event_base_t event_base, int3
 extern esp_event_loop_handle_t app_event_loop;
 
 esp_err_t init_events();
-void notify_app(app_event_t event, const void* event_data, size_t event_data_size);
+void app_events_register_handler(app_event_t event, void* arg, app_event_handler_t handler, esp_event_handler_instance_t *ctx);
+void app_events_dispatch_system(app_event_t event, const void* event_data, size_t event_data_size);
 
 #endif //ESP32_CC_LED_DRIVER_RTOS_ALAB_EVENT_BUS_H

@@ -18,6 +18,7 @@ import type {
   TimeState,
   WifiScanNetwork,
 } from '@/lib/api.ts';
+import { emitMockRealtimeMessage } from '@/lib/realtime-mock.ts';
 
 type MockState = {
   auth: AuthState;
@@ -396,6 +397,7 @@ function updatePumpRuntime(payload: PumpRunState) {
 
   if (payload.time === 0) {
     delete pumpRuntimeState[payload.id];
+    emitPumpRuntimeUpdate(payload.id);
     return;
   }
 
@@ -408,6 +410,7 @@ function updatePumpRuntime(payload: PumpRunState) {
       ends_at: null,
       duration_seconds: 0,
     };
+    emitPumpRuntimeUpdate(payload.id);
     return;
   }
 
@@ -415,7 +418,7 @@ function updatePumpRuntime(payload: PumpRunState) {
   const selected = calibration.find((item) => item.speed === payload.speed) ?? calibration[0];
   if (selected) {
     const pumpedVolume = Number(((selected.flow / 60) * payload.time).toFixed(2));
-    pump.tank_current_vol = Math.max(0, pump.tank_current_vol - pumpedVolume);
+    pump.tank_current_vol = Number(Math.max(0, pump.tank_current_vol - pumpedVolume).toFixed(2));
     pump.running_hours = Number((pump.running_hours + payload.time / 60).toFixed(2));
   }
 
@@ -427,6 +430,7 @@ function updatePumpRuntime(payload: PumpRunState) {
     ends_at: Date.now() + payload.time * 60 * 1000,
     duration_seconds: payload.time * 60,
   };
+  emitPumpRuntimeUpdate(payload.id);
 }
 
 function syncPumpRuntimeState() {
@@ -470,6 +474,18 @@ function getPumpRuntimeEntries(): PumpRuntimeEntry[] {
       remaining_seconds: runtime.state === 'timed' ? remainingSeconds : 0,
       volume_ml: 0,
     };
+  });
+}
+
+function emitPumpRuntimeUpdate(pumpId: number) {
+  const entry = getPumpRuntimeEntries().find((item) => item.id === pumpId);
+  if (!entry) {
+    return;
+  }
+
+  emitMockRealtimeMessage({
+    type: 'pump_runtime',
+    pump: entry,
   });
 }
 

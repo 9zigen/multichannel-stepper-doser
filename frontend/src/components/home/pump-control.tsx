@@ -6,10 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getPumpsRuntime, type PumpRuntimeEntry, PumpRunResponse, runPump } from '@/lib/api.ts';
+import { PumpRunResponse, runPump } from '@/lib/api.ts';
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx';
 import { AlertTriangle, LoaderCircle, Square } from 'lucide-react';
+import { usePumpRuntime } from '@/components/pump-runtime-provider.tsx';
 
 export interface PumpControlState {
   id: number;
@@ -35,8 +36,7 @@ const FormSchema = z.object({
 
 export default function PumpControl(props: PumpControlProps) {
   const { pumps } = props;
-  const [runtime, setRuntime] = React.useState<PumpRuntimeEntry[]>([]);
-  const [isSyncingRuntime, setIsSyncingRuntime] = React.useState(false);
+  const { runtime, syncRuntime } = usePumpRuntime();
   const {
     control,
     register,
@@ -69,39 +69,6 @@ export default function PumpControl(props: PumpControlProps) {
 
     return primaryActiveRun;
   }, [activeRuns, primaryActiveRun, pumpId]);
-
-  const syncRuntime = React.useCallback(async (showError = false) => {
-    try {
-      setIsSyncingRuntime(true);
-      const response = (await getPumpsRuntime<{ pumps: PumpRuntimeEntry[] }>()) ?? { pumps: [] };
-      setRuntime(response.pumps ?? []);
-    } catch (e) {
-      if (showError) {
-        toast.error('Failed to sync pump runtime.');
-      }
-      console.error(e);
-    } finally {
-      setIsSyncingRuntime(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    void syncRuntime();
-  }, [syncRuntime]);
-
-  React.useEffect(() => {
-    if (activeRuns.length === 0) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      void syncRuntime();
-    }, 1000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [activeRuns.length, syncRuntime]);
 
   React.useEffect(() => {
     if (selectedActiveRun) {
@@ -281,7 +248,7 @@ export default function PumpControl(props: PumpControlProps) {
 
             <div className="flex flex-row gap-3">
               <Button type="submit" className="w-full" variant="default" disabled={pumpIsRunning}>
-                {isSyncingRuntime ? <LoaderCircle className="animate-spin" /> : null}
+                <LoaderCircle className="hidden animate-spin data-[visible=true]:block" data-visible="false" />
                 Run {selectedPumpName}
               </Button>
               <Button
