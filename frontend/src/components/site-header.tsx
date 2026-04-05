@@ -12,6 +12,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '@/components/theme-provider';
 import { Button } from '@/components/ui/button.tsx';
 import { Moon, Sun } from 'lucide-react';
+import { BackendConnectionIndicator } from '@/components/backend-connection-indicator.tsx';
 
 export function SiteHeader(): React.ReactElement {
   const location = useLocation();
@@ -69,7 +70,10 @@ export function SiteHeader(): React.ReactElement {
         <Separator orientation="vertical" className="h-7" />
         <div className="flex w-full items-center justify-between">
           <Breadcrumbs />
-          <ButtonTheme />
+          <div className="flex items-center gap-2">
+            <BackendConnectionIndicator />
+            <ButtonTheme />
+          </div>
         </div>
       </div>
     </header>

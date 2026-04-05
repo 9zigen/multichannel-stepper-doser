@@ -16,6 +16,7 @@
 #include "esp_ota_ops.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
+#include "esp_http_server.h"
 
 #include "app_settings.h"
 #include "auth.h"
@@ -40,6 +41,11 @@ static uint32_t calibration_to_100ml_units(const pump_t *pump)
     }
 
     return (uint32_t)((100.0f / pump->calibration[0].flow) * 60.0f);
+}
+
+static esp_err_t websocket_send_json(httpd_req_t *req, const char *payload)
+{
+    return app_http_ws_send_json_to_client(req->handle, httpd_req_to_sockfd(req), payload);
 }
 
 static void send_unauthorized(httpd_req_t *req)
@@ -180,6 +186,98 @@ esp_err_t pumps_runtime_get_handler(httpd_req_t *req)
     httpd_resp_send(req, response, (ssize_t)strlen(response));
     free(response);
     return ESP_OK;
+}
+
+esp_err_t websocket_handler(httpd_req_t *req)
+{
+    if (req->method == HTTP_GET) {
+        if (app_http_validate_ws_request(req) != ESP_OK) {
+            httpd_resp_set_status(req, "401 Unauthorized!");
+            httpd_resp_send(req, NULL, 0);
+            return ESP_OK;
+        }
+
+        int sockfd = httpd_req_to_sockfd(req);
+        app_http_ws_register_client(sockfd);
+        ESP_LOGI(TAG, "websocket connected fd=%d", sockfd);
+        return ESP_OK;
+    }
+
+    httpd_ws_frame_t frame = {
+        .type = HTTPD_WS_TYPE_TEXT,
+    };
+
+    esp_err_t err = httpd_ws_recv_frame(req, &frame, 0);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    uint8_t *buffer = NULL;
+    if (frame.len > 0) {
+        buffer = calloc(1, frame.len + 1);
+        if (buffer == NULL) {
+            return ESP_ERR_NO_MEM;
+        }
+
+        frame.payload = buffer;
+        err = httpd_ws_recv_frame(req, &frame, frame.len);
+        if (err != ESP_OK) {
+            free(buffer);
+            return err;
+        }
+    }
+
+    if (frame.type == HTTPD_WS_TYPE_CLOSE) {
+        app_http_ws_unregister_client(httpd_req_to_sockfd(req));
+        free(buffer);
+        return ESP_OK;
+    }
+
+    if (frame.type == HTTPD_WS_TYPE_TEXT && buffer != NULL) {
+        int sockfd = httpd_req_to_sockfd(req);
+        app_http_ws_touch_client(sockfd);
+        cJSON *root = cJSON_Parse((const char *)buffer);
+        const cJSON *type = root != NULL ? cJSON_GetObjectItem(root, "type") : NULL;
+
+        if (cJSON_IsString(type) && strcmp(type->valuestring, "ping") == 0) {
+            cJSON *response = cJSON_CreateObject();
+            cJSON_AddStringToObject(response, "type", "pong");
+            cJSON_AddNumberToObject(response, "ts", (double)(esp_log_timestamp()));
+            cJSON_AddNumberToObject(response, "client_fd", sockfd);
+            char *payload = cJSON_PrintUnformatted(response);
+            if (payload != NULL) {
+                err = websocket_send_json(req, payload);
+                free(payload);
+            }
+            cJSON_Delete(response);
+        } else if (cJSON_IsString(type) && strcmp(type->valuestring, "hello") == 0) {
+            cJSON *response = cJSON_CreateObject();
+            cJSON_AddStringToObject(response, "type", "welcome");
+            cJSON_AddNumberToObject(response, "client_fd", sockfd);
+            char *payload = cJSON_PrintUnformatted(response);
+            if (payload != NULL) {
+                err = websocket_send_json(req, payload);
+                free(payload);
+            }
+            cJSON_Delete(response);
+        } else if (cJSON_IsString(type) && strcmp(type->valuestring, "broadcast:test") == 0) {
+            cJSON *response = cJSON_CreateObject();
+            cJSON_AddStringToObject(response, "type", "broadcast");
+            cJSON_AddStringToObject(response, "event", "test");
+            cJSON_AddNumberToObject(response, "source_fd", sockfd);
+            char *payload = cJSON_PrintUnformatted(response);
+            if (payload != NULL) {
+                err = app_http_ws_broadcast_json(payload);
+                free(payload);
+            }
+            cJSON_Delete(response);
+        }
+
+        cJSON_Delete(root);
+    }
+
+    free(buffer);
+    return err;
 }
 
 esp_err_t wifi_scan_get_handler(httpd_req_t *req)

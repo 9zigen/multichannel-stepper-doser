@@ -7,6 +7,7 @@
 
 #include "cJSON.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 
 #include "auth.h"
 #include "app_settings.h"
@@ -18,6 +19,24 @@ static const char *TAG = "WEBSERVER";
 static httpd_handle_t server = NULL;
 
 char app_http_auth_token[65];
+
+typedef struct {
+    int sockfd;
+    int64_t last_seen_ms;
+} app_http_ws_client_t;
+
+static app_http_ws_client_t ws_clients[APP_HTTP_MAX_WS_CLIENTS];
+
+static int app_http_ws_find_client_slot(int sockfd)
+{
+    for (uint32_t i = 0; i < APP_HTTP_MAX_WS_CLIENTS; ++i) {
+        if (ws_clients[i].sockfd == sockfd) {
+            return (int)i;
+        }
+    }
+
+    return -1;
+}
 
 extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
 extern const uint8_t favicon_ico_end[] asm("_binary_favicon_ico_end");
@@ -63,11 +82,128 @@ esp_err_t app_http_validate_request(httpd_req_t *req)
     return ESP_ERR_HTTPD_INVALID_REQ;
 }
 
+esp_err_t app_http_validate_ws_request(httpd_req_t *req)
+{
+    size_t query_len = httpd_req_get_url_query_len(req) + 1;
+    if (query_len <= 1) {
+        return ESP_ERR_HTTPD_INVALID_REQ;
+    }
+
+    char *query = malloc(query_len);
+    if (query == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    esp_err_t result = ESP_ERR_HTTPD_INVALID_REQ;
+    if (httpd_req_get_url_query_str(req, query, query_len) == ESP_OK) {
+        char token[65] = {0};
+        if (httpd_query_key_value(query, "token", token, sizeof(token)) == ESP_OK) {
+            if (strncmp(app_http_auth_token, token, strlen(app_http_auth_token)) == 0) {
+                result = ESP_OK;
+            }
+        }
+    }
+
+    free(query);
+    return result;
+}
+
 void app_http_set_cors_headers(httpd_req_t *req)
 {
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Authorization, Content-Type");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+}
+
+void app_http_ws_register_client(int sockfd)
+{
+    int slot = app_http_ws_find_client_slot(sockfd);
+    if (slot >= 0) {
+        ws_clients[slot].last_seen_ms = esp_timer_get_time() / 1000;
+        return;
+    }
+
+    for (uint32_t i = 0; i < APP_HTTP_MAX_WS_CLIENTS; ++i) {
+        if (ws_clients[i].sockfd <= 0) {
+            ws_clients[i].sockfd = sockfd;
+            ws_clients[i].last_seen_ms = esp_timer_get_time() / 1000;
+            ESP_LOGI(TAG, "registered websocket client fd=%d", sockfd);
+            return;
+        }
+    }
+
+    ESP_LOGW(TAG, "websocket client registry full, fd=%d not registered", sockfd);
+}
+
+void app_http_ws_unregister_client(int sockfd)
+{
+    int slot = app_http_ws_find_client_slot(sockfd);
+    if (slot < 0) {
+        return;
+    }
+
+    ws_clients[slot].sockfd = -1;
+    ws_clients[slot].last_seen_ms = 0;
+    ESP_LOGI(TAG, "unregistered websocket client fd=%d", sockfd);
+}
+
+void app_http_ws_touch_client(int sockfd)
+{
+    int slot = app_http_ws_find_client_slot(sockfd);
+    if (slot >= 0) {
+        ws_clients[slot].last_seen_ms = esp_timer_get_time() / 1000;
+    }
+}
+
+esp_err_t app_http_ws_send_json_to_client(httpd_handle_t handle, int sockfd, const char *payload)
+{
+    if (handle == NULL || sockfd < 0 || payload == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (httpd_ws_get_fd_info(handle, sockfd) != HTTPD_WS_CLIENT_WEBSOCKET) {
+        app_http_ws_unregister_client(sockfd);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    httpd_ws_frame_t frame = {
+        .final = true,
+        .fragmented = false,
+        .type = HTTPD_WS_TYPE_TEXT,
+        .payload = (uint8_t *)payload,
+        .len = strlen(payload),
+    };
+
+    esp_err_t err = httpd_ws_send_frame_async(handle, sockfd, &frame);
+    if (err == ESP_OK) {
+        app_http_ws_touch_client(sockfd);
+    } else {
+        ESP_LOGW(TAG, "failed websocket send fd=%d err=%s", sockfd, esp_err_to_name(err));
+        app_http_ws_unregister_client(sockfd);
+    }
+
+    return err;
+}
+
+esp_err_t app_http_ws_broadcast_json(const char *payload)
+{
+    if (server == NULL || payload == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t last_error = ESP_OK;
+    for (uint32_t i = 0; i < APP_HTTP_MAX_WS_CLIENTS; ++i) {
+        if (ws_clients[i].sockfd < 0) {
+            continue;
+        }
+
+        esp_err_t err = app_http_ws_send_json_to_client(server, ws_clients[i].sockfd, payload);
+        if (err != ESP_OK) {
+            last_error = err;
+        }
+    }
+
+    return last_error;
 }
 
 esp_err_t favicon_get_handler(httpd_req_t *req)
@@ -165,6 +301,11 @@ httpd_handle_t start_webserver(void)
 
     if (server != NULL) {
         stop_webserver();
+    }
+
+    for (uint32_t i = 0; i < APP_HTTP_MAX_WS_CLIENTS; ++i) {
+        ws_clients[i].sockfd = -1;
+        ws_clients[i].last_seen_ms = 0;
     }
 
     auth_t *auth = get_auth_config();
@@ -350,6 +491,14 @@ httpd_handle_t start_webserver(void)
             .user_ctx = NULL,
         };
 
+        httpd_uri_t websocket = {
+            .uri = "/ws",
+            .method = HTTP_GET,
+            .handler = websocket_handler,
+            .user_ctx = NULL,
+            .is_websocket = true,
+        };
+
         httpd_uri_t get_wifi_scan = {
             .uri = "/api/network/wifi/scan",
             .method = HTTP_GET,
@@ -427,6 +576,7 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &get_woff2);
         httpd_register_uri_handler(server, &get_status);
         httpd_register_uri_handler(server, &get_pumps_runtime);
+        httpd_register_uri_handler(server, &websocket);
         httpd_register_uri_handler(server, &get_wifi_scan);
         httpd_register_uri_handler(server, &post_run);
         httpd_register_uri_handler(server, &post_calibrate);
@@ -449,6 +599,10 @@ httpd_handle_t start_webserver(void)
 
 void stop_webserver(void)
 {
+    for (uint32_t i = 0; i < APP_HTTP_MAX_WS_CLIENTS; ++i) {
+        ws_clients[i].sockfd = -1;
+        ws_clients[i].last_seen_ms = 0;
+    }
     httpd_stop(server);
     server = NULL;
 }

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { ThemeProvider } from '@/components/theme-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { RealtimeProvider } from '@/components/realtime-provider.tsx';
 
 const App = (): React.ReactElement => {
   const isAuthenticated = useAppStore((state: AppStoreState) => state.isAuthenticated);
@@ -22,7 +23,9 @@ const App = (): React.ReactElement => {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
       <TooltipProvider>
-        <Layout>{routes}</Layout>
+        <RealtimeProvider>
+          <Layout>{routes}</Layout>
+        </RealtimeProvider>
       </TooltipProvider>
     </ThemeProvider>
   );

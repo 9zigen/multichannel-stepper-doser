@@ -19,13 +19,30 @@ function normalizeDeviceBaseUrl(deviceIp?: string): string | null {
 }
 
 const deviceBaseUrl = normalizeDeviceBaseUrl(import.meta.env.VITE_DEVICE_IP);
-const isMockEnabled = import.meta.env.DEV && !deviceBaseUrl && import.meta.env.VITE_API_MOCK !== 'false';
-const host = deviceBaseUrl ?? (import.meta.env.PROD ? `http://${document.location.host}/` : 'http://localhost:8095/');
+export const isMockApiEnabled = import.meta.env.DEV && !deviceBaseUrl && import.meta.env.VITE_API_MOCK !== 'false';
+export const apiBaseUrl =
+  deviceBaseUrl ?? (import.meta.env.PROD ? `http://${document.location.host}/` : 'http://localhost:8095/');
 
 export const http = axios.create({
-  baseURL: host,
-  adapter: isMockEnabled ? mockAdapter : undefined,
+  baseURL: apiBaseUrl,
+  adapter: isMockApiEnabled ? mockAdapter : undefined,
 });
+
+export function getWebSocketUrl(token: string): string | null {
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const baseUrl = new URL(apiBaseUrl);
+    const protocol = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = new URL('/ws', `${protocol}//${baseUrl.host}`);
+    wsUrl.searchParams.set('token', token);
+    return wsUrl.toString();
+  } catch (_error) {
+    return null;
+  }
+}
 
 function clearStoredAuth() {
   delete http.defaults.headers.common.Authorization;
