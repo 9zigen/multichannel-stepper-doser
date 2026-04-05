@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Activity, Cpu, RefreshCcw, Router, ShieldAlert, TimerReset, Wifi } from 'lucide-react';
+import { Activity, Cpu, RefreshCcw, ShieldAlert, TimerReset, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
@@ -10,8 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { DeviceMaintenanceActions } from '@/components/device-maintenance-actions';
-
-const formatPackets = (value: number) => new Intl.NumberFormat('en-US').format(value);
 
 const formatHours = (value: number) => `${value.toFixed(1)} h`;
 
@@ -158,31 +156,9 @@ const Home: React.FC = (): React.ReactElement => {
                           {deviceStatus.wifi_disconnects}
                         </Badge>
                       </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground">Packets dropped</span>
-                        <Badge variant={deviceStatus.packets_dropped > 250 ? 'destructive' : 'outline'}>
-                          {formatPackets(deviceStatus.packets_dropped)}
-                        </Badge>
-                      </div>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-card via-card to-secondary/20 p-4 shadow-sm">
-                    <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                      <Router className="size-4 text-primary" />
-                      Traffic counters
-                    </div>
-                    <div className="grid gap-3 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground">TX packets</span>
-                        <span className="font-medium">{formatPackets(deviceStatus.tx_packets)}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground">RX packets</span>
-                        <span className="font-medium">{formatPackets(deviceStatus.rx_packets)}</span>
-                      </div>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
 

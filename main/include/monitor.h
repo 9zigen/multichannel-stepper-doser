@@ -24,10 +24,14 @@ typedef struct {
   uint8_t ap_clients;
   uint8_t rssi;
   uint32_t free_heap;
+  uint32_t wifi_disconnects;
+  uint32_t reboot_count;
+  char last_reboot_reason[32];
 
 } system_status_t;
 
 system_status_t* get_system_status(void);
+void monitor_increment_wifi_disconnects(void);
 int init_monitor();
 
 #endif //HV_CC_LED_DRIVER_RTOS_MONITOR_H

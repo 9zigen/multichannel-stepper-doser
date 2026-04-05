@@ -21,6 +21,7 @@
 #include "app_settings.h"
 #include "captive_dns.h"
 #include "esp_mac.h"
+#include "monitor.h"
 
 #define AP_WIFI_SSID                   CONFIG_CONTROLLER_WIFI_SSID
 #define AP_WIFI_PASSWORD               CONFIG_CONTROLLER_WIFI_PASS
@@ -407,6 +408,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         station_connected = false;
+        monitor_increment_wifi_disconnects();
 
         if (!wifi_has_profiles()) {
             ESP_LOGI(TAG, "Station disconnected but no station profile is configured");

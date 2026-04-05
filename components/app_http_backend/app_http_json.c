@@ -72,12 +72,9 @@ char *get_status_json(void)
     cJSON_AddItemToObject(status, "firmware_version", cJSON_CreateString(app_description->version));
     cJSON_AddItemToObject(status, "firmware_date", cJSON_CreateString(app_description->date));
     cJSON_AddItemToObject(status, "board_temperature", cJSON_CreateNumber(25));
-    cJSON_AddItemToObject(status, "wifi_disconnects", cJSON_CreateNumber(0));
-    cJSON_AddItemToObject(status, "packets_dropped", cJSON_CreateNumber(0));
-    cJSON_AddItemToObject(status, "tx_packets", cJSON_CreateNumber(0));
-    cJSON_AddItemToObject(status, "rx_packets", cJSON_CreateNumber(0));
-    cJSON_AddItemToObject(status, "reboot_count", cJSON_CreateNumber(0));
-    cJSON_AddItemToObject(status, "last_reboot_reason", cJSON_CreateString("unknown"));
+    cJSON_AddItemToObject(status, "wifi_disconnects", cJSON_CreateNumber(system_status->wifi_disconnects));
+    cJSON_AddItemToObject(status, "reboot_count", cJSON_CreateNumber(system_status->reboot_count));
+    cJSON_AddItemToObject(status, "last_reboot_reason", cJSON_CreateString(system_status->last_reboot_reason));
     cJSON_AddItemToObject(status, "storage_backend", cJSON_CreateString(eeprom_backend_name()));
     cJSON_AddItemToObject(status, "rtc_backend", cJSON_CreateString(get_rtc_backend_name()));
 

@@ -19,10 +19,70 @@
 #include "monitor.h"
 #include "tools.h"
 #include "connect.h"
+#include "app_settings_storage.h"
 
 TimerHandle_t xMonitorTimer;
 static const char *TAG="MONITOR";
 system_status_t system_status = {0};
+
+typedef struct {
+  uint8_t magic;
+  uint32_t reboot_count;
+} reboot_status_t;
+
+static const char *reset_reason_to_string(esp_reset_reason_t reason)
+{
+  switch (reason) {
+    case ESP_RST_UNKNOWN: return "ESP_RST_UNKNOWN";
+    case ESP_RST_POWERON: return "ESP_RST_POWERON";
+    case ESP_RST_EXT: return "ESP_RST_EXT";
+    case ESP_RST_SW: return "ESP_RST_SW";
+    case ESP_RST_PANIC: return "ESP_RST_PANIC";
+    case ESP_RST_INT_WDT: return "ESP_RST_INT_WDT";
+    case ESP_RST_TASK_WDT: return "ESP_RST_TASK_WDT";
+    case ESP_RST_WDT: return "ESP_RST_WDT";
+    case ESP_RST_DEEPSLEEP: return "ESP_RST_DEEPSLEEP";
+    case ESP_RST_BROWNOUT: return "ESP_RST_BROWNOUT";
+    case ESP_RST_SDIO: return "ESP_RST_SDIO";
+#if defined(ESP_RST_USB)
+    case ESP_RST_USB: return "ESP_RST_USB";
+#endif
+#if defined(ESP_RST_JTAG)
+    case ESP_RST_JTAG: return "ESP_RST_JTAG";
+#endif
+#if defined(ESP_RST_EFUSE)
+    case ESP_RST_EFUSE: return "ESP_RST_EFUSE";
+#endif
+#if defined(ESP_RST_PWR_GLITCH)
+    case ESP_RST_PWR_GLITCH: return "ESP_RST_PWR_GLITCH";
+#endif
+#if defined(ESP_RST_CPU_LOCKUP)
+    case ESP_RST_CPU_LOCKUP: return "ESP_RST_CPU_LOCKUP";
+#endif
+    default: return "ESP_RST_UNKNOWN";
+  }
+}
+
+static void init_reboot_status(void)
+{
+  reboot_status_t reboot_status = {0};
+  eeprom_read(0x50, EEPROM_REBOOT_STATUS_ADDR, (uint8_t *)&reboot_status, sizeof(reboot_status));
+
+  if (reboot_status.magic == EEPROM_MAGIC) {
+    reboot_status.reboot_count += 1;
+  } else {
+    reboot_status.magic = EEPROM_MAGIC;
+    reboot_status.reboot_count = 1;
+  }
+
+  system_status.reboot_count = reboot_status.reboot_count;
+  snprintf(system_status.last_reboot_reason,
+           sizeof(system_status.last_reboot_reason),
+           "%s",
+           reset_reason_to_string(esp_reset_reason()));
+
+  eeprom_write(0x50, EEPROM_REBOOT_STATUS_ADDR, (uint8_t *)&reboot_status, sizeof(reboot_status));
+}
 
 static void update_system_info()
 {
@@ -44,6 +104,12 @@ static void update_system_info()
   memset(system_status.ap_ip_address, 0, sizeof(system_status.ap_ip_address));
   memset(system_status.ap_mac, 0, sizeof(system_status.ap_mac));
   memset(system_status.ssid, 0, sizeof(system_status.ssid));
+  if (strlen(system_status.last_reboot_reason) == 0) {
+    snprintf(system_status.last_reboot_reason,
+             sizeof(system_status.last_reboot_reason),
+             "%s",
+             reset_reason_to_string(esp_reset_reason()));
+  }
   system_status.station_connected = connect_station_is_connected();
   system_status.ap_clients = connect_get_ap_client_count();
   system_status.rssi = 0;
@@ -136,6 +202,11 @@ system_status_t* get_system_status(void)
   return &system_status;
 }
 
+void monitor_increment_wifi_disconnects(void)
+{
+  system_status.wifi_disconnects += 1;
+}
+
 static void vMonitorTimerCallback(TimerHandle_t xTimer )
 {
   update_system_info();
@@ -143,6 +214,8 @@ static void vMonitorTimerCallback(TimerHandle_t xTimer )
 
 int init_monitor()
 {
+  init_reboot_status();
+
   /* Create pump auto stop timer with 100ms. period */
   xMonitorTimer = xTimerCreate("xRunTimer", 10 * 1000 / portTICK_PERIOD_MS, pdTRUE, NULL, vMonitorTimerCallback);
   CHECK_TIMER(xTimerStart(xMonitorTimer, 100 / portTICK_PERIOD_MS));

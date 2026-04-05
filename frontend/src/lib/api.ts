@@ -166,9 +166,6 @@ export type StatusState = {
   firmware_date: string;
   hardware_version: string;
   wifi_disconnects: number;
-  packets_dropped: number;
-  tx_packets: number;
-  rx_packets: number;
   reboot_count: number;
   last_reboot_reason: string;
   storage_backend: string;
