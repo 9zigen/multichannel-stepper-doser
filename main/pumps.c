@@ -204,12 +204,10 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
 
     pump_t *pump_config = get_pump_config(pump_id);
     double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
-    if (flow_ml_per_min <= 0.0) {
-        return ESP_ERR_INVALID_STATE;
-    }
 
     pumps[pump_id].time = (uint32_t)time_minutes * 60U * PUMP_TIMER_UNIT_IN_SEC;
-    pumps[pump_id].flow_per_unit = flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0;
+    pumps[pump_id].flow_per_unit =
+        flow_ml_per_min > 0.0 ? flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0 : 0.0;
     pumps[pump_id].volume = 0;
     pumps[pump_id].rpm = rpm;
     pumps[pump_id].direction = direction;
