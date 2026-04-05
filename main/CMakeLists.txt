@@ -5,7 +5,6 @@ set(SOURCES
     pump_backend_stepper.c
     pwm_driver.c
     i2c_driver.c
-    mcp7940.c
     adc.c
     led.c
     stepper_task.c)
