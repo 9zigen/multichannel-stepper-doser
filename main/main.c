@@ -111,7 +111,6 @@ void app_main() {
 
     /* Pumps */
     init_pumps();
-    return;
 
     /* web server */
     start_webserver();
@@ -122,12 +121,6 @@ void app_main() {
 //  /* MQTT Task */
 //  xTaskCreate(&task_mqtt, "mqtt_task", 2048, NULL, 5, NULL);
 //
-//  /* ThingsBoard Task */
-//  xTaskCreate(&task_thingsboard, "thingsboard_task", 2048, NULL, 5, NULL);
-//
-//  /* LVGL Task */
-//  xTaskCreate(guiTask, "gui", 8096, NULL, 5, NULL);
-//  init_lvgl_tick();
 }
 
 

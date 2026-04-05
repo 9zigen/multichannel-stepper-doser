@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { DeviceMaintenanceActions } from '@/components/device-maintenance-actions';
 
 const formatPackets = (value: number) => new Intl.NumberFormat('en-US').format(value);
 
@@ -122,6 +123,36 @@ const Home: React.FC = (): React.ReactElement => {
                         <span className="font-medium">{deviceStatus.wifi_mode}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">Station SSID</span>
+                        <span className="max-w-[180px] truncate font-medium">
+                          {deviceStatus.station_ssid || 'Not configured'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">Station link</span>
+                        <Badge variant={deviceStatus.station_connected ? 'default' : 'outline'}>
+                          {deviceStatus.station_connected ? 'Connected' : 'Idle'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">Station IP</span>
+                        <span className="font-medium">{deviceStatus.station_ip_address || 'Unavailable'}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">AP SSID</span>
+                        <span className="max-w-[180px] truncate font-medium">{deviceStatus.ap_ssid || 'Disabled'}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">AP IP</span>
+                        <span className="font-medium">{deviceStatus.ap_ip_address || 'Unavailable'}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">AP clients</span>
+                        <Badge variant={deviceStatus.ap_clients > 0 ? 'secondary' : 'outline'}>
+                          {deviceStatus.ap_clients}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
                         <span className="text-muted-foreground">Disconnects</span>
                         <Badge variant={deviceStatus.wifi_disconnects > 10 ? 'destructive' : 'secondary'}>
                           {deviceStatus.wifi_disconnects}
@@ -200,6 +231,25 @@ const Home: React.FC = (): React.ReactElement => {
                     <span className="text-muted-foreground">RTC source</span>
                     <span className="font-medium">{deviceStatus.rtc_backend || 'Unknown'}</span>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
+                <CardHeader>
+                  <CardTitle className="text-lg">Maintenance Actions</CardTitle>
+                  <CardDescription>
+                    Apply network changes, reboot after service updates, or return the controller to a clean state.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                  <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-card via-card to-secondary/20 p-4 shadow-sm">
+                    <div className="mb-2 text-sm font-medium">Controller operations</div>
+                    <p className="text-sm text-muted-foreground">
+                      Restart is safe for normal maintenance. Factory reset removes saved network and service
+                      configuration and requires signing in again.
+                    </p>
+                  </div>
+                  <DeviceMaintenanceActions />
                 </CardContent>
               </Card>
             </div>

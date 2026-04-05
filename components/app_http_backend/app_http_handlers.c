@@ -15,6 +15,7 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
+#include "esp_wifi.h"
 
 #include "app_settings.h"
 #include "auth.h"
@@ -46,33 +47,34 @@ static void send_unauthorized(httpd_req_t *req)
     httpd_resp_send(req, NULL, 0);
 }
 
-esp_err_t reboot_get_handler(httpd_req_t *req)
+static esp_err_t send_success_and_restart(httpd_req_t *req, bool erase_before_restart)
 {
-    if (app_http_validate_request(req) == ESP_OK) {
-        char *response = app_http_success_response_json(true);
-        httpd_resp_send(req, response, (ssize_t)strlen(response));
-        free(response);
-        esp_restart();
-    } else {
+    if (app_http_validate_request(req) != ESP_OK) {
         send_unauthorized(req);
+        return ESP_OK;
     }
 
+    char *response = app_http_success_response_json(true);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
+
+    if (erase_before_restart) {
+        erase_settings();
+    }
+
+    esp_restart();
     return ESP_OK;
 }
 
-esp_err_t factory_get_handler(httpd_req_t *req)
+esp_err_t device_restart_post_handler(httpd_req_t *req)
 {
-    if (app_http_validate_request(req) == ESP_OK) {
-        char *response = app_http_success_response_json(true);
-        httpd_resp_send(req, response, (ssize_t)strlen(response));
-        free(response);
-        erase_settings();
-        esp_restart();
-    } else {
-        send_unauthorized(req);
-    }
+    return send_success_and_restart(req, false);
+}
 
-    return ESP_OK;
+esp_err_t device_factory_reset_post_handler(httpd_req_t *req)
+{
+    return send_success_and_restart(req, true);
 }
 
 esp_err_t ota_get_handler(httpd_req_t *req)
@@ -151,6 +153,65 @@ esp_err_t status_get_handler(httpd_req_t *req)
     char *response = get_status_json();
     httpd_resp_send(req, response, (ssize_t)strlen(response));
     free(response);
+    return ESP_OK;
+}
+
+esp_err_t wifi_scan_get_handler(httpd_req_t *req)
+{
+    if (app_http_validate_request(req) != ESP_OK) {
+        send_unauthorized(req);
+        return ESP_OK;
+    }
+
+    wifi_scan_config_t scan_config = {
+        .show_hidden = false,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+    };
+    uint16_t ap_count = 0;
+    wifi_ap_record_t records[16];
+    memset(records, 0, sizeof(records));
+
+    esp_err_t err = esp_wifi_scan_start(&scan_config, true);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Wi-Fi scan start failed");
+        return ESP_OK;
+    }
+
+    err = esp_wifi_scan_get_ap_num(&ap_count);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Wi-Fi scan count failed");
+        return ESP_OK;
+    }
+
+    if (ap_count > 16) {
+        ap_count = 16;
+    }
+
+    err = esp_wifi_scan_get_ap_records(&ap_count, records);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Wi-Fi scan read failed");
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *networks = cJSON_CreateArray();
+
+    for (uint16_t i = 0; i < ap_count; ++i) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddItemToObject(item, "ssid", cJSON_CreateString((const char *)records[i].ssid));
+        cJSON_AddItemToObject(item, "rssi", cJSON_CreateNumber(records[i].rssi));
+        cJSON_AddItemToObject(item, "secure", cJSON_CreateBool(records[i].authmode != WIFI_AUTH_OPEN));
+        cJSON_AddItemToObject(item, "channel", cJSON_CreateNumber(records[i].primary));
+        cJSON_AddItemToArray(networks, item);
+    }
+
+    cJSON_AddItemToObject(root, "networks", networks);
+    char *response = cJSON_Print(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, response, response != NULL ? (ssize_t)strlen(response) : 0);
+
+    free(response);
+    cJSON_Delete(root);
     return ESP_OK;
 }
 
@@ -508,6 +569,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
                 memset(network_config, 0, sizeof(*network_config));
                 network_config->id = i;
                 network_config->type = i;
+                network_config->keep_ap_active = (i == NETWORK_TYPE_WIFI);
                 network_config->dhcp = true;
                 network_config->channel = 13;
                 network_config->force_dataset = true;
@@ -538,6 +600,9 @@ esp_err_t settings_post_handler(httpd_req_t *req)
                 if (cJSON_IsString(password) && (password->valuestring != NULL)) {
                     strlcpy(network_config->password, password->valuestring, sizeof(network_config->password));
                 }
+
+                cJSON *keep_ap_active = cJSON_GetObjectItem(network_item, "keep_ap_active");
+                network_config->keep_ap_active = cJSON_IsTrue(keep_ap_active);
 
                 cJSON *ip_address = cJSON_GetObjectItem(network_item, "ip_address");
                 if (cJSON_IsString(ip_address) && (ip_address->valuestring != NULL)) {

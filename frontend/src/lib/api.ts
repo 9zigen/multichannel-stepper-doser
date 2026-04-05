@@ -59,6 +59,7 @@ export interface NetworkStateEthernet extends NetworkStateBaseEthernet {
 export interface NetworkStateWifi extends NetworkStateBaseEthernet {
   ssid: string;
   password: string;
+  keep_ap_active: boolean;
   type: NetworkType.WiFi;
 }
 
@@ -148,9 +149,17 @@ export type StatusState = {
   free_heap: number;
   vcc: number;
   board_temperature: number;
-  wifi_mode: 'STA' | 'AP';
+  wifi_mode: 'STA' | 'AP' | 'AP+STA';
   ip_address: string;
   mac_address: string;
+  station_connected: boolean;
+  station_ssid: string;
+  station_ip_address: string;
+  station_mac_address: string;
+  ap_ssid: string;
+  ap_ip_address: string;
+  ap_mac_address: string;
+  ap_clients: number;
   mqtt_service: { enabled: boolean; connected: boolean };
   ntp_service: { enabled: boolean; sync: boolean };
   firmware_version: string;
@@ -164,6 +173,13 @@ export type StatusState = {
   last_reboot_reason: string;
   storage_backend: string;
   rtc_backend: string;
+};
+
+export type WifiScanNetwork = {
+  ssid: string;
+  rssi: number;
+  secure: boolean;
+  channel: number;
 };
 
 export type PumpRunState = {
@@ -183,6 +199,11 @@ export type CalibrationResponse = {
 
 export type PumpRunResponse = {
   success: boolean;
+};
+
+export type DeviceActionResponse = {
+  success: boolean;
+  message?: string;
 };
 
 export const getStatus = async <T>(): Promise<T> => {
@@ -220,5 +241,20 @@ export const uploadFirmware = async <T>(
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress,
   });
+  return data.data as T;
+};
+
+export const restartDevice = async <T>(): Promise<T> => {
+  const data = await http.post('/api/device/restart');
+  return data.data as T;
+};
+
+export const factoryResetDevice = async <T>(): Promise<T> => {
+  const data = await http.post('/api/device/factory-reset');
+  return data.data as T;
+};
+
+export const scanWifiNetworks = async <T>(): Promise<T> => {
+  const data = await http.get('/api/network/wifi/scan');
   return data.data as T;
 };

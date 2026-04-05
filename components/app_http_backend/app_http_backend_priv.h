@@ -21,11 +21,12 @@ esp_err_t js_handler(httpd_req_t *req);
 esp_err_t css_handler(httpd_req_t *req);
 esp_err_t options_handler(httpd_req_t *req);
 
-esp_err_t reboot_get_handler(httpd_req_t *req);
-esp_err_t factory_get_handler(httpd_req_t *req);
+esp_err_t device_restart_post_handler(httpd_req_t *req);
+esp_err_t device_factory_reset_post_handler(httpd_req_t *req);
 esp_err_t ota_get_handler(httpd_req_t *req);
 esp_err_t upload_post_handler(httpd_req_t *req);
 esp_err_t status_get_handler(httpd_req_t *req);
+esp_err_t wifi_scan_get_handler(httpd_req_t *req);
 esp_err_t schedule_get_handler(httpd_req_t *req);
 esp_err_t settings_get_handler(httpd_req_t *req);
 esp_err_t run_post_handler(httpd_req_t *req);

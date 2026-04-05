@@ -24,7 +24,9 @@ const getNetworkIcon = (type: NetworkType) => {
 const getNetworkSummary = (network: NetworkState): string => {
   switch (network.type) {
     case NetworkType.WiFi:
-      return network.ssid || 'SSID not configured';
+      return network.ssid
+        ? `${network.ssid}${network.keep_ap_active ? ' • AP+STA enabled' : ' • STA only'}`
+        : 'SSID not configured';
     case NetworkType.Ethernet:
       return network.dhcp ? 'DHCP enabled' : network.ip_address || 'Static IP not configured';
     default:
@@ -60,6 +62,10 @@ const NetworkPage: React.FC = (): React.ReactElement => {
       networks.find((network) => network.type === NetworkType.Ethernet) ??
       networks[0] ??
       null,
+    [networks]
+  );
+  const wifiConnection = useMemo(
+    () => networks.find((network) => network.type === NetworkType.WiFi) ?? null,
     [networks]
   );
 
@@ -113,6 +119,12 @@ const NetworkPage: React.FC = (): React.ReactElement => {
                     {networks.length ? 'Configured' : 'Missing'}
                   </Badge>
                 </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Provisioning mode</span>
+                  <Badge variant={wifiConnection?.keep_ap_active ? 'default' : 'outline'}>
+                    {wifiConnection ? (wifiConnection.keep_ap_active ? 'AP+STA' : 'STA only') : 'No Wi-Fi'}
+                  </Badge>
+                </div>
               </div>
             </div>
 
@@ -136,8 +148,8 @@ const NetworkPage: React.FC = (): React.ReactElement => {
               <ShieldCheck />
               <AlertTitle>Useful IoT defaults</AlertTitle>
               <AlertDescription>
-                Use DHCP during first boot, switch to static addressing only for devices that need a stable endpoint,
-                and keep Wi-Fi credentials distinct from your broker credentials.
+                Use scan-first Wi-Fi setup during first boot, keep simultaneous AP + Station enabled until the device is
+                proven stable on your router, and switch to static addressing only when you need a fixed endpoint.
               </AlertDescription>
             </Alert>
           </CardContent>

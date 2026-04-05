@@ -6,13 +6,18 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 const App = (): React.ReactElement => {
+  const isAuthenticated = useAppStore((state: AppStoreState) => state.isAuthenticated);
   const loadStatus = useAppStore((state: AppStoreState) => state.loadStatus);
   const loadSettings = useAppStore((state: AppStoreState) => state.loadSettings);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     loadStatus();
     loadSettings();
-  }, []);
+  }, [isAuthenticated, loadStatus, loadSettings]);
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="ui-theme">

@@ -27,6 +27,11 @@ export const http = axios.create({
   adapter: isMockEnabled ? mockAdapter : undefined,
 });
 
+const persistedToken = localStorage.getItem('user-token');
+if (persistedToken) {
+  http.defaults.headers.common.Authorization = persistedToken;
+}
+
 // Attach Authorization header from localStorage, if present
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem('user-token');

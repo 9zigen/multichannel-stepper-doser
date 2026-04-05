@@ -61,6 +61,7 @@ static void app_settings_init_network_defaults(network_t *cfg, uint8_t id, netwo
     memset(cfg, 0, sizeof(*cfg));
     cfg->id = id;
     cfg->type = (uint8_t)type;
+    cfg->keep_ap_active = (type == NETWORK_TYPE_WIFI);
     cfg->dhcp = true;
     cfg->channel = 13;
     cfg->force_dataset = true;

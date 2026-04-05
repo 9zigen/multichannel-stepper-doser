@@ -15,6 +15,7 @@ import type {
   SettingsState,
   StatusState,
   TimeState,
+  WifiScanNetwork,
 } from '@/lib/api.ts';
 
 type MockState = {
@@ -31,6 +32,13 @@ const SCHEDULE_MODE = {
   PERIODIC: 1,
   CONTINUOUS: 2,
 } as const;
+
+const mockWifiNetworks: WifiScanNetwork[] = [
+  { ssid: 'ReefLab-5G', rssi: -42, secure: true, channel: 36 },
+  { ssid: 'Workshop-IoT', rssi: -58, secure: true, channel: 11 },
+  { ssid: 'Guest-WiFi', rssi: -67, secure: false, channel: 6 },
+  { ssid: 'FragRoom', rssi: -74, secure: true, channel: 1 },
+];
 
 const initialState: MockState = {
   services: {
@@ -49,7 +57,7 @@ const initialState: MockState = {
   },
   auth: {
     username: 'admin',
-    password: '12345678',
+    password: 'admin',
   },
   networks: [
     {
@@ -58,6 +66,7 @@ const initialState: MockState = {
       is_dirty: false,
       ssid: 'Best WiFi',
       password: '',
+      keep_ap_active: true,
       ip_address: '192.168.1.100',
       mask: '255.255.255.0',
       gateway: '192.168.1.1',
@@ -70,6 +79,7 @@ const initialState: MockState = {
       is_dirty: false,
       ssid: 'Best WiFi 2',
       password: '',
+      keep_ap_active: false,
       ip_address: '',
       mask: '',
       gateway: '',
@@ -185,9 +195,17 @@ const initialState: MockState = {
     free_heap: 23567,
     vcc: 3.3,
     board_temperature: 25,
-    wifi_mode: 'STA',
+    wifi_mode: 'AP+STA',
     ip_address: '192.168.1.199',
     mac_address: '0A:EE:00:00:01:90',
+    station_connected: true,
+    station_ssid: 'Best WiFi',
+    station_ip_address: '192.168.1.199',
+    station_mac_address: '0A:EE:00:00:01:90',
+    ap_ssid: 'stepper-doser',
+    ap_ip_address: '192.168.4.1',
+    ap_mac_address: '0A:EE:00:00:01:91',
+    ap_clients: 1,
     mqtt_service: { enabled: false, connected: false },
     ntp_service: { enabled: true, sync: true },
     firmware_version: '1.1-dirty',
@@ -214,6 +232,14 @@ const isMockDebugEnabled = import.meta.env.DEV && import.meta.env.VITE_API_DEBUG
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function parseRequestBody<T>(data: unknown): T {
+  if (typeof data === 'string') {
+    return JSON.parse(data) as T;
+  }
+
+  return (data ?? {}) as T;
 }
 
 function debugRequest(
@@ -268,7 +294,20 @@ function normalizeUrl(url?: string): string {
 }
 
 function getToken(config: AxiosRequestConfig): string | undefined {
-  const rawAuthorization = config.headers?.Authorization ?? config.headers?.authorization;
+  const headers = config.headers as
+    | {
+        Authorization?: unknown;
+        authorization?: unknown;
+        get?: (name: string) => unknown;
+      }
+    | undefined;
+
+  const rawAuthorization =
+    headers?.Authorization ??
+    headers?.authorization ??
+    headers?.get?.('Authorization') ??
+    headers?.get?.('authorization');
+
   if (Array.isArray(rawAuthorization)) {
     return rawAuthorization[0];
   }
@@ -355,6 +394,35 @@ function updatePumpRuntime(payload: PumpRunState) {
   pump.running_hours = Number((pump.running_hours + payload.time / 60).toFixed(2));
 }
 
+function ensureAuthorized(config: InternalAxiosRequestConfig, method: string, url: string, requestBody: unknown) {
+  const token = getToken(config);
+  if (!token || token === 'undefined') {
+    const errorBody = { message: 'Unauthorized!' };
+    debugRequest(config, { method, url, requestBody, responseBody: errorBody, status: 401, error: 'Unauthorized' });
+    rejectWithStatus(config, 401, errorBody, 'Unauthorized');
+  }
+}
+
+function simulateRestart(reason: StatusState['last_reboot_reason']) {
+  state.status.reboot_count += 1;
+  state.status.last_reboot_reason = reason;
+  state.status.up_time = '0 min';
+  state.status.local_time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+}
+
+function resolveWifiMode(): StatusState['wifi_mode'] {
+  const wifiNetwork = state.networks.find((item) => item.type === 0);
+  if (!wifiNetwork) {
+    return 'AP+STA';
+  }
+
+  if ('keep_ap_active' in wifiNetwork && wifiNetwork.keep_ap_active) {
+    return 'AP+STA';
+  }
+
+  return 'STA';
+}
+
 export const mockAdapter: AxiosAdapter = async (config) => {
   const method = (config.method ?? 'get').toLowerCase();
   const url = normalizeUrl(config.url);
@@ -363,6 +431,14 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   await new Promise((resolve) => setTimeout(resolve, 120));
 
   if (url === '/api/auth' && method === 'post') {
+    const payload = parseRequestBody<{ username?: string; password?: string }>(config.data);
+
+    if (payload.username !== state.auth.username || payload.password !== state.auth.password) {
+      const errorBody = { message: 'Invalid username or password.' };
+      debugRequest(config, { method, url, requestBody, responseBody: errorBody, status: 401, error: 'Unauthorized' });
+      rejectWithStatus(config, 401, errorBody, 'Unauthorized');
+    }
+
     const mockResponse = response(config, {
       success: true,
       token: 'dsfsdfsdfs',
@@ -372,21 +448,28 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   }
 
   if (url === '/api/status' && method === 'get') {
-    const token = getToken(config);
-    if (!token || token === 'undefined') {
-      const errorBody = { message: 'Unauthorized!' };
-      debugRequest(config, { method, url, requestBody, responseBody: errorBody, status: 401, error: 'Unauthorized' });
-      rejectWithStatus(config, 401, errorBody, 'Unauthorized');
-    }
+    ensureAuthorized(config, method, url, requestBody);
 
     const now = new Date();
     state.status.local_time = now.toLocaleTimeString('en-GB', { hour12: false });
+    state.status.wifi_mode = resolveWifiMode();
+    state.status.station_ssid = state.networks.find((item) => item.type === 0)?.ssid ?? '';
+    state.status.station_connected = state.status.station_ssid.length > 0;
+    state.status.station_ip_address = state.status.station_connected ? '192.168.1.199' : '';
+    state.status.station_mac_address = state.status.station_connected ? '0A:EE:00:00:01:90' : '';
+    state.status.ap_ssid = 'stepper-doser';
+    state.status.ap_ip_address = '192.168.4.1';
+    state.status.ap_mac_address = '0A:EE:00:00:01:91';
+    state.status.ap_clients = state.status.wifi_mode === 'STA' ? 0 : 1;
+    state.status.ip_address = state.status.station_connected ? state.status.station_ip_address : state.status.ap_ip_address;
+    state.status.mac_address = state.status.station_connected ? state.status.station_mac_address : state.status.ap_mac_address;
     const mockResponse = response(config, { status: clone(state.status) });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;
   }
 
   if (url === '/api/settings' && method === 'get') {
+    ensureAuthorized(config, method, url, requestBody);
     const mockResponse = response(config, {
       pumps: clone(state.pumps),
       networks: clone(state.networks),
@@ -399,27 +482,55 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   }
 
   if (url === '/api/settings' && method === 'post') {
-    const payload = (config.data ?? {}) as Partial<SettingsState>;
+    ensureAuthorized(config, method, url, requestBody);
+    const payload = parseRequestBody<Partial<SettingsState>>(config.data);
     applySettingsPatch(payload);
     const mockResponse = response(config, { success: true });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;
   }
 
+  if (url === '/api/network/wifi/scan' && method === 'get') {
+    ensureAuthorized(config, method, url, requestBody);
+    const mockResponse = response(config, { networks: clone(mockWifiNetworks) });
+    debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
+    return mockResponse;
+  }
+
   if (url === '/api/calibration' && method === 'post') {
+    ensureAuthorized(config, method, url, requestBody);
     const mockResponse = response(config, { success: true });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;
   }
 
   if (url === '/api/run' && method === 'post') {
-    updatePumpRuntime((config.data ?? {}) as PumpRunState);
+    ensureAuthorized(config, method, url, requestBody);
+    updatePumpRuntime(parseRequestBody<PumpRunState>(config.data));
     const mockResponse = response(config, { success: true });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;
   }
 
+  if (url === '/api/device/restart' && method === 'post') {
+    ensureAuthorized(config, method, url, requestBody);
+    simulateRestart('ESP_RST_SW');
+    const mockResponse = response(config, { success: true, message: 'Device restart queued.' });
+    debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
+    return mockResponse;
+  }
+
+  if (url === '/api/device/factory-reset' && method === 'post') {
+    ensureAuthorized(config, method, url, requestBody);
+    state = clone(initialState);
+    simulateRestart('ESP_RST_SW');
+    const mockResponse = response(config, { success: true, message: 'Factory reset queued.' });
+    debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
+    return mockResponse;
+  }
+
   if (url === '/upload' && method === 'post') {
+    ensureAuthorized(config, method, url, requestBody);
     simulateUploadProgress(config.onUploadProgress);
     const mockResponse = response(config, { success: true });
     debugRequest(config, {

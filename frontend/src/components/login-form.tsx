@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +9,8 @@ import { SubmitHandler, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
+import { ShieldAlert } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 type FormData = {
   username: string;
@@ -20,6 +23,7 @@ const FormSchema = z.object({
 });
 
 export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
+  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -38,7 +42,8 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     const result = await login(data);
     if (result) {
-      loadSettings();
+      const settings = await loadSettings();
+      navigate(settings && settings.networks.length === 0 ? '/settings/network' : '/');
     }
   };
 
@@ -50,7 +55,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
           <CardDescription>Login with your credentials</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
+          <form className="w-full" autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
             <div className="grid gap-6">
               <div className="grid gap-6">
                 <div className="grid gap-2">
@@ -58,6 +63,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
                   <Input
                     id="username"
                     type="text"
+                    autoComplete="off"
                     placeholder="user name"
                     {...register('username', { required: true })}
                   />
@@ -70,10 +76,21 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
                       Forgot your password?
                     </a>
                   </div>
-                  <Input id="password" type="password" {...register('password', { required: true })} />
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="new-password"
+                    {...register('password', { required: true })}
+                  />
                   {errors.password && <p role="alert">{errors.password?.message}</p>}
                 </div>
-                {loginError && <p role="alert">{loginError}</p>}
+                {loginError && (
+                  <Alert variant="destructive">
+                    <ShieldAlert />
+                    <AlertTitle>Login failed</AlertTitle>
+                    <AlertDescription>{loginError}</AlertDescription>
+                  </Alert>
+                )}
                 <Button type="submit" className="w-full">
                   Login
                 </Button>

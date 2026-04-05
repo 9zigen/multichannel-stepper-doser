@@ -60,6 +60,7 @@ typedef struct {
     bool is_dirty;                        // UI-only dirty marker
     char ssid[32];                        // Wifi SSID Name
     char password[64];                    // Wifi Password
+    bool keep_ap_active;                  // Keep AP available while STA is configured
     uint8_t ip_address[4];                // IP Address
     uint8_t mask[4];                      // Mask
     uint8_t gateway[4];                   // Gateway

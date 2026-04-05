@@ -85,7 +85,7 @@ static void captive_dns_task(void *pvParameters) {
       }
 
       if(len > CAPTIVE_DNS_HEADER_SIZE + CAPTIVE_DNS_QUESTION_MAX_LENGTH) {
-        ESP_LOGW(TAG, "Received more data [%d] than expected. Ignoring.", len);
+        ESP_LOGD(TAG, "Received DNS packet [%d] larger than captive parser limit. Ignoring.", len);
         continue;
       }
 
@@ -185,6 +185,10 @@ esp_err_t captive_dns_start() {
 }
 
 esp_err_t captive_dns_stop() {
+  if(captive_dns_handle.task_handle == NULL) {
+    return ESP_OK;
+  }
+
   vTaskDelete(captive_dns_handle.task_handle);
   captive_dns_handle.task_handle = NULL;
 

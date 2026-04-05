@@ -59,6 +59,14 @@ char *get_status_json(void)
     cJSON_AddItemToObject(status, "wifi_mode", cJSON_CreateString(system_status->wifi_mode));
     cJSON_AddItemToObject(status, "ip_address", cJSON_CreateString(system_status->net_address));
     cJSON_AddItemToObject(status, "mac_address", cJSON_CreateString(system_status->mac));
+    cJSON_AddItemToObject(status, "station_connected", cJSON_CreateBool(system_status->station_connected));
+    cJSON_AddItemToObject(status, "station_ssid", cJSON_CreateString(system_status->station_ssid));
+    cJSON_AddItemToObject(status, "station_ip_address", cJSON_CreateString(system_status->station_ip_address));
+    cJSON_AddItemToObject(status, "station_mac_address", cJSON_CreateString(system_status->station_mac));
+    cJSON_AddItemToObject(status, "ap_ssid", cJSON_CreateString(system_status->ap_ssid));
+    cJSON_AddItemToObject(status, "ap_ip_address", cJSON_CreateString(system_status->ap_ip_address));
+    cJSON_AddItemToObject(status, "ap_mac_address", cJSON_CreateString(system_status->ap_mac));
+    cJSON_AddItemToObject(status, "ap_clients", cJSON_CreateNumber(system_status->ap_clients));
     cJSON_AddItemToObject(status, "hardware_version", cJSON_CreateString(HARDWARE_VERSION));
     cJSON_AddItemToObject(status, "firmware_version", cJSON_CreateString(app_description->version));
     cJSON_AddItemToObject(status, "firmware_date", cJSON_CreateString(app_description->date));
@@ -230,6 +238,7 @@ char *get_settings_json(void)
             case NETWORK_TYPE_WIFI:
                 cJSON_AddItemToObject(network_item, "ssid", cJSON_CreateString(network_config->ssid));
                 cJSON_AddItemToObject(network_item, "password", cJSON_CreateString(network_config->password));
+                cJSON_AddItemToObject(network_item, "keep_ap_active", cJSON_CreateBool(network_config->keep_ap_active));
                 ip_to_string(network_config->ip_address, net_buff);
                 cJSON_AddItemToObject(network_item, "ip_address", cJSON_CreateString(net_buff));
                 ip_to_string(network_config->mask, net_buff);

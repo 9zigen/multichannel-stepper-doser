@@ -3,6 +3,7 @@ import { NetworkStateBle, NetworkStateEthernet, NetworkStateThread, NetworkState
 export const defaultsWifi: Partial<NetworkStateWifi> = {
   ssid: '',
   password: '',
+  keep_ap_active: true,
   ip_address: '0.0.0.0',
   mask: '255.255.255.0',
   gateway: '0.0.0.0',

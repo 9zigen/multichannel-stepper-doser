@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 export interface HardwareInfoProps {
   vcc: number;
   board_temperature: number;
-  wifi_mode: 'STA' | 'AP';
+  wifi_mode: 'STA' | 'AP' | 'AP+STA';
   ip_address: string;
   mac_address: string;
   hardware_version: string;

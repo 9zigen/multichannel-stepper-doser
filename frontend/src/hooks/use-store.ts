@@ -3,10 +3,13 @@ import { create } from 'zustand';
 import {
   checkCredentials,
   CheckCredentialsState,
+  DeviceActionResponse,
+  factoryResetDevice as runFactoryReset,
   getSettings,
   getStatus,
   NetworkState,
   PumpState,
+  restartDevice as runRestart,
   ServiceState,
   setSettings,
   SettingsSaveResponse,
@@ -28,11 +31,13 @@ export type AppStoreState = {
 
   login: (user: UserCredentials) => Promise<boolean>;
   logout: () => void;
-  loadStatus: () => void;
-  loadSettings: () => void;
+  loadStatus: () => Promise<StatusState | null>;
+  loadSettings: () => Promise<SettingsState | null>;
   saveSettings: (entity: string | string[] | null, data: Partial<SettingsState>) => Promise<boolean>;
+  restartDevice: () => Promise<boolean>;
+  factoryResetDevice: () => Promise<boolean>;
 
-  addNetwork: (data: Partial<NetworkState>) => void;
+  addNetwork: (data: Partial<NetworkState>) => Promise<boolean>;
   deleteNetwork: (id: number) => Promise<boolean>;
   updateNetwork: (data: NetworkState) => Promise<boolean>;
   updateServices: (data: ServiceState) => Promise<boolean>;
@@ -49,58 +54,70 @@ export enum SettingsKey {
   time = 'time',
 }
 
+const defaultStatus: StatusState = {
+  up_time: '',
+  local_time: '',
+  free_heap: 0,
+  vcc: 3.3,
+  board_temperature: 25,
+  wifi_mode: 'AP+STA',
+  ip_address: '',
+  mac_address: '',
+  station_connected: false,
+  station_ssid: '',
+  station_ip_address: '',
+  station_mac_address: '',
+  ap_ssid: '',
+  ap_ip_address: '',
+  ap_mac_address: '',
+  ap_clients: 0,
+  mqtt_service: { enabled: false, connected: false },
+  ntp_service: { enabled: true, sync: true },
+  firmware_version: '',
+  firmware_date: '',
+  hardware_version: '',
+  wifi_disconnects: 0,
+  packets_dropped: 0,
+  tx_packets: 0,
+  rx_packets: 0,
+  reboot_count: 0,
+  last_reboot_reason: '',
+  storage_backend: '',
+  rtc_backend: '',
+};
+
+const defaultSettings: SettingsState = {
+  services: {
+    hostname: '',
+    ntp_server: '',
+    utc_offset: 0,
+    ntp_dst: false,
+    mqtt_ip_address: '',
+    mqtt_port: '',
+    mqtt_user: '',
+    mqtt_password: '',
+    mqtt_qos: 0,
+    enable_ntp: false,
+    enable_mqtt: false,
+    ota_url: '',
+  },
+  auth: {
+    username: '',
+    password: '',
+  },
+  networks: [],
+  pumps: [],
+  time: {
+    time_zone: '',
+    date: '',
+    time: '',
+  },
+};
+
 const useAppStore = create<AppStoreState>()((set, get) => ({
   isAuthenticated: !!localStorage.getItem('user-token'),
-  status: {
-    up_time: '',
-    local_time: '',
-    free_heap: 0,
-    vcc: 3.3,
-    board_temperature: 25,
-    wifi_mode: 'STA',
-    ip_address: '',
-    mac_address: '',
-    mqtt_service: { enabled: false, connected: false },
-    ntp_service: { enabled: true, sync: true },
-    firmware_version: '',
-    firmware_date: '',
-    hardware_version: '',
-    wifi_disconnects: 0,
-    packets_dropped: 0,
-    tx_packets: 0,
-    rx_packets: 0,
-    reboot_count: 0,
-    last_reboot_reason: '',
-    storage_backend: '',
-    rtc_backend: '',
-  },
-  settings: {
-    services: {
-      hostname: '',
-      ntp_server: '',
-      utc_offset: 0,
-      ntp_dst: false,
-      mqtt_ip_address: '',
-      mqtt_port: '',
-      mqtt_user: '',
-      mqtt_password: '',
-      mqtt_qos: 0,
-      enable_ntp: false,
-      enable_mqtt: false,
-      ota_url: '',
-    },
-    auth: {
-      username: '',
-      password: '',
-    },
-    networks: [],
-    pumps: [],
-    time: {
-      time_zone: '',
-      date: '',
-      time: '',
-    },
-  },
+  status: cloneSettings(defaultStatus),
+  settings: cloneSettings(defaultSettings),
   error: null,
 
   login: async (user: UserCredentials): Promise<boolean> => {
@@ -108,12 +125,26 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       const response = (await checkCredentials(user)) as CheckCredentialsState;
       const token = response.token;
       http.defaults.headers.common.Authorization = token;
-      set(() => ({ isAuthenticated: true }));
+      set(() => ({ isAuthenticated: true, error: null }));
       localStorage.setItem('user-token', token);
       return true;
     } catch (e) {
-      console.log(e);
-      set(() => ({ error: 'Failed to login' }));
+      const message =
+        typeof e === 'object' &&
+        e !== null &&
+        'response' in e &&
+        typeof e.response === 'object' &&
+        e.response !== null &&
+        'data' in e.response &&
+        typeof e.response.data === 'object' &&
+        e.response.data !== null &&
+        'message' in e.response.data &&
+        typeof e.response.data.message === 'string'
+          ? e.response.data.message
+          : 'Failed to login';
+
+      set(() => ({ error: message, isAuthenticated: false }));
+      delete http.defaults.headers.common.Authorization;
       localStorage.removeItem('user-token');
       return false;
     }
@@ -121,7 +152,7 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
 
   logout: () => {
     delete http.defaults.headers.common.Authorization;
-    set(() => ({ isAuthenticated: false }));
+    set(() => ({ isAuthenticated: false, error: null }));
     localStorage.removeItem('user-token');
   },
 
@@ -130,9 +161,12 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       const response = (await getStatus()) as StatusState;
       set(() => ({
         status: response,
+        error: null,
       }));
+      return response;
     } catch (e) {
       set(() => ({ error: 'Failed to load Status' }));
+      return null;
     }
   },
 
@@ -147,9 +181,12 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
           pumps: response.pumps,
           time: response.time,
         },
+        error: null,
       });
+      return response;
     } catch (e) {
       set({ error: 'Failed to load Settings' });
+      return null;
     }
   },
 
@@ -175,7 +212,44 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       const response = (await setSettings(message)) as SettingsSaveResponse;
       return response.success;
     } catch (e) {
-      set(() => ({ error: 'Failed to load Status' }));
+      set(() => ({ error: 'Failed to save settings' }));
+      return false;
+    }
+  },
+
+  restartDevice: async () => {
+    try {
+      const response = (await runRestart<DeviceActionResponse>()) as DeviceActionResponse;
+      if (response.success) {
+        const status = await get().loadStatus();
+        set(() => ({
+          error: null,
+          status: status ?? get().status,
+        }));
+      }
+      return response.success;
+    } catch (e) {
+      set(() => ({ error: 'Failed to restart device' }));
+      return false;
+    }
+  },
+
+  factoryResetDevice: async () => {
+    try {
+      const response = (await runFactoryReset<DeviceActionResponse>()) as DeviceActionResponse;
+      if (response.success) {
+        delete http.defaults.headers.common.Authorization;
+        localStorage.removeItem('user-token');
+        set(() => ({
+          isAuthenticated: false,
+          error: null,
+          status: cloneSettings(defaultStatus),
+          settings: cloneSettings(defaultSettings),
+        }));
+      }
+      return response.success;
+    } catch (e) {
+      set(() => ({ error: 'Failed to factory reset device' }));
       return false;
     }
   },
@@ -193,7 +267,11 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       throw new Error('This connection already exists');
     }
 
-    const nextNetwork = { ...cloneSettings(data), id: networks.length ?? 0 } as NetworkState;
+    const nextNetwork = {
+      ...cloneSettings(data),
+      id: networks.length ?? 0,
+      is_dirty: true,
+    } as NetworkState;
     const nextNetworks = [...networks, nextNetwork];
 
     set({
@@ -216,7 +294,10 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     const idx = networks.findIndex((x) => x.id === data.id);
     if (idx != -1) {
       const nextNetworks = [...networks];
-      nextNetworks[idx] = cloneSettings(data);
+      nextNetworks[idx] = {
+        ...cloneSettings(data),
+        is_dirty: false,
+      };
       set({
         settings: {
           ...get().settings,
