@@ -27,6 +27,11 @@ export const http = axios.create({
   adapter: isMockEnabled ? mockAdapter : undefined,
 });
 
+function clearStoredAuth() {
+  delete http.defaults.headers.common.Authorization;
+  localStorage.removeItem('user-token');
+}
+
 const persistedToken = localStorage.getItem('user-token');
 if (persistedToken) {
   http.defaults.headers.common.Authorization = persistedToken;
@@ -47,9 +52,11 @@ http.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error && error.response && error.response.status === 401) {
-      // Hard redirect keeps it framework-agnostic
+      clearStoredAuth();
+
+      // Hard redirect keeps it framework-agnostic and breaks auth loops cleanly.
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+        window.location.replace('/login');
       }
     }
     return Promise.reject(error);

@@ -63,6 +63,13 @@ esp_err_t app_http_validate_request(httpd_req_t *req)
     return ESP_ERR_HTTPD_INVALID_REQ;
 }
 
+void app_http_set_cors_headers(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Authorization, Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+}
+
 esp_err_t favicon_get_handler(httpd_req_t *req)
 {
     const size_t size = (favicon_ico_end - favicon_ico_start);
@@ -141,7 +148,7 @@ esp_err_t woff2_handler(httpd_req_t *req)
 
 esp_err_t options_handler(httpd_req_t *req)
 {
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    app_http_set_cors_headers(req);
     httpd_resp_send(req, NULL, 0);
     return ESP_OK;
 }

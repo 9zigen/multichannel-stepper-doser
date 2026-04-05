@@ -14,6 +14,7 @@ extern char app_http_auth_token[65];
 
 char *app_http_success_response_json(bool success);
 esp_err_t app_http_validate_request(httpd_req_t *req);
+void app_http_set_cors_headers(httpd_req_t *req);
 
 esp_err_t index_get_handler(httpd_req_t *req);
 esp_err_t favicon_get_handler(httpd_req_t *req);

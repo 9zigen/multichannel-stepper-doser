@@ -43,6 +43,7 @@ static uint32_t calibration_to_100ml_units(const pump_t *pump)
 
 static void send_unauthorized(httpd_req_t *req)
 {
+    app_http_set_cors_headers(req);
     httpd_resp_set_status(req, "401 Unauthorized!");
     httpd_resp_send(req, NULL, 0);
 }
@@ -54,6 +55,7 @@ static esp_err_t send_success_and_restart(httpd_req_t *req, bool erase_before_re
         return ESP_OK;
     }
 
+    app_http_set_cors_headers(req);
     char *response = app_http_success_response_json(true);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, response, (ssize_t)strlen(response));
@@ -79,20 +81,27 @@ esp_err_t device_factory_reset_post_handler(httpd_req_t *req)
 
 esp_err_t ota_get_handler(httpd_req_t *req)
 {
-    if (app_http_validate_request(req) == ESP_OK) {
-        char *response = app_http_success_response_json(true);
-        httpd_resp_send(req, response, (ssize_t)strlen(response));
-        free(response);
-        upgrade_firmware();
-    } else {
+    if (app_http_validate_request(req) != ESP_OK) {
         send_unauthorized(req);
+        return ESP_OK;
     }
 
+    app_http_set_cors_headers(req);
+    char *response = app_http_success_response_json(true);
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
+    upgrade_firmware();
     return ESP_OK;
 }
 
 esp_err_t upload_post_handler(httpd_req_t *req)
 {
+    if (app_http_validate_request(req) != ESP_OK) {
+        send_unauthorized(req);
+        return ESP_OK;
+    }
+
+    app_http_set_cors_headers(req);
     char buf[1024];
     esp_ota_handle_t ota_handle;
     int remaining = (int)req->content_len;
@@ -150,6 +159,8 @@ esp_err_t upload_post_handler(httpd_req_t *req)
 
 esp_err_t status_get_handler(httpd_req_t *req)
 {
+    app_http_set_cors_headers(req);
+
     char *response = get_status_json();
     httpd_resp_send(req, response, (ssize_t)strlen(response));
     free(response);
@@ -163,6 +174,7 @@ esp_err_t wifi_scan_get_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
+    app_http_set_cors_headers(req);
     wifi_scan_config_t scan_config = {
         .show_hidden = false,
         .scan_type = WIFI_SCAN_TYPE_ACTIVE,
@@ -217,27 +229,29 @@ esp_err_t wifi_scan_get_handler(httpd_req_t *req)
 
 esp_err_t schedule_get_handler(httpd_req_t *req)
 {
-    if (app_http_validate_request(req) == ESP_OK) {
-        char *response = get_schedule_json();
-        httpd_resp_send(req, response, (ssize_t)strlen(response));
-        free(response);
-    } else {
+    if (app_http_validate_request(req) != ESP_OK) {
         send_unauthorized(req);
+        return ESP_OK;
     }
 
+    app_http_set_cors_headers(req);
+    char *response = get_schedule_json();
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
     return ESP_OK;
 }
 
 esp_err_t settings_get_handler(httpd_req_t *req)
 {
-    if (app_http_validate_request(req) == ESP_OK) {
-        char *response = get_settings_json();
-        httpd_resp_send(req, response, (ssize_t)strlen(response));
-        free(response);
-    } else {
+    if (app_http_validate_request(req) != ESP_OK) {
         send_unauthorized(req);
+        return ESP_OK;
     }
 
+    app_http_set_cors_headers(req);
+    char *response = get_settings_json();
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
     return ESP_OK;
 }
 
@@ -255,7 +269,10 @@ esp_err_t run_post_handler(httpd_req_t *req)
 
     if (app_http_validate_request(req) != ESP_OK) {
         send_unauthorized(req);
+        free(buf);
+        return ESP_OK;
     } else {
+        app_http_set_cors_headers(req);
         while (cur_len < total_len) {
             received = httpd_req_recv(req, buf + cur_len, total_len);
             if (received <= 0) {
@@ -314,7 +331,10 @@ esp_err_t calibrate_post_handler(httpd_req_t *req)
 
     if (app_http_validate_request(req) != ESP_OK) {
         send_unauthorized(req);
+        free(buf);
+        return ESP_OK;
     } else {
+        app_http_set_cors_headers(req);
         while (cur_len < total_len) {
             received = httpd_req_recv(req, buf + cur_len, total_len);
             if (received <= 0) {
@@ -372,7 +392,10 @@ esp_err_t schedule_post_handler(httpd_req_t *req)
 
     if (app_http_validate_request(req) != ESP_OK) {
         send_unauthorized(req);
+        free(buf);
+        return ESP_OK;
     } else {
+        app_http_set_cors_headers(req);
         int cur_len = 0;
         while (cur_len < total_len) {
             int received = httpd_req_recv(req, buf + cur_len, total_len);
@@ -458,7 +481,10 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
     if (app_http_validate_request(req) != ESP_OK) {
         send_unauthorized(req);
+        free(buf);
+        return ESP_OK;
     } else {
+        app_http_set_cors_headers(req);
         int cur_len = 0;
         while (cur_len < total_len) {
             int received = httpd_req_recv(req, buf + cur_len, total_len);
@@ -807,6 +833,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
 esp_err_t auth_post_handler(httpd_req_t *req)
 {
+    app_http_set_cors_headers(req);
+
     bool user_valid = false;
     int total_len = (int)req->content_len;
     char *buf = malloc(req->content_len + 1);
