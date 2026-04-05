@@ -17,6 +17,7 @@
 #include "mcp7940.h"
 #include "monitor.h"
 #include "mqtt.h"
+#include "pumps.h"
 #include "rtc.h"
 #include "web_server.h"
 
@@ -160,6 +161,49 @@ char *get_schedule_json(void)
 
     string = cJSON_Print(root);
 
+    cJSON_Delete(root);
+    return string;
+}
+
+static const char *pump_state_to_string(pump_state_t state)
+{
+    switch (state) {
+        case PUMP_ON:
+            return "timed";
+        case PUMP_CONTINUOUS:
+            return "continuous";
+        case PUMP_CAL:
+            return "calibration";
+        case PUMP_OFF:
+        default:
+            return "off";
+    }
+}
+
+char *get_pumps_runtime_json(void)
+{
+    char *string = NULL;
+    cJSON *root = cJSON_CreateObject();
+    cJSON *runtime = cJSON_CreateArray();
+    const pumps_status_t *pump_runtime = get_pumps_runtime_status();
+
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        const pumps_status_t *pump = &pump_runtime[i];
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddItemToObject(item, "id", cJSON_CreateNumber(i));
+        cJSON_AddItemToObject(item, "active", cJSON_CreateBool(pump->state != PUMP_OFF));
+        cJSON_AddItemToObject(item, "state", cJSON_CreateString(pump_state_to_string(pump->state)));
+        cJSON_AddItemToObject(item, "speed", cJSON_CreateNumber(pump->rpm));
+        cJSON_AddItemToObject(item, "direction", cJSON_CreateBool(pump->direction));
+        cJSON_AddItemToObject(item, "remaining_ticks", cJSON_CreateNumber(pump->time));
+        cJSON_AddItemToObject(item, "remaining_seconds",
+                              cJSON_CreateNumber((double)pump->time / (double)PUMP_TIMER_UNIT_IN_SEC));
+        cJSON_AddItemToObject(item, "volume_ml", cJSON_CreateNumber(pump->volume));
+        cJSON_AddItemToArray(runtime, item);
+    }
+
+    cJSON_AddItemToObject(root, "pumps", runtime);
+    string = cJSON_Print(root);
     cJSON_Delete(root);
     return string;
 }

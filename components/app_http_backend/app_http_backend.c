@@ -343,6 +343,13 @@ httpd_handle_t start_webserver(void)
             .user_ctx = NULL,
         };
 
+        httpd_uri_t get_pumps_runtime = {
+            .uri = "/api/pumps/runtime",
+            .method = HTTP_GET,
+            .handler = pumps_runtime_get_handler,
+            .user_ctx = NULL,
+        };
+
         httpd_uri_t get_wifi_scan = {
             .uri = "/api/network/wifi/scan",
             .method = HTTP_GET,
@@ -419,6 +426,7 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &get_css);
         httpd_register_uri_handler(server, &get_woff2);
         httpd_register_uri_handler(server, &get_status);
+        httpd_register_uri_handler(server, &get_pumps_runtime);
         httpd_register_uri_handler(server, &get_wifi_scan);
         httpd_register_uri_handler(server, &post_run);
         httpd_register_uri_handler(server, &post_calibrate);

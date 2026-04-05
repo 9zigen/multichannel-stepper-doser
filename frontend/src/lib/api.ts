@@ -189,6 +189,19 @@ export type PumpRunState = {
   time: number;
 };
 
+export type PumpRuntimeMode = 'off' | 'timed' | 'continuous' | 'calibration';
+
+export type PumpRuntimeEntry = {
+  id: number;
+  active: boolean;
+  state: PumpRuntimeMode;
+  speed: number;
+  direction: boolean;
+  remaining_ticks: number;
+  remaining_seconds: number;
+  volume_ml: number;
+};
+
 export type SettingsSaveResponse = {
   success: boolean;
 };
@@ -228,6 +241,11 @@ export const runCalibration = async <T>(payload: PumpRunState): Promise<T> => {
 
 export const runPump = async <T>(payload: PumpRunState): Promise<T> => {
   const data = await http.post('/api/run', payload);
+  return data.data as T;
+};
+
+export const getPumpsRuntime = async <T>(): Promise<T> => {
+  const data = await http.get('/api/pumps/runtime');
   return data.data as T;
 };
 

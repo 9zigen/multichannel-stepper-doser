@@ -6,10 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { PumpRunResponse, runPump } from '@/lib/api.ts';
+import { getPumpsRuntime, type PumpRuntimeEntry, PumpRunResponse, runPump } from '@/lib/api.ts';
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx';
-import { AlertTriangle, Square } from 'lucide-react';
+import { AlertTriangle, LoaderCircle, Square } from 'lucide-react';
 
 export interface PumpControlState {
   id: number;
@@ -35,17 +35,13 @@ const FormSchema = z.object({
 
 export default function PumpControl(props: PumpControlProps) {
   const { pumps } = props;
-  const [activeRun, setActiveRun] = React.useState<{
-    pumpId: number;
-    pumpName: string;
-    speed: number;
-    time: number;
-  } | null>(null);
-  const runTimeoutRef = React.useRef<number | null>(null);
+  const [runtime, setRuntime] = React.useState<PumpRuntimeEntry[]>([]);
+  const [isSyncingRuntime, setIsSyncingRuntime] = React.useState(false);
   const {
     control,
     register,
     handleSubmit,
+    setValue,
     watch,
     formState: { errors },
   } = useForm<FormData>({
@@ -58,25 +54,60 @@ export default function PumpControl(props: PumpControlProps) {
     },
   });
 
-  React.useEffect(() => {
-    return () => {
-      if (runTimeoutRef.current !== null) {
-        window.clearTimeout(runTimeoutRef.current);
+  const pumpId = watch('pump_id');
+  const activeRuns = React.useMemo(() => runtime.filter((entry) => entry.active), [runtime]);
+  const primaryActiveRun = React.useMemo(() => activeRuns[0] ?? null, [activeRuns]);
+  const pumpIsRunning = activeRuns.length > 0;
+  const selectedPumpName = pumps.find((pump) => pump.id === pumpId)?.name ?? 'Selected pump';
+  const selectedActiveRun = React.useMemo(() => {
+    if (pumpId !== undefined) {
+      const matchingEntry = activeRuns.find((entry) => entry.id === pumpId);
+      if (matchingEntry) {
+        return matchingEntry;
       }
-    };
+    }
+
+    return primaryActiveRun;
+  }, [activeRuns, primaryActiveRun, pumpId]);
+
+  const syncRuntime = React.useCallback(async (showError = false) => {
+    try {
+      setIsSyncingRuntime(true);
+      const response = (await getPumpsRuntime<{ pumps: PumpRuntimeEntry[] }>()) ?? { pumps: [] };
+      setRuntime(response.pumps ?? []);
+    } catch (e) {
+      if (showError) {
+        toast.error('Failed to sync pump runtime.');
+      }
+      console.error(e);
+    } finally {
+      setIsSyncingRuntime(false);
+    }
   }, []);
 
-  const pumpId = watch('pump_id');
-  const pumpIsRunning = activeRun !== null;
-  const selectedPumpName = pumps.find((pump) => pump.id === pumpId)?.name ?? 'Selected pump';
+  React.useEffect(() => {
+    void syncRuntime();
+  }, [syncRuntime]);
 
-  const clearRunningState = () => {
-    if (runTimeoutRef.current !== null) {
-      window.clearTimeout(runTimeoutRef.current);
-      runTimeoutRef.current = null;
+  React.useEffect(() => {
+    if (activeRuns.length === 0) {
+      return;
     }
-    setActiveRun(null);
-  };
+
+    const intervalId = window.setInterval(() => {
+      void syncRuntime();
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeRuns.length, syncRuntime]);
+
+  React.useEffect(() => {
+    if (selectedActiveRun) {
+      setValue('pump_id', selectedActiveRun.id);
+    }
+  }, [selectedActiveRun, setValue]);
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     try {
@@ -88,27 +119,8 @@ export default function PumpControl(props: PumpControlProps) {
       };
       const response = (await runPump(action)) as PumpRunResponse;
       if (response.success) {
+        await syncRuntime();
         toast.success('Pump started.');
-        const pumpName = pumps.find((pump) => pump.id === data.pump_id)?.name ?? `Pump ${data.pump_id}`;
-        setActiveRun({
-          pumpId: data.pump_id,
-          pumpName,
-          speed: data.speed,
-          time: data.time,
-        });
-        runTimeoutRef.current = window.setTimeout(
-          () => {
-            setActiveRun((current) => {
-              if (current?.pumpId === data.pump_id) {
-                toast.success(`${pumpName} finished in ${data.time} min at ${data.speed} rpm.`);
-                return null;
-              }
-              return current;
-            });
-            runTimeoutRef.current = null;
-          },
-          data.time * 60 * 1000
-        );
       } else {
         toast.error('Pump failed.');
       }
@@ -119,21 +131,22 @@ export default function PumpControl(props: PumpControlProps) {
   };
 
   const emergencyStop = async () => {
-    if (activeRun === null) {
+    if (!selectedActiveRun) {
       return;
     }
 
     try {
       const response = (await runPump({
-        id: activeRun.pumpId,
+        id: selectedActiveRun.id,
         direction: true,
-        speed: activeRun.speed,
+        speed: selectedActiveRun.speed || 1,
         time: 0,
       })) as PumpRunResponse;
 
       if (response.success) {
-        clearRunningState();
-        toast.error(`${activeRun.pumpName} stopped.`);
+        await syncRuntime();
+        const pumpName = pumps.find((pump) => pump.id === selectedActiveRun.id)?.name ?? `Pump ${selectedActiveRun.id}`;
+        toast.error(`${pumpName} stopped.`);
       } else {
         toast.error('Emergency stop failed.');
       }
@@ -155,15 +168,24 @@ export default function PumpControl(props: PumpControlProps) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-4">
-          {activeRun ? (
+          {selectedActiveRun ? (
             <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
               <div className="mb-1 flex items-center gap-2 font-medium text-destructive">
                 <AlertTriangle className="size-4" />
-                Manual run active
+                Pump activity detected
               </div>
               <div className="text-muted-foreground">
-                {activeRun.pumpName} is running at {activeRun.speed} rpm for up to {activeRun.time} min.
+                {(pumps.find((pump) => pump.id === selectedActiveRun.id)?.name ?? `Pump ${selectedActiveRun.id}`) +
+                  ` is ${selectedActiveRun.state === 'timed' ? 'running' : selectedActiveRun.state} at ${
+                    selectedActiveRun.speed
+                  } rpm`}
+                {selectedActiveRun.state === 'timed' && selectedActiveRun.remaining_seconds > 0
+                  ? ` for another ${Math.ceil(selectedActiveRun.remaining_seconds / 60)} min.`
+                  : '.'}
               </div>
+              {activeRuns.length > 1 ? (
+                <div className="mt-2 text-xs text-muted-foreground">{activeRuns.length} pumps are currently active.</div>
+              ) : null}
             </div>
           ) : null}
           <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
@@ -259,13 +281,14 @@ export default function PumpControl(props: PumpControlProps) {
 
             <div className="flex flex-row gap-3">
               <Button type="submit" className="w-full" variant="default" disabled={pumpIsRunning}>
+                {isSyncingRuntime ? <LoaderCircle className="animate-spin" /> : null}
                 Run {selectedPumpName}
               </Button>
               <Button
                 type="button"
                 className="w-full"
                 variant="destructive"
-                disabled={!pumpIsRunning}
+                disabled={!selectedActiveRun}
                 onClick={emergencyStop}
               >
                 <Square data-icon="inline-start" />

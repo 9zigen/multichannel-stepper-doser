@@ -9,6 +9,7 @@ import type {
 import type {
   AuthState,
   NetworkState,
+  PumpRuntimeEntry,
   PumpRunState,
   PumpState,
   ServiceState,
@@ -25,6 +26,15 @@ type MockState = {
   services: ServiceState;
   status: StatusState;
   time: TimeState;
+};
+
+type MockPumpRuntimeState = {
+  state: PumpRuntimeEntry['state'];
+  speed: number;
+  direction: boolean;
+  started_at: number;
+  ends_at: number | null;
+  duration_seconds: number;
 };
 
 const SCHEDULE_MODE = {
@@ -228,6 +238,7 @@ const initialState: MockState = {
 };
 
 let state = clone(initialState);
+let pumpRuntimeState: Record<number, MockPumpRuntimeState> = {};
 const isMockDebugEnabled = import.meta.env.DEV && import.meta.env.VITE_API_DEBUG === 'true';
 
 function clone<T>(value: T): T {
@@ -379,19 +390,87 @@ function simulateUploadProgress(onUploadProgress?: (progressEvent: AxiosProgress
 
 function updatePumpRuntime(payload: PumpRunState) {
   const pump = state.pumps.find((item) => item.id === payload.id);
-  if (!pump || payload.time <= 0) {
+  if (!pump) {
+    return;
+  }
+
+  if (payload.time === 0) {
+    delete pumpRuntimeState[payload.id];
+    return;
+  }
+
+  if (payload.time < 0) {
+    pumpRuntimeState[payload.id] = {
+      state: 'calibration',
+      speed: payload.speed,
+      direction: payload.direction,
+      started_at: Date.now(),
+      ends_at: null,
+      duration_seconds: 0,
+    };
     return;
   }
 
   const calibration = [...pump.calibration].sort((a, b) => a.speed - b.speed);
   const selected = calibration.find((item) => item.speed === payload.speed) ?? calibration[0];
-  if (!selected) {
-    return;
+  if (selected) {
+    const pumpedVolume = Number(((selected.flow / 60) * payload.time).toFixed(2));
+    pump.tank_current_vol = Math.max(0, pump.tank_current_vol - pumpedVolume);
+    pump.running_hours = Number((pump.running_hours + payload.time / 60).toFixed(2));
   }
 
-  const pumpedVolume = Number(((selected.flow / 60) * payload.time).toFixed(2));
-  pump.tank_current_vol = Math.max(0, pump.tank_current_vol - pumpedVolume);
-  pump.running_hours = Number((pump.running_hours + payload.time / 60).toFixed(2));
+  pumpRuntimeState[payload.id] = {
+    state: 'timed',
+    speed: payload.speed,
+    direction: payload.direction,
+    started_at: Date.now(),
+    ends_at: Date.now() + payload.time * 60 * 1000,
+    duration_seconds: payload.time * 60,
+  };
+}
+
+function syncPumpRuntimeState() {
+  const now = Date.now();
+
+  for (const [pumpId, runtime] of Object.entries(pumpRuntimeState)) {
+    if (runtime.state === 'timed' && runtime.ends_at !== null && runtime.ends_at <= now) {
+      delete pumpRuntimeState[Number(pumpId)];
+    }
+  }
+}
+
+function getPumpRuntimeEntries(): PumpRuntimeEntry[] {
+  syncPumpRuntimeState();
+
+  return state.pumps.map((pump) => {
+    const runtime = pumpRuntimeState[pump.id];
+    if (!runtime) {
+      return {
+        id: pump.id,
+        active: false,
+        state: 'off',
+        speed: 0,
+        direction: pump.direction,
+        remaining_ticks: 0,
+        remaining_seconds: 0,
+        volume_ml: 0,
+      };
+    }
+
+    const remainingSeconds =
+      runtime.ends_at === null ? 0 : Math.max(0, Math.ceil((runtime.ends_at - Date.now()) / 1000));
+
+    return {
+      id: pump.id,
+      active: true,
+      state: runtime.state,
+      speed: runtime.speed,
+      direction: runtime.direction,
+      remaining_ticks: runtime.state === 'timed' ? remainingSeconds * 100 : 0,
+      remaining_seconds: runtime.state === 'timed' ? remainingSeconds : 0,
+      volume_ml: 0,
+    };
+  });
 }
 
 function ensureAuthorized(config: InternalAxiosRequestConfig, method: string, url: string, requestBody: unknown) {
@@ -490,6 +569,13 @@ export const mockAdapter: AxiosAdapter = async (config) => {
     return mockResponse;
   }
 
+  if (url === '/api/pumps/runtime' && method === 'get') {
+    ensureAuthorized(config, method, url, requestBody);
+    const mockResponse = response(config, { pumps: getPumpRuntimeEntries() });
+    debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
+    return mockResponse;
+  }
+
   if (url === '/api/network/wifi/scan' && method === 'get') {
     ensureAuthorized(config, method, url, requestBody);
     const mockResponse = response(config, { networks: clone(mockWifiNetworks) });
@@ -550,4 +636,5 @@ export const mockAdapter: AxiosAdapter = async (config) => {
 
 export function resetMockState() {
   state = clone(initialState);
+  pumpRuntimeState = {};
 }

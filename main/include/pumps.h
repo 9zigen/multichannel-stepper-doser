@@ -42,6 +42,7 @@ typedef struct {
 
 /* public */
 int64_t get_tank_volume(uint8_t pump_id);
+const pumps_status_t *get_pumps_runtime_status(void);
 void run_pump_with_timeout(uint8_t pump_id, uint32_t timeout_ms, uint8_t speed);
 void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm);
 esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t time_minutes);

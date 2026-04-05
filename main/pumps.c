@@ -241,6 +241,11 @@ int64_t get_tank_volume(uint8_t pump_id)
     return (int64_t)get_pump_config(pump_id)->tank_current_vol;
 }
 
+const pumps_status_t *get_pumps_runtime_status(void)
+{
+    return pumps;
+}
+
 static void restore_eeprom_tank_status(void)
 {
     tank_status_t tank;

@@ -168,6 +168,20 @@ esp_err_t status_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t pumps_runtime_get_handler(httpd_req_t *req)
+{
+    if (app_http_validate_request(req) != ESP_OK) {
+        send_unauthorized(req);
+        return ESP_OK;
+    }
+
+    app_http_set_cors_headers(req);
+    char *response = get_pumps_runtime_json();
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
+    return ESP_OK;
+}
+
 esp_err_t wifi_scan_get_handler(httpd_req_t *req)
 {
     if (app_http_validate_request(req) != ESP_OK) {
