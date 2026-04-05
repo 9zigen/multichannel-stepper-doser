@@ -45,7 +45,6 @@
 #include "i2c_driver.h"
 #include "pump_backend_stepper.h"
 #include "stepper_task.h"
-#include "driver/rmt.h"
 #include "tmc2209.h"
 
 /*********************
