@@ -114,7 +114,7 @@ void stepper_task(void *pvParameter)
     gpio_num_t step_pins[] = {GPIO_NUM_14, GPIO_NUM_27, GPIO_NUM_16, GPIO_NUM_33};
     tmc2209_microsteps_t micro_steps[] = {MICROSTEPS_256, MICROSTEPS_256, MICROSTEPS_256, MICROSTEPS_256};
 
-#if defined(RMT_LEGACY)
+#if defined(RMT_LEGACY) && RMT_LEGACY
     rmt_channel_t rmt_channels[] = {RMT_CHANNEL_0, RMT_CHANNEL_1, RMT_CHANNEL_2, RMT_CHANNEL_3};
 #else
     rmt_channel_handle_t rmt_channels[] = {NULL, NULL, NULL, NULL};

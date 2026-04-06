@@ -18,7 +18,7 @@
 #include "tmc2209_reg.h"
 
 #define RMT_LEGACY 1
-#if defined(RMT_LEGACY)
+#if defined(RMT_LEGACY) && RMT_LEGACY
 #include <driver/rmt.h>
 #else
 #include <driver/rmt_tx.h>
@@ -100,9 +100,11 @@ typedef struct
     gpio_num_t* en_pin;
     tmc2209_microsteps_t* micro_steps;
     uint8_t motors_num;
-#if defined(RMT_LEGACY)
+#if defined(RMT_LEGACY) && RMT_LEGACY
+    /* Legacy RMT backend: preallocated channel ids managed outside the driver. */
     rmt_channel_t *rmt_channel;
 #else
+    /* New RMT backend: channel handles allocated during init. */
     rmt_channel_handle_t *rmt_channel;
 #endif
 } tms2209_t;
@@ -123,7 +125,20 @@ void TMC2209_set_steps(tms2209_t *cfg, uint32_t motor_num, uint32_t steps);
 
 void TMC2209_step_move(tms2209_t *cfg, int64_t* steps, uint32_t* period_us);
 
-#if defined(RMT_LEGACY)
+/**
+ * Pulse contract for both legacy and new RMT backends:
+ * - `steps` is the number of full STEP pulses to emit.
+ * - one requested step must produce one rising edge on STEP.
+ * - the signal is a 50/50 square wave where the high and low phases both use
+ *   `signal_duration_us`.
+ * - effective step period is `2 * signal_duration_us`.
+ * - `async = 0` blocks until the full burst is transmitted.
+ * - `async = 1` returns after queueing the burst.
+ *
+ * Any new backend must preserve these semantics exactly before replacing the
+ * legacy backend.
+ */
+#if defined(RMT_LEGACY) && RMT_LEGACY
 esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, uint32_t steps, uint32_t signal_duration, uint8_t async);
 #else
 esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, int steps, uint32_t steps_second);
@@ -162,5 +177,3 @@ tmc2209_otp_read_reg_t tmc2209_get_otp(tms2209_t cfg, uint8_t motor_num);
 tmc2209_ioin_reg_t tmc2209_get_ioin(tms2209_t cfg, uint8_t motor_num);
 
 tmc2209_chopconf_reg_t tmc2209_get_chopconf(tms2209_t *cfg, uint8_t motor_num);
-
-

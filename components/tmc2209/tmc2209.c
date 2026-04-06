@@ -6,7 +6,7 @@
 #include "tmc2209.h"
 
 
-#if defined(RMT_LEGACY)
+#if defined(RMT_LEGACY) && RMT_LEGACY
 #include <driver/rmt.h>
 #else
 #include <driver/rmt_tx.h>
@@ -26,7 +26,7 @@ static int64_t steps_left[] = {0, 0, 0, 0};
 
 static const uint32_t timer_N = sizeof(gptimer) / sizeof(gptimer[0]); // number of timers
 
-#if !defined(RMT_LEGACY)
+#if !(defined(RMT_LEGACY) && RMT_LEGACY)
 /* RMT Uniform */
 rmt_transmit_config_t tx_config = { .loop_count = 0 };
 stepper_motor_uniform_encoder_config_t uniform_encoder_config = { .resolution = STEP_MOTOR_RESOLUTION_HZ };
@@ -34,6 +34,22 @@ rmt_encoder_handle_t uniform_motor_encoder = NULL;
 #endif
 
 static const char* TAG = "TMC2209";
+
+static esp_err_t tmc2209_backend_rmt_init(tms2209_t *cfg, uint8_t motor_num);
+static void tmc2209_backend_rmt_deinit(tms2209_t *cfg, uint8_t motor_num);
+
+#if defined(RMT_LEGACY) && RMT_LEGACY
+static esp_err_t tmc2209_backend_steps_legacy(tms2209_t *cfg,
+                                              uint8_t motor_num,
+                                              uint32_t steps,
+                                              uint32_t signal_duration,
+                                              uint8_t async);
+#else
+static esp_err_t tmc2209_backend_steps_tx(tms2209_t *cfg,
+                                          uint8_t motor_num,
+                                          int steps,
+                                          uint32_t steps_second);
+#endif
 
 static void print_bytes_in_lines(uint8_t *array, size_t size)
 {
@@ -102,9 +118,9 @@ static esp_err_t write_register(tms2209_t *cfg, uint8_t* datagram, uint8_t len)
         }
         xSemaphoreGive(uart_tx_sem);
         return ret;
-    } else {
-        ESP_LOGE(TAG, "uart_write_bytes: timeout");
     }
+
+    ESP_LOGE(TAG, "uart_write_bytes: timeout");
     return ESP_FAIL;
 }
 
@@ -139,6 +155,7 @@ static esp_err_t read_register(tms2209_t *cfg, uint8_t *datagram)
         free(data);
         return ESP_FAIL;
     }
+
     free(data);
     return ESP_OK;
 }
@@ -386,23 +403,8 @@ void tmc2209_init(tms2209_t *cfg)
         TMC2209_enable(cfg, i, 1);
         TMC2209_set_dir(cfg, i, CW_DIR);
 
-        /* Configure RMT */
-#if !defined(RMT_LEGACY)
-        rmt_tx_channel_config_t tx_chan_config = {
-                .clk_src = RMT_CLK_SRC_DEFAULT,
-                .gpio_num = cfg->step_pin[i],
-                .mem_block_symbols = 64,
-                .resolution_hz = 1000000,
-                .trans_queue_depth = 1
-        };
-        ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &cfg->rmt_channel[i]));
-        ESP_ERROR_CHECK(rmt_new_stepper_motor_uniform_encoder(&uniform_encoder_config, &uniform_motor_encoder));
-        ESP_ERROR_CHECK(rmt_enable(cfg->rmt_channel[i]));
-#else
-//        rmt_driver_install(cfg->rmt_channel[i], 0, 0);
-//        rmt_config_t config = RMT_DEFAULT_CONFIG_TX(cfg->step_pin[i], cfg->rmt_channel[i]);
-//        rmt_config(&config);
-#endif
+        /* Configure the pulse generation backend. */
+        ESP_ERROR_CHECK(tmc2209_backend_rmt_init(cfg, i));
 
         // configure timers
 
@@ -441,6 +443,7 @@ void TMC2209_deinit(tms2209_t *cfg)
 {
     for (uint32_t i = 0; i < timer_N; i++)
     {
+        tmc2209_backend_rmt_deinit(cfg, i);
         ESP_ERROR_CHECK(gptimer_disable(gptimer[i]));
         ESP_ERROR_CHECK(gptimer_del_timer(gptimer[i]));
     }
@@ -599,11 +602,65 @@ void TMC2209_step_move(tms2209_t *cfg, int64_t* steps, uint32_t* period_us)
     }
 }
 
-#if defined(RMT_LEGACY)
+#if defined(RMT_LEGACY) && RMT_LEGACY
 esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, uint32_t steps, uint32_t signal_duration, uint8_t async)
 {
-    esp_err_t ret = ESP_OK;
+    return tmc2209_backend_steps_legacy(cfg, motor_num, steps, signal_duration, async);
+}
+#else
+esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, int steps, uint32_t steps_second)
+{
+    return tmc2209_backend_steps_tx(cfg, motor_num, steps, steps_second);
+}
+#endif
 
+static esp_err_t tmc2209_backend_rmt_init(tms2209_t *cfg, uint8_t motor_num)
+{
+#if defined(RMT_LEGACY) && RMT_LEGACY
+    (void)cfg;
+    (void)motor_num;
+    /* Legacy backend uses static channel ids supplied by the caller. */
+    return ESP_OK;
+#else
+    rmt_tx_channel_config_t tx_chan_config = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .gpio_num = cfg->step_pin[motor_num],
+        .mem_block_symbols = 64,
+        .resolution_hz = 1000000,
+        .trans_queue_depth = 1
+    };
+
+    ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &cfg->rmt_channel[motor_num]));
+    if (uniform_motor_encoder == NULL) {
+        ESP_ERROR_CHECK(rmt_new_stepper_motor_uniform_encoder(&uniform_encoder_config, &uniform_motor_encoder));
+    }
+    return rmt_enable(cfg->rmt_channel[motor_num]);
+#endif
+}
+
+static void tmc2209_backend_rmt_deinit(tms2209_t *cfg, uint8_t motor_num)
+{
+#if defined(RMT_LEGACY) && RMT_LEGACY
+    (void)cfg;
+    (void)motor_num;
+#else
+    if (cfg->rmt_channel[motor_num] != NULL) {
+        rmt_disable(cfg->rmt_channel[motor_num]);
+        rmt_del_channel(cfg->rmt_channel[motor_num]);
+        cfg->rmt_channel[motor_num] = NULL;
+    }
+#endif
+}
+
+/* Legacy pulse backend. This is the behavioral reference implementation that
+ * the new TX backend must match before it can replace the legacy path. */
+static esp_err_t tmc2209_backend_steps_legacy(tms2209_t *cfg,
+                                              uint8_t motor_num,
+                                              uint32_t steps,
+                                              uint32_t signal_duration,
+                                              uint8_t async)
+{
+    esp_err_t ret = ESP_OK;
     // Allocate memory for the RMT items
     rmt_item32_t* items = (rmt_item32_t*) pvPortMalloc(sizeof(rmt_item32_t) * steps);
     if (items == NULL) {
@@ -632,17 +689,19 @@ esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, uint32_t steps, uint3
 
     return ret;
 }
-#else
-esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, int steps, uint32_t steps_second)
-{
-    esp_err_t ret = ESP_OK;
-
-    tx_config.loop_count = steps;
-    ret = rmt_transmit(cfg->rmt_channel[motor_num], uniform_motor_encoder, &steps_second, sizeof(steps_second), &tx_config);
-    rmt_tx_wait_all_done(cfg->rmt_channel[motor_num], -1);
-    return ret;
-}
-#endif
+// #else
+// /* New TX backend placeholder. It currently does not match the legacy pulse
+//  * contract and therefore must not be enabled by default. */
+// static esp_err_t tmc2209_backend_steps_tx(tms2209_t *cfg, uint8_t motor_num, int steps, uint32_t steps_second)
+// {
+//     esp_err_t ret = ESP_OK;
+//
+//     tx_config.loop_count = steps;
+//     ret = rmt_transmit(cfg->rmt_channel[motor_num], uniform_motor_encoder, &steps_second, sizeof(steps_second), &tx_config);
+//     rmt_tx_wait_all_done(cfg->rmt_channel[motor_num], -1);
+//     return ret;
+// }
+// #endif
 
 
 /**
