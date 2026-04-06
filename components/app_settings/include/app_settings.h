@@ -82,8 +82,7 @@ typedef struct {
     char hostname[20];                    // Device Name
     char ota_url[MAX_SERVICE_URL_LEN];    // OTA Server URL (full web path to firmware)
     char ntp_server[MAX_NETWORK_STR_LEN]; // NTP server / host
-    int utc_offset;                       // UTC offset in minutes
-    bool ntp_dst;                         // Daylight save
+    char time_zone[MAX_NETWORK_STR_LEN];  // Time zone name (for example Europe/Madrid)
     uint8_t mqtt_ip_address[4];           // IP v4 Address Array
     uint16_t mqtt_port;                   // MQTT Server port 1883 default
     char mqtt_user[MAX_NETWORK_STR_LEN];

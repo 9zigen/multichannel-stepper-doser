@@ -196,6 +196,14 @@ const Home: React.FC = (): React.ReactElement => {
                     <span className="font-medium">{deviceStatus.firmware_date}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Local time</span>
+                    <span className="font-medium">
+                      {deviceStatus.local_date || deviceStatus.local_time
+                        ? `${deviceStatus.local_date || 'Unknown date'} ${deviceStatus.local_time || ''}`.trim()
+                        : 'Unavailable'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Uptime</span>
                     <span className="font-medium">{deviceStatus.up_time}</span>
                   </div>

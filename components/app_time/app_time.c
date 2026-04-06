@@ -1,7 +1,6 @@
 /***
 ** Created by Aleksey Volkov on 19.12.2019.
 ***/
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -27,6 +26,93 @@ static const char *TAG = "RTC";
 static uint8_t ntp_sync = 0;
 static const char *rtc_backend = "System clock";
 static bool rtc_fallback = true;
+
+typedef struct {
+    const char *name;
+    const char *tz;
+} app_time_zone_entry_t;
+
+static const app_time_zone_entry_t APP_TIME_ZONES[] = {
+    {"UTC", "UTC0"},
+    {"Europe/London", "GMT0BST,M3.5.0/1,M10.5.0"},
+    {"Europe/Dublin", "IST-1GMT0,M10.5.0,M3.5.0/1"},
+    {"Europe/Lisbon", "WET0WEST,M3.5.0/1,M10.5.0"},
+    {"Europe/Madrid", "CET-1CEST,M3.5.0/2,M10.5.0/3"},
+    {"Europe/Paris", "CET-1CEST,M3.5.0/2,M10.5.0/3"},
+    {"Europe/Berlin", "CET-1CEST,M3.5.0/2,M10.5.0/3"},
+    {"Europe/Rome", "CET-1CEST,M3.5.0/2,M10.5.0/3"},
+    {"Europe/Athens", "EET-2EEST,M3.5.0/3,M10.5.0/4"},
+    {"Europe/Helsinki", "EET-2EEST,M3.5.0/3,M10.5.0/4"},
+    {"Europe/Kyiv", "EET-2EEST,M3.5.0/3,M10.5.0/4"},
+    {"Europe/Istanbul", "<+03>-3"},
+    {"Europe/Moscow", "MSK-3"},
+    {"America/New_York", "EST5EDT,M3.2.0/2,M11.1.0/2"},
+    {"America/Chicago", "CST6CDT,M3.2.0/2,M11.1.0/2"},
+    {"America/Denver", "MST7MDT,M3.2.0/2,M11.1.0/2"},
+    {"America/Phoenix", "MST7"},
+    {"America/Los_Angeles", "PST8PDT,M3.2.0/2,M11.1.0/2"},
+    {"America/Anchorage", "AKST9AKDT,M3.2.0/2,M11.1.0/2"},
+    {"Pacific/Honolulu", "HST10"},
+    {"America/Sao_Paulo", "<-03>3"},
+    {"America/Argentina/Buenos_Aires", "<-03>3"},
+    {"Africa/Johannesburg", "SAST-2"},
+    {"Asia/Dubai", "<+04>-4"},
+    {"Asia/Karachi", "PKT-5"},
+    {"Asia/Kolkata", "IST-5:30"},
+    {"Asia/Dhaka", "<+06>-6"},
+    {"Asia/Bangkok", "<+07>-7"},
+    {"Asia/Singapore", "<+08>-8"},
+    {"Asia/Hong_Kong", "HKT-8"},
+    {"Asia/Shanghai", "CST-8"},
+    {"Asia/Tokyo", "JST-9"},
+    {"Asia/Seoul", "KST-9"},
+    {"Australia/Perth", "AWST-8"},
+    {"Australia/Adelaide", "ACST-9:30ACDT,M10.1.0/2,M4.1.0/3"},
+    {"Australia/Sydney", "AEST-10AEDT,M10.1.0/2,M4.1.0/3"},
+    {"Pacific/Auckland", "NZST-12NZDT,M9.5.0/2,M4.1.0/3"},
+    {"Etc/GMT+12", "GMT+12"},
+    {"Etc/GMT+11", "GMT+11"},
+    {"Etc/GMT+10", "GMT+10"},
+    {"Etc/GMT+9", "GMT+9"},
+    {"Etc/GMT+8", "GMT+8"},
+    {"Etc/GMT+7", "GMT+7"},
+    {"Etc/GMT+6", "GMT+6"},
+    {"Etc/GMT+5", "GMT+5"},
+    {"Etc/GMT+4", "GMT+4"},
+    {"Etc/GMT+3", "GMT+3"},
+    {"Etc/GMT+2", "GMT+2"},
+    {"Etc/GMT+1", "GMT+1"},
+    {"Etc/GMT", "GMT0"},
+    {"Etc/GMT-1", "GMT-1"},
+    {"Etc/GMT-2", "GMT-2"},
+    {"Etc/GMT-3", "GMT-3"},
+    {"Etc/GMT-4", "GMT-4"},
+    {"Etc/GMT-5", "GMT-5"},
+    {"Etc/GMT-6", "GMT-6"},
+    {"Etc/GMT-7", "GMT-7"},
+    {"Etc/GMT-8", "GMT-8"},
+    {"Etc/GMT-9", "GMT-9"},
+    {"Etc/GMT-10", "GMT-10"},
+    {"Etc/GMT-11", "GMT-11"},
+    {"Etc/GMT-12", "GMT-12"},
+    {"Etc/GMT-13", "GMT-13"},
+    {"Etc/GMT-14", "GMT-14"},
+};
+
+static const char *app_time_lookup_tz(const char *time_zone_name)
+{
+    if (time_zone_name == NULL || time_zone_name[0] == '\0') {
+        return "UTC0";
+    }
+
+    for (size_t i = 0; i < sizeof(APP_TIME_ZONES) / sizeof(APP_TIME_ZONES[0]); ++i) {
+        if (strcmp(APP_TIME_ZONES[i].name, time_zone_name) == 0) {
+            return APP_TIME_ZONES[i].tz;
+        }
+    }
+
+    return NULL;
+}
 
 static void time_sync_notification_cb(struct timeval *tv)
 {
@@ -76,17 +162,15 @@ void init_clock(void)
     time_t now;
     struct tm timeinfo;
     char strftime_buf[64];
-    char tz_buff[32];
 
     services_t *services = get_service_config();
-
-    if (services->utc_offset > 0) {
-        snprintf(tz_buff, sizeof(tz_buff), "UTC-%d", services->utc_offset + ((uint8_t)services->ntp_dst));
-    } else {
-        uint8_t offset = fabs((double)services->utc_offset);
-        snprintf(tz_buff, sizeof(tz_buff), "UTC+%d", offset + ((uint8_t)services->ntp_dst));
+    const char *tz_spec = app_time_lookup_tz(services->time_zone);
+    if (tz_spec == NULL) {
+        ESP_LOGW(TAG, "Unknown time zone '%s'. Falling back to UTC.", services->time_zone);
+        tz_spec = "UTC0";
     }
-    setenv("TZ", tz_buff, 1);
+
+    setenv("TZ", tz_spec, 1);
     tzset();
     ESP_LOGI(TAG, "new TZ is: %s", getenv("TZ"));
 

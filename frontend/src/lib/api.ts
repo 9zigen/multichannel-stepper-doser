@@ -117,8 +117,7 @@ export type PumpState = {
 export type ServiceState = {
   hostname: string;
   ntp_server: string;
-  utc_offset: number;
-  ntp_dst: boolean;
+  time_zone: string;
   mqtt_ip_address: string;
   mqtt_port: string;
   mqtt_user: string;
@@ -146,6 +145,7 @@ export type SettingsState = {
 export type StatusState = {
   up_time: string;
   local_time: string;
+  local_date: string;
   free_heap: number;
   vcc: number;
   board_temperature: number;

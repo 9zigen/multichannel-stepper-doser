@@ -16,17 +16,24 @@ import {
   FieldTitle,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input.tsx';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { ServiceState } from '@/lib/api.ts';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
+import { TIME_ZONE_OPTIONS } from '@/lib/timezones.ts';
 
 type FormData = {
   hostname: string;
   ntp_server: string;
-  utc_offset: number;
-  ntp_dst: boolean;
+  time_zone: string;
   mqtt_ip_address: string;
   mqtt_port: string;
   mqtt_user: string;
@@ -43,8 +50,7 @@ const FormSchema = z.object({
     .min(3, 'Hostname must be at least 3 characters.')
     .max(20, 'Hostname must be 20 characters or fewer.'),
   ntp_server: z.string().max(64, 'NTP server must be 64 characters or fewer.'),
-  utc_offset: z.number(),
-  ntp_dst: z.boolean(),
+  time_zone: z.string().min(1, 'Select a time zone.'),
   mqtt_ip_address: z.string().max(64, 'Broker host must be 64 characters or fewer.'),
   mqtt_port: z
     .string()
@@ -101,8 +107,7 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
     defaultValues: {
       hostname: services.hostname,
       ntp_server: services.ntp_server,
-      utc_offset: services.utc_offset,
-      ntp_dst: services.ntp_dst,
+      time_zone: services.time_zone || 'UTC',
       mqtt_ip_address: services.mqtt_ip_address,
       mqtt_port: services.mqtt_port,
       mqtt_user: services.mqtt_user,
@@ -186,38 +191,31 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
             </Field>
 
             <Field data-disabled={!enableNtp}>
-              <FieldLabel htmlFor="utc_offset">UTC offset</FieldLabel>
+              <FieldLabel htmlFor="time_zone">Time zone</FieldLabel>
               <FieldContent>
-                <Input
-                  id="utc_offset"
-                  type="number"
-                  step={1}
-                  placeholder="1"
-                  {...register('utc_offset', { valueAsNumber: true })}
-                  disabled={!enableNtp}
-                  aria-invalid={!!errors.utc_offset}
+                <Controller
+                  name="time_zone"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange} disabled={!enableNtp}>
+                      <SelectTrigger id="time_zone" className="w-full" aria-invalid={!!errors.time_zone}>
+                        <SelectValue placeholder="Select time zone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIME_ZONE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 />
-                <FieldDescription>Hours offset from UTC for the device timezone.</FieldDescription>
-                <FieldError errors={[errors.utc_offset]} />
+                <FieldDescription>Uses the selected region&apos;s DST rules automatically when applicable.</FieldDescription>
+                <FieldError errors={[errors.time_zone]} />
               </FieldContent>
             </Field>
           </div>
-
-          <Field orientation="horizontal" className="items-start justify-between rounded-xl border bg-muted/20 p-4">
-            <FieldContent className="gap-1">
-              <FieldLabel htmlFor="dst-mode">Daylight saving time</FieldLabel>
-              <FieldDescription>
-                Apply DST automatically when your dosing schedule should follow local clock time.
-              </FieldDescription>
-            </FieldContent>
-            <Controller
-              name="ntp_dst"
-              control={control}
-              render={({ field }) => (
-                <Switch id="dst-mode" checked={field.value} onCheckedChange={field.onChange} disabled={!enableNtp} />
-              )}
-            />
-          </Field>
         </SettingsSection>
 
         <SettingsSection

@@ -827,15 +827,21 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             }
 
             cJSON *ntp_server = cJSON_GetObjectItem(services, "ntp_server");
-            if (cJSON_IsString(ntp_server) && (hostname->valuestring != NULL)) {
+            if (cJSON_IsString(ntp_server) && (ntp_server->valuestring != NULL)) {
                 strlcpy(service_config->ntp_server, ntp_server->valuestring, sizeof(service_config->ntp_server));
             }
 
-            cJSON *utc_offset = cJSON_GetObjectItem(services, "utc_offset");
-            service_config->utc_offset = utc_offset->valueint;
-
-            cJSON *ntp_dst = cJSON_GetObjectItem(services, "ntp_dst");
-            service_config->ntp_dst = cJSON_IsTrue(ntp_dst);
+            cJSON *time_zone = cJSON_GetObjectItem(services, "time_zone");
+            if (cJSON_IsString(time_zone) && (time_zone->valuestring != NULL)) {
+                strlcpy(service_config->time_zone, time_zone->valuestring, sizeof(service_config->time_zone));
+            } else {
+                /* Backward compatibility for older clients still posting a plain UTC offset. */
+                cJSON *utc_offset = cJSON_GetObjectItem(services, "utc_offset");
+                if (cJSON_IsNumber(utc_offset)) {
+                    int offset = utc_offset->valueint;
+                    snprintf(service_config->time_zone, sizeof(service_config->time_zone), "Etc/GMT%+d", -offset);
+                }
+            }
 
             cJSON *mqtt_ip_address = cJSON_GetObjectItem(services, "mqtt_ip_address");
             if (cJSON_IsString(mqtt_ip_address) && (mqtt_ip_address->valuestring != NULL)) {
@@ -899,10 +905,9 @@ esp_err_t settings_post_handler(httpd_req_t *req)
                 }
             }
             if (cJSON_IsString(time_zone) && time_zone->valuestring != NULL) {
-                int offset = 0;
-                if (sscanf(time_zone->valuestring, "UTC%d", &offset) == 1) {
-                    get_service_config()->utc_offset = offset;
-                }
+                strlcpy(get_service_config()->time_zone, time_zone->valuestring,
+                        sizeof(get_service_config()->time_zone));
+                save_service();
             }
 
 #if defined(USE_MCP7940)

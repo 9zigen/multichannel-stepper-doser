@@ -31,15 +31,11 @@ static void format_iso_time(const datetime_t *datetime, char *buffer, size_t siz
     snprintf(buffer, size, "%02u:%02u:%02u", datetime->hour, datetime->min, datetime->sec);
 }
 
-static void format_utc_offset(int offset, char *buffer, size_t size)
-{
-    snprintf(buffer, size, "UTC%+d", offset);
-}
-
 char *get_status_json(void)
 {
     char *string = NULL;
     char time_string[32];
+    char date_string[32];
     const esp_app_desc_t *app_description = esp_app_get_description();
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
@@ -54,6 +50,13 @@ char *get_status_json(void)
 
     get_time_string((char *)&time_string);
     cJSON_AddItemToObject(status, "local_time", cJSON_CreateString(time_string));
+
+    time_t now = 0;
+    struct tm timeinfo = {0};
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    strftime(date_string, sizeof(date_string), "%Y-%m-%d", &timeinfo);
+    cJSON_AddItemToObject(status, "local_date", cJSON_CreateString(date_string));
 
     cJSON_AddItemToObject(status, "free_heap", cJSON_CreateNumber((double)system_status->free_heap));
     cJSON_AddItemToObject(status, "vcc", cJSON_CreateNumber(0));
@@ -326,8 +329,7 @@ char *get_settings_json(void)
     cJSON_AddItemToObject(services, "hostname", cJSON_CreateString(service_config->hostname));
     cJSON_AddItemToObject(services, "ota_url", cJSON_CreateString(service_config->ota_url));
     cJSON_AddItemToObject(services, "ntp_server", cJSON_CreateString(service_config->ntp_server));
-    cJSON_AddItemToObject(services, "utc_offset", cJSON_CreateNumber(service_config->utc_offset));
-    cJSON_AddItemToObject(services, "ntp_dst", cJSON_CreateBool(service_config->ntp_dst));
+    cJSON_AddItemToObject(services, "time_zone", cJSON_CreateString(service_config->time_zone));
 
     char net_buff[16];
     ip_to_string(service_config->mqtt_ip_address, net_buff);
@@ -366,10 +368,10 @@ char *get_settings_json(void)
 
     char date_string[16];
     char time_string_iso[16];
-    char time_zone[16];
+    char time_zone[64];
     format_iso_date(&datetime, date_string, sizeof(date_string));
     format_iso_time(&datetime, time_string_iso, sizeof(time_string_iso));
-    format_utc_offset(service_config->utc_offset, time_zone, sizeof(time_zone));
+    strlcpy(time_zone, service_config->time_zone, sizeof(time_zone));
 
     cJSON *time_json = cJSON_CreateObject();
     cJSON_AddItemToObject(time_json, "time_zone", cJSON_CreateString(time_zone));

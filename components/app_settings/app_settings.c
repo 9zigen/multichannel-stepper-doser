@@ -478,8 +478,7 @@ void set_default_service()
 
     /* NTP */
     strlcpy(service.ntp_server, "pool.ntp.org", sizeof(service.ntp_server));
-    service.utc_offset = 1;
-    service.ntp_dst = false;
+    strlcpy(service.time_zone, "UTC", sizeof(service.time_zone));
     service.enable_ntp = false;
 
     /*MQTT */

@@ -71,6 +71,10 @@ const ServicesPage: React.FC = (): React.ReactElement => {
                   <div>{serviceState.ntp_server || 'Not configured'}</div>
                 </div>
                 <div>
+                  <div className="text-xs uppercase tracking-wide">Time zone</div>
+                  <div>{serviceState.time_zone || 'UTC'}</div>
+                </div>
+                <div>
                   <div className="text-xs uppercase tracking-wide">Broker</div>
                   <div>{mqttEndpoint}</div>
                 </div>

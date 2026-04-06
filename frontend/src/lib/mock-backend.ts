@@ -55,8 +55,7 @@ const initialState: MockState = {
   services: {
     hostname: 'test',
     ntp_server: '',
-    utc_offset: 0,
-    ntp_dst: true,
+    time_zone: 'Europe/Madrid',
     mqtt_ip_address: '192.168.1.100',
     mqtt_port: '',
     mqtt_user: '',
@@ -203,6 +202,7 @@ const initialState: MockState = {
   status: {
     up_time: '1 day',
     local_time: '12:22',
+    local_date: '2026-04-03',
     free_heap: 23567,
     vcc: 3.3,
     board_temperature: 25,
@@ -229,7 +229,7 @@ const initialState: MockState = {
     rtc_backend: 'NTP fallback',
   },
   time: {
-    time_zone: 'UTC+1',
+    time_zone: 'Europe/Madrid',
     date: '2026-04-03',
     time: '12:01:01',
   },

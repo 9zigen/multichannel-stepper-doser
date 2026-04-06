@@ -72,6 +72,7 @@ export enum SettingsKey {
 const defaultStatus: StatusState = {
   up_time: '',
   local_time: '',
+  local_date: '',
   free_heap: 0,
   vcc: 3.3,
   board_temperature: 25,
@@ -102,8 +103,7 @@ const defaultSettings: SettingsState = {
   services: {
     hostname: '',
     ntp_server: '',
-    utc_offset: 0,
-    ntp_dst: false,
+    time_zone: 'UTC',
     mqtt_ip_address: '',
     mqtt_port: '',
     mqtt_user: '',
