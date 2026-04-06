@@ -12,6 +12,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 
+#include "app_events.h"
 #include "board.h"
 #include "app_settings.h"
 
@@ -31,6 +32,8 @@ pump_t pump[MAX_PUMP];
 schedule_t schedule[MAX_SCHEDULE];
 auth_t auth;
 static pump_aging_state_t pump_aging_state;
+
+extern esp_event_loop_handle_t app_event_loop;
 
 typedef struct {
     uint8_t id;
@@ -538,6 +541,11 @@ void save_service(void)
     esp_err_t err = app_settings_set_blob("service", &service, sizeof(services_t), true);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to save services.");
+        return;
+    }
+
+    if (app_event_loop != NULL) {
+        app_events_dispatch_system(SERVICES_UPDATED, &service, sizeof(service));
     }
 }
 

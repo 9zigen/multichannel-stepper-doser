@@ -10,3 +10,5 @@ void det_time_string_since_boot(char *time_string);
 uint8_t get_ntp_sync_status(void);
 const char *get_rtc_backend_name(void);
 bool rtc_using_fallback(void);
+bool app_time_is_valid(void);
+const char *app_time_warning_message(void);

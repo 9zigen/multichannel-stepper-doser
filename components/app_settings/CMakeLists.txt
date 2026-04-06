@@ -4,4 +4,4 @@ set(SOURCES
 idf_component_register(SRCS ${SOURCES}
         INCLUDE_DIRS . include
         PRIV_INCLUDE_DIRS "../../main/include"
-        REQUIRES nvs_flash driver)
+        REQUIRES nvs_flash driver app_events)

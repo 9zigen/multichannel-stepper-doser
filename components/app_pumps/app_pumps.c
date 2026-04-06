@@ -14,6 +14,7 @@
 
 #include "app_events.h"
 #include "app_pumps.h"
+#include "app_time.h"
 #include "app_settings.h"
 #include "app_settings_storage.h"
 
@@ -254,6 +255,10 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
         }
 
         if (schedule->mode != SCHEDULE_MODE_PERIODIC || !schedule->active || pumps[schedule->pump_id].state != PUMP_OFF) {
+            continue;
+        }
+
+        if (!app_time_is_valid()) {
             continue;
         }
 

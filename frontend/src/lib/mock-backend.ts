@@ -203,6 +203,8 @@ const initialState: MockState = {
     up_time: '1 day',
     local_time: '12:22',
     local_date: '2026-04-03',
+    time_valid: true,
+    time_warning: '',
     free_heap: 23567,
     vcc: 3.3,
     board_temperature: 25,

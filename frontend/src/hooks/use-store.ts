@@ -73,6 +73,8 @@ const defaultStatus: StatusState = {
   up_time: '',
   local_time: '',
   local_date: '',
+  time_valid: true,
+  time_warning: '',
   free_heap: 0,
   vcc: 3.3,
   board_temperature: 25,

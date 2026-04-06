@@ -146,6 +146,8 @@ export type StatusState = {
   up_time: string;
   local_time: string;
   local_date: string;
+  time_valid: boolean;
+  time_warning: string;
   free_heap: number;
   vcc: number;
   board_temperature: number;

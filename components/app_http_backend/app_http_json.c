@@ -18,7 +18,7 @@
 #include "monitor.h"
 #include "mqtt.h"
 #include "pumps.h"
-#include "rtc.h"
+#include "app_time.h"
 #include "web_server.h"
 
 static void format_iso_date(const datetime_t *datetime, char *buffer, size_t size)
@@ -80,6 +80,8 @@ char *get_status_json(void)
     cJSON_AddItemToObject(status, "last_reboot_reason", cJSON_CreateString(system_status->last_reboot_reason));
     cJSON_AddItemToObject(status, "storage_backend", cJSON_CreateString(eeprom_backend_name()));
     cJSON_AddItemToObject(status, "rtc_backend", cJSON_CreateString(get_rtc_backend_name()));
+    cJSON_AddItemToObject(status, "time_valid", cJSON_CreateBool(app_time_is_valid()));
+    cJSON_AddItemToObject(status, "time_warning", cJSON_CreateString(app_time_warning_message()));
 
     cJSON *mqtt_status = cJSON_CreateObject();
     switch (get_mqtt_status()) {

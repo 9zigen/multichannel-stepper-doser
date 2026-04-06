@@ -11,14 +11,17 @@ import {
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '@/components/theme-provider';
 import { Button } from '@/components/ui/button.tsx';
-import { Moon, Sun } from 'lucide-react';
+import { AlertTriangle, Moon, Sun } from 'lucide-react';
 import { BackendConnectionIndicator } from '@/components/backend-connection-indicator.tsx';
 import { CalibrationStatusIndicator } from '@/components/calibration-status-indicator.tsx';
+import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
+import { Badge } from '@/components/ui/badge';
 
 export function SiteHeader(): React.ReactElement {
   const location = useLocation();
   const pathNames = location.pathname.split('/').filter((x) => x);
   const { theme, setTheme } = useTheme();
+  const status = useAppStore((state: AppStoreState) => state.status);
 
   const routes = [
     { path: '/', name: 'Home' },
@@ -66,8 +69,21 @@ export function SiteHeader(): React.ReactElement {
   };
 
   return (
-    <header className="sticky top-0 z-10 flex h-18 shrink-0 items-center border-b border-border/70 bg-background/70 backdrop-blur-xl">
-      <div className="flex w-full items-center justify-between gap-3 px-5 py-3 md:px-6">
+    <header className="sticky top-0 z-10 shrink-0 border-b border-border/70 bg-background/70 backdrop-blur-xl">
+      {!status.time_valid && (
+        <div className="border-b border-amber-500/30 bg-amber-500/10">
+          <div className="flex items-center justify-between gap-3 px-5 py-2 text-sm md:px-6">
+            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <AlertTriangle className="size-4" />
+              <span className="font-medium">{status.time_warning || 'Time is not set.'}</span>
+            </div>
+            <Badge variant="outline" className="border-amber-500/40 bg-transparent text-amber-900 dark:text-amber-200">
+              Periodic paused
+            </Badge>
+          </div>
+        </div>
+      )}
+      <div className="flex h-18 w-full items-center justify-between gap-3 px-5 py-3 md:px-6">
         <SidebarTrigger />
         <Separator orientation="vertical" className="h-7" />
         <div className="flex w-full items-center justify-between">

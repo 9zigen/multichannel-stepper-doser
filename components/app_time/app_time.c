@@ -15,6 +15,7 @@
 #include "esp_system.h"
 #include "esp_sntp.h"
 
+#include "app_events.h"
 #include "app_time.h"
 #include "main.h"
 #include "connect.h"
@@ -26,6 +27,11 @@ static const char *TAG = "RTC";
 static uint8_t ntp_sync = 0;
 static const char *rtc_backend = "System clock";
 static bool rtc_fallback = true;
+static bool time_valid = false;
+static esp_event_handler_instance_t services_updated_event_ctx;
+static bool services_event_registered = false;
+
+#define APP_TIME_VALID_YEAR_MIN 2024
 
 typedef struct {
     const char *name;
@@ -99,6 +105,9 @@ static const app_time_zone_entry_t APP_TIME_ZONES[] = {
     {"Etc/GMT-14", "GMT-14"},
 };
 
+static void initialize_sntp(services_t *config);
+static void app_time_reconfigure_services(const services_t *services, bool restart_sntp);
+
 static const char *app_time_lookup_tz(const char *time_zone_name)
 {
     if (time_zone_name == NULL || time_zone_name[0] == '\0') {
@@ -114,9 +123,101 @@ static const char *app_time_lookup_tz(const char *time_zone_name)
     return NULL;
 }
 
+static bool app_time_is_datetime_valid(const struct tm *timeinfo)
+{
+    if (timeinfo == NULL) {
+        return false;
+    }
+
+    const int year = timeinfo->tm_year + 1900;
+    return year >= APP_TIME_VALID_YEAR_MIN;
+}
+
+static void app_time_refresh_validity_from_system_clock(void)
+{
+    time_t now = 0;
+    struct tm timeinfo = {0};
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    time_valid = app_time_is_datetime_valid(&timeinfo);
+}
+
+static void app_time_apply_timezone(const services_t *services)
+{
+    const char *tz_spec = app_time_lookup_tz(services != NULL ? services->time_zone : NULL);
+    if (tz_spec == NULL) {
+        ESP_LOGW(TAG, "Unknown time zone '%s'. Falling back to UTC.", services != NULL ? services->time_zone : "");
+        tz_spec = "UTC0";
+    }
+
+    setenv("TZ", tz_spec, 1);
+    tzset();
+    ESP_LOGI(TAG, "new TZ is: %s", getenv("TZ"));
+}
+
+static void app_time_apply_ntp_settings(const services_t *services)
+{
+    if (services == NULL) {
+        return;
+    }
+
+    if (esp_sntp_enabled()) {
+        ESP_LOGI(TAG, "Stopping SNTP");
+        esp_sntp_stop();
+    }
+
+    ntp_sync = 0;
+
+    if (services->enable_ntp && strlen(services->ntp_server) > 5) {
+        initialize_sntp((services_t *)services);
+    } else {
+        ESP_LOGI(TAG, "SNTP disabled by services settings");
+    }
+
+    app_time_refresh_validity_from_system_clock();
+}
+
+static void app_time_reconfigure_services(const services_t *services, bool restart_sntp)
+{
+    if (services == NULL) {
+        return;
+    }
+
+    app_time_apply_timezone(services);
+
+    if (restart_sntp) {
+        app_time_apply_ntp_settings(services);
+    } else {
+        app_time_refresh_validity_from_system_clock();
+    }
+}
+
+static void app_time_on_services_updated(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_base;
+    (void)event_id;
+
+    const services_t *services = event_data != NULL ? (const services_t *)event_data : get_service_config();
+    ESP_LOGI(TAG, "Applying updated services settings to time subsystem");
+    app_time_reconfigure_services(services, true);
+}
+
+static void app_time_register_services_handler(void)
+{
+    if (services_event_registered) {
+        return;
+    }
+
+    app_events_register_handler(SERVICES_UPDATED, NULL, app_time_on_services_updated, &services_updated_event_ctx);
+    services_event_registered = true;
+}
+
 static void time_sync_notification_cb(struct timeval *tv)
 {
     (void)tv;
+    ntp_sync = 1;
+    app_time_refresh_validity_from_system_clock();
     ESP_LOGI(TAG, "Notification of a time synchronization event");
 }
 
@@ -136,7 +237,7 @@ static void obtain_time(void)
     services_t *services = get_service_config();
 
     if (services->enable_ntp && strlen(services->ntp_server) > 5) {
-        initialize_sntp(services);
+        app_time_apply_ntp_settings(services);
     }
 
     time_t now = 0;
@@ -164,15 +265,9 @@ void init_clock(void)
     char strftime_buf[64];
 
     services_t *services = get_service_config();
-    const char *tz_spec = app_time_lookup_tz(services->time_zone);
-    if (tz_spec == NULL) {
-        ESP_LOGW(TAG, "Unknown time zone '%s'. Falling back to UTC.", services->time_zone);
-        tz_spec = "UTC0";
-    }
-
-    setenv("TZ", tz_spec, 1);
-    tzset();
-    ESP_LOGI(TAG, "new TZ is: %s", getenv("TZ"));
+    time_valid = false;
+    app_time_register_services_handler();
+    app_time_reconfigure_services(services, false);
 
     datetime_t datetime = {0};
     bool i2c_available = i2c_is_supported() && i2c_is_initialized();
@@ -195,8 +290,10 @@ void init_clock(void)
         strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
         ESP_LOGI(TAG, "The current date/time is: %s", strftime_buf);
 
-        if (timeinfo.tm_year < (2020 - 1900)) {
-            ESP_LOGI(TAG, "Time is not set yet.");
+        if (!app_time_is_datetime_valid(&timeinfo)) {
+            ESP_LOGW(TAG, "RTC time is not valid yet.");
+        } else {
+            time_valid = true;
         }
 
         rtc_backend = "MCP7940 RTC";
@@ -221,6 +318,7 @@ void init_clock(void)
 
             strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
             ESP_LOGI(TAG, "The NTP date/time is: %s", strftime_buf);
+            time_valid = app_time_is_datetime_valid(&timeinfo);
 
             datetime.year = 1900 + timeinfo.tm_year - 2000;
             datetime.month = timeinfo.tm_mon + 1;
@@ -245,6 +343,7 @@ void init_clock(void)
 
     time(&now);
     localtime_r(&now, &timeinfo);
+    time_valid = app_time_is_datetime_valid(&timeinfo);
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
     ESP_LOGI(TAG, "The Local date/time is: %s", strftime_buf);
 }
@@ -303,4 +402,18 @@ const char *get_rtc_backend_name(void)
 bool rtc_using_fallback(void)
 {
     return rtc_fallback;
+}
+
+bool app_time_is_valid(void)
+{
+    return time_valid;
+}
+
+const char *app_time_warning_message(void)
+{
+    if (time_valid) {
+        return "";
+    }
+
+    return "Time is not set. Periodic schedules are paused until RTC or NTP provides a valid date.";
 }
