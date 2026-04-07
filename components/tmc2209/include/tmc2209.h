@@ -10,11 +10,13 @@
 
 #include "tmc2209_reg.h"
 
-#define RMT_LEGACY 1
+#if defined(USE_RMT) && USE_RMT
+#define RMT_LEGACY 0
 #if defined(RMT_LEGACY) && RMT_LEGACY
 #include <driver/rmt.h>
 #else
 #include <driver/rmt_tx.h>
+#endif
 #endif
 
 #define GCONF        0x00    // R/W    Global configuration flags
@@ -93,12 +95,14 @@ typedef struct
     gpio_num_t* en_pin;
     tmc2209_microsteps_t* micro_steps;
     uint8_t motors_num;
+#if defined(USE_RMT) && USE_RMT
 #if defined(RMT_LEGACY) && RMT_LEGACY
     /* Legacy RMT backend: preallocated channel ids managed outside the driver. */
     rmt_channel_t *rmt_channel;
 #else
     /* New RMT backend: channel handles allocated during init. */
     rmt_channel_handle_t *rmt_channel;
+#endif
 #endif
 } tms2209_t;
 
@@ -131,10 +135,12 @@ void TMC2209_step_move(tms2209_t *cfg, int64_t* steps, uint32_t* period_us);
  * Any new backend must preserve these semantics exactly before replacing the
  * legacy backend.
  */
+#if defined(USE_RMT) && USE_RMT
 #if defined(RMT_LEGACY) && RMT_LEGACY
 esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, uint32_t steps, uint32_t signal_duration, uint8_t async);
 #else
 esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, int steps, uint32_t steps_second);
+#endif
 #endif
 
 void TMC2209_uart_move(tms2209_t *cfg, uint8_t address, int32_t speed);

@@ -5,13 +5,15 @@
 #include "esp_timer.h"
 #include "tmc2209.h"
 
-
+#if defined(USE_RMT) && USE_RMT
 #if defined(RMT_LEGACY) && RMT_LEGACY
 #include <driver/rmt.h>
 #else
 #include <driver/rmt_tx.h>
 #define STEP_MOTOR_RESOLUTION_HZ 1000000
 #endif
+#endif
+
 
 static portMUX_TYPE spinlock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -26,14 +28,18 @@ static int64_t steps_left[] = {0, 0, 0, 0};
 
 static const uint32_t timer_N = sizeof(gptimer) / sizeof(gptimer[0]); // number of timers
 
+static const char* TAG = "TMC2209";
+
+#if defined(USE_RMT) && USE_RMT
 #if !(defined(RMT_LEGACY) && RMT_LEGACY)
 /* RMT Uniform */
-rmt_transmit_config_t tx_config = { .loop_count = 0 };
-stepper_motor_uniform_encoder_config_t uniform_encoder_config = { .resolution = STEP_MOTOR_RESOLUTION_HZ };
-rmt_encoder_handle_t uniform_motor_encoder = NULL;
+static rmt_transmit_config_t tx_config = {
+    .loop_count = 0,
+    .flags.eot_level = 0,
+};
+static rmt_encoder_handle_t step_copy_encoder = NULL;
 #endif
 
-static const char* TAG = "TMC2209";
 
 static esp_err_t tmc2209_backend_rmt_init(tms2209_t *cfg, uint8_t motor_num);
 static void tmc2209_backend_rmt_deinit(tms2209_t *cfg, uint8_t motor_num);
@@ -49,6 +55,20 @@ static esp_err_t tmc2209_backend_steps_tx(tms2209_t *cfg,
                                           uint8_t motor_num,
                                           int steps,
                                           uint32_t steps_second);
+#endif
+
+#if !(defined(RMT_LEGACY) && RMT_LEGACY)
+static bool tmc2209_backend_has_active_channels(tms2209_t *cfg)
+{
+    for (uint8_t i = 0; i < cfg->motors_num; i++) {
+        if (cfg->rmt_channel[i] != NULL) {
+            return true;
+        }
+    }
+
+    return false;
+}
+#endif
 #endif
 
 static void print_bytes_in_lines(uint8_t *array, size_t size)
@@ -403,11 +423,12 @@ void tmc2209_init(tms2209_t *cfg)
         TMC2209_enable(cfg, i, 1);
         TMC2209_set_dir(cfg, i, CW_DIR);
 
+#if defined(USE_RMT) && USE_RMT
         /* Configure the pulse generation backend. */
         ESP_ERROR_CHECK(tmc2209_backend_rmt_init(cfg, i));
+#endif
 
         // configure timers
-
         gptimer_config_t timer_config = {
             .clk_src = GPTIMER_CLK_SRC_DEFAULT,
             .direction = GPTIMER_COUNT_UP,
@@ -443,7 +464,11 @@ void TMC2209_deinit(tms2209_t *cfg)
 {
     for (uint32_t i = 0; i < timer_N; i++)
     {
+
+#if defined(USE_RMT) && USE_RMT
         tmc2209_backend_rmt_deinit(cfg, i);
+#endif
+
         ESP_ERROR_CHECK(gptimer_disable(gptimer[i]));
         ESP_ERROR_CHECK(gptimer_del_timer(gptimer[i]));
     }
@@ -602,6 +627,7 @@ void TMC2209_step_move(tms2209_t *cfg, int64_t* steps, uint32_t* period_us)
     }
 }
 
+#if defined(USE_RMT) && USE_RMT
 #if defined(RMT_LEGACY) && RMT_LEGACY
 esp_err_t TMC2209_steps(tms2209_t *cfg, uint8_t motor_num, uint32_t steps, uint32_t signal_duration, uint8_t async)
 {
@@ -631,9 +657,10 @@ static esp_err_t tmc2209_backend_rmt_init(tms2209_t *cfg, uint8_t motor_num)
     };
 
     ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &cfg->rmt_channel[motor_num]));
-    if (uniform_motor_encoder == NULL)
+    if (step_copy_encoder == NULL)
     {
-        ESP_ERROR_CHECK(rmt_new_stepper_motor_uniform_encoder(&uniform_encoder_config, &uniform_motor_encoder));
+        rmt_copy_encoder_config_t copy_encoder_config = {};
+        ESP_ERROR_CHECK(rmt_new_copy_encoder(&copy_encoder_config, &step_copy_encoder));
     }
     return rmt_enable(cfg->rmt_channel[motor_num]);
 #endif
@@ -649,6 +676,11 @@ static void tmc2209_backend_rmt_deinit(tms2209_t *cfg, uint8_t motor_num)
         rmt_disable(cfg->rmt_channel[motor_num]);
         rmt_del_channel(cfg->rmt_channel[motor_num]);
         cfg->rmt_channel[motor_num] = NULL;
+    }
+
+    if (step_copy_encoder != NULL && !tmc2209_backend_has_active_channels(cfg)) {
+        rmt_del_encoder(step_copy_encoder);
+        step_copy_encoder = NULL;
     }
 #endif
 }
@@ -696,15 +728,60 @@ static esp_err_t tmc2209_backend_steps_legacy(tms2209_t *cfg,
  * contract and therefore must not be enabled by default. */
 static esp_err_t tmc2209_backend_steps_tx(tms2209_t *cfg, uint8_t motor_num, int steps, uint32_t steps_second)
 {
-    esp_err_t ret = ESP_OK;
+    if (cfg == NULL || cfg->rmt_channel == NULL || motor_num >= cfg->motors_num) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
-    tx_config.loop_count = steps;
-    ret = rmt_transmit(cfg->rmt_channel[motor_num], uniform_motor_encoder, &steps_second, sizeof(steps_second), &tx_config);
-    rmt_tx_wait_all_done(cfg->rmt_channel[motor_num], -1);
+    if (cfg->rmt_channel[motor_num] == NULL || step_copy_encoder == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (steps == 0) {
+        return ESP_OK;
+    }
+
+    if (steps_second == 0) {
+        ESP_LOGE(TAG, "steps_second must be greater than zero");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (steps < 0) {
+        TMC2209_set_dir(cfg, motor_num, CCW_DIR);
+        steps = -steps;
+    } else {
+        TMC2209_set_dir(cfg, motor_num, CW_DIR);
+    }
+
+    uint32_t signal_duration = STEP_MOTOR_RESOLUTION_HZ / steps_second / 2;
+    if (signal_duration == 0) {
+        signal_duration = 1;
+    }
+
+    rmt_symbol_word_t *symbols = calloc((size_t)steps, sizeof(rmt_symbol_word_t));
+    if (symbols == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for %d step symbols", steps);
+        return ESP_ERR_NO_MEM;
+    }
+
+    for (int i = 0; i < steps; i++) {
+        symbols[i] = (rmt_symbol_word_t) {
+            .level0 = 1,
+            .duration0 = signal_duration,
+            .level1 = 0,
+            .duration1 = signal_duration,
+        };
+    }
+
+    esp_err_t ret = rmt_transmit(cfg->rmt_channel[motor_num], step_copy_encoder, symbols, sizeof(rmt_symbol_word_t) * (size_t)steps, &tx_config);
+    if (ret == ESP_OK) {
+        ret = rmt_tx_wait_all_done(cfg->rmt_channel[motor_num], -1);
+    }
+
+    free(symbols);
     return ret;
 }
 #endif
-
+#endif
 
 /**
  * @brief move continuously with desired speed
@@ -739,7 +816,6 @@ void TMC2209_uart_move(tms2209_t *cfg, uint8_t address, int32_t speed)
 int32_t TMC2209_uart_get_position(tms2209_t *cfg, uint8_t address)
 {
     int32_t pos = read_datagram(cfg, address, MSCNT);
-
     return pos;
 }
 
