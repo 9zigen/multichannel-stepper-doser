@@ -40,14 +40,40 @@ typedef struct {
     const char *name;
 } mqtt_pump_snapshot_t;
 
+typedef struct {
+    bool enabled;
+    uint8_t mqtt_ip_address[4];
+    uint16_t mqtt_port;
+    char mqtt_user[MAX_NETWORK_STR_LEN];
+    char mqtt_password[MAX_NETWORK_STR_LEN];
+    uint8_t mqtt_qos;
+    uint8_t mqtt_retain;
+    char hostname[sizeof(((services_t *)0)->hostname)];
+} mqtt_runtime_config_t;
+
+typedef enum {
+    MQTT_CMD_RECONFIGURE = 1,
+} mqtt_command_type_t;
+
+typedef struct {
+    mqtt_command_type_t type;
+    mqtt_runtime_config_t config;
+} mqtt_command_t;
+
 static esp_mqtt_client_handle_t s_client;
 static esp_event_handler_instance_t s_pump_runtime_event_ctx;
+static esp_event_handler_instance_t s_services_updated_event_ctx;
 static TimerHandle_t s_status_timer;
+static QueueHandle_t s_command_queue;
 static bool s_mqtt_enabled;
 static bool s_mqtt_connected;
 static bool s_discovery_published;
 static char s_broker_uri[96];
 static char s_availability_topic[96];
+static mqtt_runtime_config_t s_runtime_config;
+static bool s_runtime_config_valid;
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
 
 static const char *pump_state_to_string(pump_state_t state)
 {
@@ -70,14 +96,24 @@ static void build_topic_base(char *buffer, size_t size)
     strlcpy(buffer, services->hostname, size);
 }
 
-static bool mqtt_is_server_configured(const services_t *services)
+static void build_topic_base_from_hostname(const char *hostname, char *buffer, size_t size)
 {
-    if (services == NULL || !services->enable_mqtt || services->mqtt_port == 0) {
+    if (hostname == NULL || hostname[0] == '\0') {
+        strlcpy(buffer, "device", size);
+        return;
+    }
+
+    strlcpy(buffer, hostname, size);
+}
+
+static bool mqtt_runtime_config_is_usable(const mqtt_runtime_config_t *config)
+{
+    if (config == NULL || !config->enabled || config->mqtt_port == 0) {
         return false;
     }
 
-    return services->mqtt_ip_address[0] != 0 || services->mqtt_ip_address[1] != 0 ||
-           services->mqtt_ip_address[2] != 0 || services->mqtt_ip_address[3] != 0;
+    return config->mqtt_ip_address[0] != 0 || config->mqtt_ip_address[1] != 0 ||
+           config->mqtt_ip_address[2] != 0 || config->mqtt_ip_address[3] != 0;
 }
 
 static void build_broker_uri(const services_t *services, char *buffer, size_t size)
@@ -88,6 +124,49 @@ static void build_broker_uri(const services_t *services, char *buffer, size_t si
              services->mqtt_ip_address[2],
              services->mqtt_ip_address[3],
              services->mqtt_port);
+}
+
+static void build_broker_uri_from_config(const mqtt_runtime_config_t *config, char *buffer, size_t size)
+{
+    snprintf(buffer, size, "mqtt://%u.%u.%u.%u:%u",
+             config->mqtt_ip_address[0],
+             config->mqtt_ip_address[1],
+             config->mqtt_ip_address[2],
+             config->mqtt_ip_address[3],
+             config->mqtt_port);
+}
+
+static void mqtt_runtime_config_from_services(const services_t *services, mqtt_runtime_config_t *config)
+{
+    memset(config, 0, sizeof(*config));
+    if (services == NULL) {
+        return;
+    }
+
+    config->enabled = services->enable_mqtt;
+    memcpy(config->mqtt_ip_address, services->mqtt_ip_address, sizeof(config->mqtt_ip_address));
+    config->mqtt_port = services->mqtt_port;
+    strlcpy(config->mqtt_user, services->mqtt_user, sizeof(config->mqtt_user));
+    strlcpy(config->mqtt_password, services->mqtt_password, sizeof(config->mqtt_password));
+    config->mqtt_qos = services->mqtt_qos;
+    config->mqtt_retain = services->mqtt_retain;
+    strlcpy(config->hostname, services->hostname, sizeof(config->hostname));
+}
+
+static bool mqtt_runtime_config_equal(const mqtt_runtime_config_t *left, const mqtt_runtime_config_t *right)
+{
+    if (left == NULL || right == NULL) {
+        return false;
+    }
+
+    return left->enabled == right->enabled &&
+           left->mqtt_port == right->mqtt_port &&
+           left->mqtt_qos == right->mqtt_qos &&
+           left->mqtt_retain == right->mqtt_retain &&
+           memcmp(left->mqtt_ip_address, right->mqtt_ip_address, sizeof(left->mqtt_ip_address)) == 0 &&
+           strcmp(left->mqtt_user, right->mqtt_user) == 0 &&
+           strcmp(left->mqtt_password, right->mqtt_password) == 0 &&
+           strcmp(left->hostname, right->hostname) == 0;
 }
 
 static void publish_string_topic(const char *topic, const char *payload, int qos, int retain)
@@ -254,6 +333,30 @@ static void publish_discovery_if_needed(void)
         hass_mqtt_discovery_deinit();
         s_discovery_published = true;
     }
+}
+
+static void mqtt_stop_client(void)
+{
+    if (s_status_timer != NULL) {
+        xTimerStop(s_status_timer, 0);
+    }
+
+    if (s_client != NULL) {
+        esp_mqtt_client_unregister_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler);
+        esp_mqtt_client_stop(s_client);
+        esp_mqtt_client_destroy(s_client);
+        s_client = NULL;
+    }
+
+    if (s_mqtt_connected) {
+        app_events_dispatch_system(MQTT_DISCONNECTED, NULL, 0);
+    }
+
+    s_mqtt_enabled = false;
+    s_mqtt_connected = false;
+    s_discovery_published = false;
+    s_broker_uri[0] = '\0';
+    s_availability_topic[0] = '\0';
 }
 
 static void status_timer_callback(TimerHandle_t timer)
@@ -437,30 +540,29 @@ static void on_pump_runtime_event(void *arg, esp_event_base_t event_base, int32_
 
 static esp_err_t create_client(void)
 {
-    services_t *services = get_service_config();
     char topic_base[48];
     esp_mqtt_client_config_t mqtt_cfg = {0};
 
-    if (!mqtt_is_server_configured(services)) {
+    if (!mqtt_runtime_config_is_usable(&s_runtime_config)) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    build_broker_uri(services, s_broker_uri, sizeof(s_broker_uri));
-    build_topic_base(topic_base, sizeof(topic_base));
+    build_broker_uri_from_config(&s_runtime_config, s_broker_uri, sizeof(s_broker_uri));
+    build_topic_base_from_hostname(s_runtime_config.hostname, topic_base, sizeof(topic_base));
     snprintf(s_availability_topic, sizeof(s_availability_topic), "%s/availability", topic_base);
 
     mqtt_cfg.broker.address.uri = s_broker_uri;
     mqtt_cfg.session.keepalive = 60;
     mqtt_cfg.session.last_will.topic = s_availability_topic;
     mqtt_cfg.session.last_will.msg = "offline";
-    mqtt_cfg.session.last_will.retain = services->mqtt_retain;
-    mqtt_cfg.session.last_will.qos = services->mqtt_qos;
+    mqtt_cfg.session.last_will.retain = s_runtime_config.mqtt_retain;
+    mqtt_cfg.session.last_will.qos = s_runtime_config.mqtt_qos;
 
-    if (services->mqtt_user[0] != '\0') {
-        mqtt_cfg.credentials.username = services->mqtt_user;
+    if (s_runtime_config.mqtt_user[0] != '\0') {
+        mqtt_cfg.credentials.username = s_runtime_config.mqtt_user;
     }
-    if (services->mqtt_password[0] != '\0') {
-        mqtt_cfg.credentials.authentication.password = services->mqtt_password;
+    if (s_runtime_config.mqtt_password[0] != '\0') {
+        mqtt_cfg.credentials.authentication.password = s_runtime_config.mqtt_password;
     }
 
     s_client = esp_mqtt_client_init(&mqtt_cfg);
@@ -469,52 +571,96 @@ static esp_err_t create_client(void)
     }
 
     esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    s_mqtt_enabled = s_runtime_config.enabled;
     return esp_mqtt_client_start(s_client);
+}
+
+static void mqtt_reconfigure(const mqtt_runtime_config_t *config)
+{
+    if (config == NULL) {
+        return;
+    }
+
+    if (s_runtime_config_valid && mqtt_runtime_config_equal(&s_runtime_config, config)) {
+        ESP_LOGI(TAG, "MQTT config unchanged");
+        return;
+    }
+
+    mqtt_stop_client();
+    s_runtime_config = *config;
+    s_runtime_config_valid = true;
+    s_mqtt_enabled = s_runtime_config.enabled;
+
+    if (!mqtt_runtime_config_is_usable(&s_runtime_config)) {
+        ESP_LOGI(TAG, "MQTT disabled or broker is not configured");
+        return;
+    }
+
+    if (create_client() != ESP_OK) {
+        ESP_LOGE(TAG, "failed to start MQTT client");
+        mqtt_stop_client();
+        s_mqtt_enabled = s_runtime_config.enabled;
+    }
+}
+
+static void on_services_updated(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_base;
+
+    if (event_id != SERVICES_UPDATED || s_command_queue == NULL) {
+        return;
+    }
+
+    mqtt_command_t command = {
+        .type = MQTT_CMD_RECONFIGURE,
+    };
+    mqtt_runtime_config_from_services(event_data != NULL ? (const services_t *)event_data : get_service_config(),
+                                      &command.config);
+    if (xQueueSend(s_command_queue, &command, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "dropping MQTT reconfigure command");
+    }
 }
 
 void app_mqtt_task(void *pvParameters)
 {
     (void)pvParameters;
-    services_t *services = get_service_config();
-
-    s_mqtt_enabled = services->enable_mqtt;
     s_mqtt_connected = false;
     s_discovery_published = false;
-
-    if (!mqtt_is_server_configured(services)) {
-        ESP_LOGI(TAG, "MQTT disabled or broker is not configured");
-        vTaskDelete(NULL);
-        return;
-    }
+    s_runtime_config_valid = false;
 
     s_status_timer = xTimerCreate("mqtt_status_timer",
                                   pdMS_TO_TICKS(30000),
                                   pdTRUE,
                                   NULL,
                                   status_timer_callback);
+    s_command_queue = xQueueCreate(4, sizeof(mqtt_command_t));
     app_events_register_handler(PUMP_RUNTIME_DATA, NULL, on_pump_runtime_event, &s_pump_runtime_event_ctx);
+    app_events_register_handler(SERVICES_UPDATED, NULL, on_services_updated, &s_services_updated_event_ctx);
 
-    if (create_client() != ESP_OK) {
-        ESP_LOGE(TAG, "failed to start MQTT client");
-        vTaskDelete(NULL);
-        return;
-    }
+    mqtt_command_t initial_command = {
+        .type = MQTT_CMD_RECONFIGURE,
+    };
+    mqtt_runtime_config_from_services(get_service_config(), &initial_command.config);
+    mqtt_reconfigure(&initial_command.config);
 
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        mqtt_command_t command;
+        if (xQueueReceive(s_command_queue, &command, pdMS_TO_TICKS(1000)) == pdTRUE) {
+            if (command.type == MQTT_CMD_RECONFIGURE) {
+                mqtt_reconfigure(&command.config);
+            }
+        }
     }
 }
 
 mqtt_service_status_t get_mqtt_status(void)
 {
-    services_t *services = get_service_config();
-    bool enabled = services != NULL && services->enable_mqtt;
-
-    if (enabled && s_mqtt_connected) {
+    if (s_mqtt_enabled && s_mqtt_connected) {
         return MQTT_ENABLED_CONNECTED;
     }
 
-    if (enabled) {
+    if (s_mqtt_enabled) {
         return MQTT_ENABLED_NOT_CONNECTED;
     }
 
