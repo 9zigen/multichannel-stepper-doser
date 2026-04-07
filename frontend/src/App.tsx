@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { RealtimeProvider } from '@/components/realtime-provider.tsx';
 import { PumpRuntimeProvider } from '@/components/pump-runtime-provider.tsx';
+import { AUTH_STATE_EVENT, getStoredAuthToken } from '@/lib/auth-storage.ts';
 
 const App = (): React.ReactElement => {
   const isAuthenticated = useAppStore((state: AppStoreState) => state.isAuthenticated);
@@ -20,6 +21,23 @@ const App = (): React.ReactElement => {
     loadStatus();
     loadSettings();
   }, [isAuthenticated, loadStatus, loadSettings]);
+
+  useEffect(() => {
+    const syncAuthenticationState = () => {
+      useAppStore.setState((state) => ({
+        ...state,
+        isAuthenticated: !!getStoredAuthToken(),
+        error: null,
+      }));
+    };
+
+    window.addEventListener(AUTH_STATE_EVENT, syncAuthenticationState as EventListener);
+    window.addEventListener('storage', syncAuthenticationState);
+    return () => {
+      window.removeEventListener(AUTH_STATE_EVENT, syncAuthenticationState as EventListener);
+      window.removeEventListener('storage', syncAuthenticationState);
+    };
+  }, []);
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="ui-theme">

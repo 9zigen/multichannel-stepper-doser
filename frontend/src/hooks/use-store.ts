@@ -18,6 +18,7 @@ import {
   UserCredentials,
 } from '@/lib/api.ts';
 import { http } from '@/lib/http.ts';
+import { clearStoredAuthToken, getStoredAuthToken, setStoredAuthToken } from '@/lib/auth-storage.ts';
 
 function cloneSettings<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -129,7 +130,7 @@ const defaultSettings: SettingsState = {
 };
 
 const useAppStore = create<AppStoreState>()((set, get) => ({
-  isAuthenticated: !!localStorage.getItem('user-token'),
+  isAuthenticated: !!getStoredAuthToken(),
   status: cloneSettings(defaultStatus),
   settings: cloneSettings(defaultSettings),
   error: null,
@@ -139,8 +140,8 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       const response = (await checkCredentials(user)) as CheckCredentialsState;
       const token = response.token;
       http.defaults.headers.common.Authorization = token;
+      setStoredAuthToken(token);
       set(() => ({ isAuthenticated: true, error: null }));
-      localStorage.setItem('user-token', token);
       return true;
     } catch (e) {
       const message =
@@ -159,15 +160,15 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
 
       set(() => ({ error: message, isAuthenticated: false }));
       delete http.defaults.headers.common.Authorization;
-      localStorage.removeItem('user-token');
+      clearStoredAuthToken();
       return false;
     }
   },
 
   logout: () => {
-    delete http.defaults.headers.common.Authorization;
     set(() => ({ isAuthenticated: false, error: null }));
-    localStorage.removeItem('user-token');
+    delete http.defaults.headers.common.Authorization;
+    clearStoredAuthToken();
   },
 
   loadStatus: async () => {

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { mockAdapter } from '@/lib/mock-backend.ts';
+import { clearStoredAuthToken, getStoredAuthToken } from '@/lib/auth-storage.ts';
 
 function normalizeDeviceBaseUrl(deviceIp?: string): string | null {
   if (!deviceIp) {
@@ -44,19 +45,14 @@ export function getWebSocketUrl(token: string): string | null {
   }
 }
 
-function clearStoredAuth() {
-  delete http.defaults.headers.common.Authorization;
-  localStorage.removeItem('user-token');
-}
-
-const persistedToken = localStorage.getItem('user-token');
+const persistedToken = getStoredAuthToken();
 if (persistedToken) {
   http.defaults.headers.common.Authorization = persistedToken;
 }
 
 // Attach Authorization header from localStorage, if present
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('user-token');
+  const token = getStoredAuthToken();
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = token;
@@ -69,7 +65,8 @@ http.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error && error.response && error.response.status === 401) {
-      clearStoredAuth();
+      delete http.defaults.headers.common.Authorization;
+      clearStoredAuthToken();
 
       // Hard redirect keeps it framework-agnostic and breaks auth loops cleanly.
       if (window.location.pathname !== '/login') {

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { getWebSocketUrl, isMockApiEnabled } from '@/lib/http.ts';
 import { emitMockRealtimeMessage, registerMockRealtimePeer, unregisterMockRealtimePeer } from '@/lib/realtime-mock.ts';
+import { getStoredAuthToken } from '@/lib/auth-storage.ts';
 
 type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'paused';
 
@@ -116,7 +117,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }): R
       return;
     }
 
-    const token = localStorage.getItem('user-token');
+    const token = getStoredAuthToken();
     if (!token) {
       disconnect();
       setStatus('idle');

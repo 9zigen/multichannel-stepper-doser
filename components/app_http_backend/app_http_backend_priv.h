@@ -36,6 +36,7 @@ esp_err_t ota_get_handler(httpd_req_t *req);
 esp_err_t upload_post_handler(httpd_req_t *req);
 esp_err_t status_get_handler(httpd_req_t *req);
 esp_err_t pumps_runtime_get_handler(httpd_req_t *req);
+esp_err_t websocket_pre_handshake_cb(httpd_req_t *req);
 esp_err_t websocket_handler(httpd_req_t *req);
 esp_err_t wifi_scan_get_handler(httpd_req_t *req);
 esp_err_t schedule_get_handler(httpd_req_t *req);

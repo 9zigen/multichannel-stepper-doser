@@ -357,6 +357,7 @@ httpd_handle_t start_webserver(void)
     config.lru_purge_enable = true;
     config.recv_wait_timeout = 30;
     config.send_wait_timeout = 60;
+    config.uri_match_fn = httpd_uri_match_wildcard;
 
     ESP_LOGI(TAG, "Starting web server on port: '%d'", config.server_port);
 
@@ -559,6 +560,7 @@ httpd_handle_t start_webserver(void)
             .handler = websocket_handler,
             .user_ctx = NULL,
             .is_websocket = true,
+            .ws_pre_handshake_cb = websocket_pre_handshake_cb,
         };
 
         httpd_uri_t get_wifi_scan = {

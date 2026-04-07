@@ -48,10 +48,22 @@ static esp_err_t websocket_send_json(httpd_req_t *req, const char *payload)
     return app_http_ws_send_json_to_client(req->handle, httpd_req_to_sockfd(req), payload);
 }
 
+esp_err_t websocket_pre_handshake_cb(httpd_req_t *req)
+{
+    if (app_http_validate_ws_request(req) == ESP_OK) {
+        return ESP_OK;
+    }
+
+    app_http_set_cors_headers(req);
+    httpd_resp_set_status(req, "401 Unauthorized");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_FAIL;
+}
+
 static void send_unauthorized(httpd_req_t *req)
 {
     app_http_set_cors_headers(req);
-    httpd_resp_set_status(req, "401 Unauthorized!");
+    httpd_resp_set_status(req, "401 Unauthorized");
     httpd_resp_send(req, NULL, 0);
 }
 
@@ -191,12 +203,6 @@ esp_err_t pumps_runtime_get_handler(httpd_req_t *req)
 esp_err_t websocket_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
-        if (app_http_validate_ws_request(req) != ESP_OK) {
-            httpd_resp_set_status(req, "401 Unauthorized!");
-            httpd_resp_send(req, NULL, 0);
-            return ESP_OK;
-        }
-
         int sockfd = httpd_req_to_sockfd(req);
         app_http_ws_register_client(sockfd);
         ESP_LOGI(TAG, "websocket connected fd=%d", sockfd);
