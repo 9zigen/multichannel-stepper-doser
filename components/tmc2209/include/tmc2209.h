@@ -1,20 +1,13 @@
 #pragma once
 
-/**
- * @file AS5600.c
- * @author JanG175
- * @brief ESP IDF component for the TMC2209
- *
- * @copyright Apache 2.0
- */
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
-#include <stdio.h>
 #include "driver/gptimer.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "esp_log.h"
+
 #include "tmc2209_reg.h"
 
 #define RMT_LEGACY 1
@@ -27,7 +20,7 @@
 #define GCONF        0x00    // R/W    Global configuration flags
 #define GSTAT        0x01    // R/W    (W clears) Global status flags
 #define IFCNT        0x02    // R      Counter for write access
-#define NODECONF    0x03    // W      Delay for read access
+#define NODECONF     0x03    // W      Delay for read access
 #define OTP_PROG     0x04    // W      Write access programs OTP memory
 #define OTP_READ     0x05    // R      Access to OTP memory
 #define IOIN         0x06    // R      Reads the state of all input pins

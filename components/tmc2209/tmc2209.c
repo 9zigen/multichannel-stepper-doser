@@ -631,7 +631,8 @@ static esp_err_t tmc2209_backend_rmt_init(tms2209_t *cfg, uint8_t motor_num)
     };
 
     ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &cfg->rmt_channel[motor_num]));
-    if (uniform_motor_encoder == NULL) {
+    if (uniform_motor_encoder == NULL)
+    {
         ESP_ERROR_CHECK(rmt_new_stepper_motor_uniform_encoder(&uniform_encoder_config, &uniform_motor_encoder));
     }
     return rmt_enable(cfg->rmt_channel[motor_num]);
@@ -652,6 +653,7 @@ static void tmc2209_backend_rmt_deinit(tms2209_t *cfg, uint8_t motor_num)
 #endif
 }
 
+#if defined(RMT_LEGACY) && RMT_LEGACY
 /* Legacy pulse backend. This is the behavioral reference implementation that
  * the new TX backend must match before it can replace the legacy path. */
 static esp_err_t tmc2209_backend_steps_legacy(tms2209_t *cfg,
@@ -689,19 +691,19 @@ static esp_err_t tmc2209_backend_steps_legacy(tms2209_t *cfg,
 
     return ret;
 }
-// #else
-// /* New TX backend placeholder. It currently does not match the legacy pulse
-//  * contract and therefore must not be enabled by default. */
-// static esp_err_t tmc2209_backend_steps_tx(tms2209_t *cfg, uint8_t motor_num, int steps, uint32_t steps_second)
-// {
-//     esp_err_t ret = ESP_OK;
-//
-//     tx_config.loop_count = steps;
-//     ret = rmt_transmit(cfg->rmt_channel[motor_num], uniform_motor_encoder, &steps_second, sizeof(steps_second), &tx_config);
-//     rmt_tx_wait_all_done(cfg->rmt_channel[motor_num], -1);
-//     return ret;
-// }
-// #endif
+#else
+/* New TX backend placeholder. It currently does not match the legacy pulse
+ * contract and therefore must not be enabled by default. */
+static esp_err_t tmc2209_backend_steps_tx(tms2209_t *cfg, uint8_t motor_num, int steps, uint32_t steps_second)
+{
+    esp_err_t ret = ESP_OK;
+
+    tx_config.loop_count = steps;
+    ret = rmt_transmit(cfg->rmt_channel[motor_num], uniform_motor_encoder, &steps_second, sizeof(steps_second), &tx_config);
+    rmt_tx_wait_all_done(cfg->rmt_channel[motor_num], -1);
+    return ret;
+}
+#endif
 
 
 /**
