@@ -8,6 +8,7 @@ import PumpControlCard from '@/components/home/pump-control-card.tsx';
 import ConnectivityStabilityCard from '@/components/home/connectivity-stability-card.tsx';
 import MaintenanceActionsCard from '@/components/home/maintenance-actions-card.tsx';
 import SystemCard from '@/components/home/system-card.tsx';
+import PumpHistoryTodayCard from '@/components/home/pump-history-today-card.tsx';
 
 const Home: React.FC = (): React.ReactElement => {
   const deviceStatus = useAppStore((state: AppStoreState) => state.status);
@@ -65,6 +66,10 @@ const Home: React.FC = (): React.ReactElement => {
 
         <div className="xl:col-span-3 xl:h-full">
           <ConnectivityStabilityCard deviceStatus={deviceStatus} />
+        </div>
+
+        <div className="xl:col-span-9 xl:h-full">
+          <PumpHistoryTodayCard pumps={pumps} />
         </div>
       </section>
     </div>

@@ -212,6 +212,32 @@ export type PumpRuntimeEntry = {
   volume_ml: number;
 };
 
+export type PumpHistoryHour = {
+  hour: number;
+  scheduled_volume_ml: number;
+  manual_volume_ml: number;
+  total_runtime_s: number;
+  flags: number;
+};
+
+export type PumpHistoryDay = {
+  day_stamp: number;
+  date: string;
+  hours: PumpHistoryHour[];
+};
+
+export type PumpHistoryPump = {
+  id: number;
+  name: string;
+  days: PumpHistoryDay[];
+};
+
+export type PumpHistoryState = {
+  retention_days: number;
+  current_day_stamp: number;
+  pumps: PumpHistoryPump[];
+};
+
 export type SettingsSaveResponse = {
   success: boolean;
 };
@@ -262,6 +288,11 @@ export const setSettings = async <T>(payload: Partial<SettingsState>): Promise<T
 
 export const getBoardConfig = async <T>(): Promise<T> => {
   const data = await http.get('/api/board-config');
+  return data.data as T;
+};
+
+export const getPumpsHistory = async <T>(): Promise<T> => {
+  const data = await http.get('/api/pumps/history');
   return data.data as T;
 };
 

@@ -10,6 +10,10 @@ import type {
   AuthState,
   BoardConfigState,
   NetworkState,
+  PumpHistoryDay,
+  PumpHistoryHour,
+  PumpHistoryPump,
+  PumpHistoryState,
   PumpRuntimeEntry,
   PumpRunState,
   PumpState,
@@ -273,6 +277,77 @@ const initialState: MockState = {
 
 let state = clone(initialState);
 let pumpRuntimeState: Record<number, MockPumpRuntimeState> = {};
+
+function formatMockDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function createHistoryHours(pumpId: number, dayOffset: number): PumpHistoryHour[] {
+  return Array.from({ length: 24 }, (_, hour) => {
+    const activeWindow = ((hour + pumpId * 3 + dayOffset) % 7) < 3;
+    const scheduledVolume = activeWindow ? 8 + ((pumpId + hour + dayOffset) % 19) : 0;
+    const manualVolume = (dayOffset + hour + pumpId) % 17 === 0 ? 4 + ((hour + pumpId) % 9) : 0;
+    const runtime = scheduledVolume > 0 || manualVolume > 0 ? 35 + ((hour * 11 + dayOffset * 7 + pumpId * 13) % 520) : 0;
+    let flags = 0;
+
+    if (scheduledVolume > 0) {
+      flags |= 1;
+    }
+
+    if (manualVolume > 0) {
+      flags |= 2;
+    }
+
+    if ((dayOffset + hour + pumpId) % 29 === 0 && runtime > 0) {
+      flags |= 4;
+    }
+
+    if ((dayOffset + hour + pumpId) % 37 === 0 && runtime > 0) {
+      flags |= 8;
+    }
+
+    return {
+      hour,
+      scheduled_volume_ml: scheduledVolume,
+      manual_volume_ml: manualVolume,
+      total_runtime_s: runtime,
+      flags,
+    };
+  });
+}
+
+function createPumpHistoryDays(pumpId: number, retentionDays: number): PumpHistoryDay[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: retentionDays }, (_, index) => {
+    const dayOffset = retentionDays - 1 - index;
+    const dayDate = new Date(today);
+    dayDate.setDate(today.getDate() - dayOffset);
+
+    return {
+      day_stamp: Math.floor(dayDate.getTime() / 86400000),
+      date: formatMockDate(dayDate),
+      hours: createHistoryHours(pumpId, dayOffset),
+    };
+  });
+}
+
+function getMockPumpHistory(): PumpHistoryState {
+  const retentionDays = 28;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return {
+    retention_days: retentionDays,
+    current_day_stamp: Math.floor(today.getTime() / 86400000),
+    pumps: state.pumps.map<PumpHistoryPump>((pump) => ({
+      id: pump.id,
+      name: pump.name,
+      days: createPumpHistoryDays(pump.id, retentionDays),
+    })),
+  };
+}
 const isMockDebugEnabled = import.meta.env.DEV && import.meta.env.VITE_API_DEBUG === 'true';
 
 function clone<T>(value: T): T {
@@ -641,6 +716,13 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   if (url === '/api/pumps/runtime' && method === 'get') {
     ensureAuthorized(config, method, url, requestBody);
     const mockResponse = response(config, { pumps: getPumpRuntimeEntries() });
+    debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
+    return mockResponse;
+  }
+
+  if (url === '/api/pumps/history' && method === 'get') {
+    ensureAuthorized(config, method, url, requestBody);
+    const mockResponse = response(config, getMockPumpHistory());
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;
   }

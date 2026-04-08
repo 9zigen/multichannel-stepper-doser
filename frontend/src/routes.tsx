@@ -12,11 +12,13 @@ import Onboarding from './pages/Onboarding';
 import NotFound from './pages/NotFound';
 import Schedule from '@/pages/Schedule.tsx';
 import ApiDocsPage from '@/pages/Settings.Api.tsx';
+import HistoryPage from '@/pages/History.tsx';
 
 export default (
   <Routes>
     <Route path="/" element={<Home />} />
     <Route path="/schedule" element={<Schedule />} />
+    <Route path="/history" element={<HistoryPage />} />
     <Route path="/login" element={<Login />} />
     <Route path="/onboarding" element={<Onboarding />} />
     <Route path="/settings/firmware" element={<Firmware />} />
