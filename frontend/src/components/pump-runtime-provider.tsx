@@ -18,6 +18,7 @@ type PumpRuntimeContextValue = {
   calibratingRuns: PumpRuntimeEntry[];
   timedRuns: PumpRuntimeEntry[];
   calibrationSessions: Record<number, CalibrationSession>;
+  lastRuntimeUpdateAt: number | null;
   syncRuntime: (showError?: boolean) => Promise<void>;
   beginCalibrationSession: (pump: PumpState, speed: number, direction: boolean) => Promise<boolean>;
   stopCalibrationSession: (pumpId: number) => Promise<boolean>;
@@ -29,6 +30,7 @@ const PumpRuntimeContext = React.createContext<PumpRuntimeContextValue>({
   calibratingRuns: [],
   timedRuns: [],
   calibrationSessions: {},
+  lastRuntimeUpdateAt: null,
   syncRuntime: async () => undefined,
   beginCalibrationSession: async () => false,
   stopCalibrationSession: async () => false,
@@ -62,6 +64,7 @@ export function PumpRuntimeProvider({ children }: { children: React.ReactNode })
   const [calibrationSessions, setCalibrationSessions] = React.useState<Record<number, CalibrationSession>>(() =>
     readSessions()
   );
+  const [lastRuntimeUpdateAt, setLastRuntimeUpdateAt] = React.useState<number | null>(null);
 
   const persistSessions = React.useCallback((nextValue: Record<number, CalibrationSession>) => {
     setCalibrationSessions(nextValue);
@@ -77,6 +80,7 @@ export function PumpRuntimeProvider({ children }: { children: React.ReactNode })
     try {
       const response = (await getPumpsRuntime<{ pumps: PumpRuntimeEntry[] }>()) ?? { pumps: [] };
       setRuntime(response.pumps ?? []);
+      setLastRuntimeUpdateAt(Date.now());
     } catch (error) {
       if (showError) {
         toast.error('Failed to sync pump runtime.');
@@ -102,6 +106,7 @@ export function PumpRuntimeProvider({ children }: { children: React.ReactNode })
     }
 
     const incomingPump = (lastMessage as { pump: PumpRuntimeEntry }).pump;
+    setLastRuntimeUpdateAt(Date.now());
     setRuntime((current) => {
       const next = [...current];
       const index = next.findIndex((entry) => entry.id === incomingPump.id);
@@ -252,6 +257,7 @@ export function PumpRuntimeProvider({ children }: { children: React.ReactNode })
       calibratingRuns,
       timedRuns,
       calibrationSessions,
+      lastRuntimeUpdateAt,
       syncRuntime,
       beginCalibrationSession,
       stopCalibrationSession,
@@ -262,6 +268,7 @@ export function PumpRuntimeProvider({ children }: { children: React.ReactNode })
       calibratingRuns,
       calibrationSessions,
       clearCalibrationSession,
+      lastRuntimeUpdateAt,
       runtime,
       stopCalibrationSession,
       syncRuntime,
