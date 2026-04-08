@@ -40,7 +40,7 @@ const FormSchema = z.object({
   time: z.number().min(1, 'Please select a pump working time.'),
 });
 
-export default function PumpControl(props: PumpControlProps) {
+export default function PumpControlCard(props: PumpControlProps) {
   const { pumps } = props;
   const { runtime, syncRuntime, lastRuntimeUpdateAt } = usePumpRuntime();
   const [boardConfig, setBoardConfig] = React.useState<BoardConfigState>(createEmptyBoardConfig);
@@ -194,7 +194,7 @@ export default function PumpControl(props: PumpControlProps) {
   }
 
   return (
-    <Card className="w-full shadow-none">
+    <Card className="flex h-full flex-col overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
       <CardHeader>
         <CardTitle>Pump Control</CardTitle>
         <CardDescription>Manual control of pumps with live runtime feedback and immediate stop support.</CardDescription>

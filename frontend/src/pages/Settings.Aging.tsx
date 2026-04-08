@@ -152,8 +152,9 @@ const AgingPage: React.FC = (): React.ReactElement => {
               <TriangleAlert />
               <AlertTitle>Recommended starting point</AlertTitle>
               <AlertDescription>
-                A standard 3-roller hose at 600 RPM typically lands around 200-300 hours. Use 200 as warning and 250
-                as planned replacement, then tune from real service history.
+                A standard 3-roller hose at 60 RPM lasts ~2000–3000 hours.
+                Set a warning at 2000 h and replacement at 2500 h, then refine based on real usage.
+                At 10 RPM, lifetime increases ~5× to ~12,500 hours.
               </AlertDescription>
             </Alert>
           </CardContent>
