@@ -86,6 +86,11 @@ export type PumpCalibrationState = {
   flow: number;
 };
 
+export type PumpAgingState = {
+  warning_hours: number;
+  replace_hours: number;
+};
+
 export enum SCHEDULE_MODE {
   OFF = 0,
   PERIODIC = 1,
@@ -106,12 +111,17 @@ export type PumpState = {
   name: string;
   direction: boolean;
   running_hours: number;
+  aging: PumpAgingState;
   tank_full_vol: number;
   tank_current_vol: number;
   tank_concentration_total: number /* runtime data */;
   tank_concentration_active: number;
   schedule: ScheduleState;
   calibration: PumpCalibrationState[];
+};
+
+export type AppState = {
+  onboarding_completed: boolean;
 };
 
 export type ServiceState = {
@@ -136,6 +146,7 @@ export type TimeState = {
 
 export type SettingsState = {
   auth: AuthState;
+  app: AppState;
   networks: NetworkState[];
   services: ServiceState;
   pumps: PumpState[];

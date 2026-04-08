@@ -23,6 +23,7 @@ import { emitMockRealtimeMessage } from '@/lib/realtime-mock.ts';
 
 type MockState = {
   auth: AuthState;
+  app: { onboarding_completed: boolean };
   boardConfig: BoardConfigState;
   networks: NetworkState[];
   pumps: PumpState[];
@@ -70,6 +71,9 @@ const initialState: MockState = {
   auth: {
     username: 'admin',
     password: 'admin',
+  },
+  app: {
+    onboarding_completed: true,
   },
   boardConfig: {
     uart: 2,
@@ -136,6 +140,10 @@ const initialState: MockState = {
         { speed: 10, flow: 22 },
         { speed: 40, flow: 85 },
       ],
+      aging: {
+        warning_hours: 200,
+        replace_hours: 250,
+      },
     },
     {
       id: 1,
@@ -161,6 +169,10 @@ const initialState: MockState = {
         { speed: 10, flow: 22 },
         { speed: 40, flow: 85 },
       ],
+      aging: {
+        warning_hours: 200,
+        replace_hours: 250,
+      },
     },
     {
       id: 2,
@@ -186,6 +198,10 @@ const initialState: MockState = {
         { speed: 10, flow: 22 },
         { speed: 40, flow: 85 },
       ],
+      aging: {
+        warning_hours: 200,
+        replace_hours: 250,
+      },
     },
     {
       id: 3,
@@ -211,6 +227,10 @@ const initialState: MockState = {
         { speed: 10, flow: 22 },
         { speed: 40, flow: 85 },
       ],
+      aging: {
+        warning_hours: 200,
+        replace_hours: 250,
+      },
     },
   ],
   status: {
@@ -375,6 +395,9 @@ function rejectWithStatus(
 function applySettingsPatch(payload: Partial<SettingsState>) {
   if (payload.auth) {
     state.auth = clone(payload.auth);
+  }
+  if (payload.app) {
+    state.app = clone(payload.app);
   }
   if (payload.networks) {
     state.networks = clone(payload.networks);
@@ -584,6 +607,7 @@ export const mockAdapter: AxiosAdapter = async (config) => {
       services: clone(state.services),
       time: clone(state.time),
       auth: clone(state.auth),
+      app: clone(state.app),
     });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;

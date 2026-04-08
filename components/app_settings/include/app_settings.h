@@ -55,6 +55,11 @@ typedef struct {
 } pump_calibration_t;
 
 typedef struct {
+    uint16_t warning_hours;
+    uint16_t replace_hours;
+} pump_aging_config_t;
+
+typedef struct {
     uint8_t id;                           // Network ID for UI
     uint8_t type;                         // network_type_t
     bool is_dirty;                        // UI-only dirty marker
@@ -106,6 +111,7 @@ typedef struct {
     uint32_t tank_concentration_active;   // Tank Active Component Concentration in mg/l
     double tank_current_vol;              // Tank Current Volume in ml
     bool state;                           // Enable/Disable pump
+    pump_aging_config_t aging;            // Service thresholds in hours
 } pump_t;
 
 typedef struct {
@@ -131,6 +137,10 @@ typedef struct {
 } pump_aging_state_t;
 
 typedef struct {
+    bool onboarding_completed;
+} app_state_t;
+
+typedef struct {
     int32_t dir_pin;
     int32_t en_pin;
     int32_t step_pin;
@@ -152,6 +162,7 @@ void set_default_pump(void);
 void set_default_schedule(void);
 void set_default_auth(void);
 void set_default_stepper_board_config(void);
+void set_default_app_state(void);
 
 void save_network(void);
 void save_service(void);
@@ -159,6 +170,8 @@ void save_pump(void);
 void save_schedule(void);
 void save_auth(void);
 void save_stepper_board_config(void);
+void save_pump_aging_config(void);
+void save_app_state(void);
 void load_pump_aging_state(void);
 void save_pump_aging_state(uint32_t day_stamp);
 uint32_t get_pump_aging_day_stamp(void);
@@ -171,6 +184,8 @@ pump_t *get_pump_config(uint8_t pump_id);
 schedule_t *get_schedule_config(uint8_t schedule_id);
 auth_t *get_auth_config(void);
 stepper_board_config_t *get_stepper_board_config(void);
+pump_aging_config_t *get_pump_aging_config(uint8_t pump_id);
+app_state_t *get_app_state_config(void);
 
 void ip_to_string(uint8_t ip[4], char* string);
 void string_to_ip(const char *ip_string, uint8_t *octets);

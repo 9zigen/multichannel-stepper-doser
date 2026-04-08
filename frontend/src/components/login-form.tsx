@@ -43,7 +43,14 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
     const result = await login(data);
     if (result) {
       const settings = await loadSettings();
-      navigate(settings && settings.networks.length === 0 ? '/settings/network' : '/');
+      navigate(
+        settings && !settings.app.onboarding_completed
+          ? '/onboarding'
+          : settings && settings.networks.length === 0
+            ? '/settings/network'
+            : '/',
+        { replace: true }
+      );
     }
   };
 

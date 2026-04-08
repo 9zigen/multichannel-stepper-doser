@@ -851,6 +851,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
                 cJSON *tank_current_volume = cJSON_GetObjectItem(pump_item, "tank_current_vol");
                 cJSON *calibration = cJSON_GetObjectItem(pump_item, "calibration");
                 cJSON *schedule = cJSON_GetObjectItem(pump_item, "schedule");
+                cJSON *aging = cJSON_GetObjectItem(pump_item, "aging");
 
                 pump_t *pump_config = get_pump_config(id->valueint);
                 schedule_t *schedule_config = get_schedule_config(id->valueint);
@@ -866,6 +867,17 @@ esp_err_t settings_post_handler(httpd_req_t *req)
                 pump_config->tank_concentration_active = tank_concentration_active->valueint;
                 pump_config->tank_current_vol = tank_current_volume->valuedouble;
                 pump_config->state = cJSON_IsTrue(enabled);
+
+                if (cJSON_IsObject(aging)) {
+                    cJSON *warning_hours = cJSON_GetObjectItem(aging, "warning_hours");
+                    cJSON *replace_hours = cJSON_GetObjectItem(aging, "replace_hours");
+                    if (cJSON_IsNumber(warning_hours) && warning_hours->valueint >= 0) {
+                        pump_config->aging.warning_hours = (uint16_t)warning_hours->valueint;
+                    }
+                    if (cJSON_IsNumber(replace_hours) && replace_hours->valueint >= 0) {
+                        pump_config->aging.replace_hours = (uint16_t)replace_hours->valueint;
+                    }
+                }
 
                 pump_config->calibration_count = 0;
                 if (cJSON_IsArray(calibration)) {
@@ -921,6 +933,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             }
 
             save_pump();
+            save_pump_aging_config();
             save_pump_aging_state(get_pump_aging_day_stamp());
             save_schedule();
             backup_eeprom_tank_status();
@@ -1162,6 +1175,16 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             }
 
             save_auth();
+        }
+
+        cJSON *app_json = cJSON_GetObjectItem(root, "app");
+        if (cJSON_IsObject(app_json)) {
+            app_state_t *app_state = get_app_state_config();
+            cJSON *onboarding_completed = cJSON_GetObjectItem(app_json, "onboarding_completed");
+            if (cJSON_IsBool(onboarding_completed)) {
+                app_state->onboarding_completed = cJSON_IsTrue(onboarding_completed);
+                save_app_state();
+            }
         }
 
         cJSON_Delete(root);

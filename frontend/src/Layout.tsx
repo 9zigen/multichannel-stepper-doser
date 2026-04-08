@@ -6,6 +6,7 @@ import { AppSidebar } from '@/components/app-sidebar.tsx';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { SiteHeader } from '@/components/site-header.tsx';
 import Login from '@/pages/Login';
+import { Navigate, useLocation } from 'react-router-dom';
 import './index.css';
 
 interface LayoutProps {
@@ -14,9 +15,18 @@ interface LayoutProps {
 
 export const Layout = ({ children }: LayoutProps): React.ReactElement => {
   const isAuthenticated = useAppStore((state: AppStoreState) => state.isAuthenticated);
+  const onboardingCompleted = useAppStore((state: AppStoreState) => state.settings.app.onboarding_completed);
+  const location = useLocation();
 
   if (!isAuthenticated) {
     return <Login />;
+  }
+
+  const onboardingAllowedPaths = ['/onboarding', '/settings/network', '/settings/board'];
+  const onboardingBlockingRequired =
+    !onboardingCompleted && !onboardingAllowedPaths.some((path) => location.pathname.startsWith(path));
+  if (onboardingBlockingRequired) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return (

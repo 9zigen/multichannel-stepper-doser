@@ -65,6 +65,7 @@ export type AppStoreState = {
 export enum SettingsKey {
   services = 'services',
   auth = 'auth',
+  app = 'app',
   networks = 'networks',
   pumps = 'pumps',
   time = 'time',
@@ -119,6 +120,9 @@ const defaultSettings: SettingsState = {
   auth: {
     username: '',
     password: '',
+  },
+  app: {
+    onboarding_completed: true,
   },
   networks: [],
   pumps: [],
@@ -192,6 +196,7 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       set({
         settings: {
           auth: response.auth,
+          app: response.app,
           services: response.services,
           networks: response.networks,
           pumps: normalizedPumps,
@@ -377,8 +382,13 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     const pumps = get().settings.pumps;
     const idx = pumps.findIndex((x) => x.id === nextPump.id);
     if (idx != -1) {
+      const currentPump = pumps[idx];
       const nextPumps = [...pumps];
-      nextPumps[idx] = nextPump;
+      nextPumps[idx] = {
+        ...currentPump,
+        ...nextPump,
+        aging: nextPump.aging ?? currentPump.aging,
+      };
       set((state) => ({
         settings: { ...state.settings, pumps: nextPumps },
       }));

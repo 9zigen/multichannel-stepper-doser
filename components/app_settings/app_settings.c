@@ -25,6 +25,8 @@ static SemaphoreHandle_t nvs_lock = NULL;
 #define APP_SETTINGS_PUMP_CFG_KEY_FMT   "PUMP%u_CFG"
 #define APP_SETTINGS_PUMP_CAL_KEY_FMT   "PUMP%u_CAL%u"
 #define APP_SETTINGS_PUMP_AGING_KEY     "PUMP_AGING"
+#define APP_SETTINGS_PUMP_AGING_CFG_KEY "PUMP_AGECFG"
+#define APP_SETTINGS_APP_STATE_KEY      "APP_STATE"
 
 network_t network[MAX_NETWORKS];
 services_t service;
@@ -32,6 +34,8 @@ pump_t pump[MAX_PUMP];
 schedule_t schedule[MAX_SCHEDULE];
 auth_t auth;
 stepper_board_config_t stepper_board_config;
+static pump_aging_config_t pump_aging_config[MAX_PUMP];
+static app_state_t app_state;
 static pump_aging_state_t pump_aging_state;
 
 extern esp_event_loop_handle_t app_event_loop;
@@ -114,6 +118,8 @@ static void app_settings_apply_default_pump(uint8_t pump_id)
     pump[pump_id].tank_concentration_active = 0;
     pump[pump_id].tank_current_vol = 0;
     pump[pump_id].state = true;
+    pump[pump_id].aging.warning_hours = 200;
+    pump[pump_id].aging.replace_hours = 250;
     strlcpy(pump[pump_id].name, default_names[pump_id], sizeof(pump[pump_id].name));
 }
 
@@ -241,6 +247,23 @@ void load_pump_aging_state(void)
 
     for (uint8_t i = 0; i < MAX_PUMP; ++i) {
         pump[i].running_hours = pump_aging_state.running_hours[i];
+    }
+}
+
+static void load_pump_aging_config(void)
+{
+    size_t required_size = sizeof(pump_aging_config);
+    esp_err_t ret = app_settings_get_blob(APP_SETTINGS_PUMP_AGING_CFG_KEY, &pump_aging_config, &required_size);
+    if (ret != ESP_OK) {
+        for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+            pump_aging_config[i].warning_hours = 200;
+            pump_aging_config[i].replace_hours = 250;
+        }
+        save_pump_aging_config();
+    }
+
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        pump[i].aging = pump_aging_config[i];
     }
 }
 
@@ -432,6 +455,7 @@ void init_settings()
         save_pump();
     }
     load_pump_aging_state();
+    load_pump_aging_config();
 
     /* Read Schedule */
     required_size = sizeof(schedule_t) * MAX_SCHEDULE;
@@ -461,6 +485,16 @@ void init_settings()
     } else if (ret == ESP_ERR_NVS_NOT_FOUND || ret == ESP_ERR_NVS_INVALID_LENGTH) {
         ESP_LOGI(TAG, "default stepper board config used.");
         set_default_stepper_board_config();
+    }
+
+    /* Read App State */
+    required_size = sizeof(app_state_t);
+    ret = app_settings_get_blob(APP_SETTINGS_APP_STATE_KEY, &app_state, &required_size);
+    if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND && ret != ESP_ERR_NVS_INVALID_LENGTH) {
+        ESP_LOGE(TAG, "config not saved yet! error: %s", esp_err_to_name(ret));
+    } else if (ret == ESP_ERR_NVS_NOT_FOUND || ret == ESP_ERR_NVS_INVALID_LENGTH) {
+        ESP_LOGI(TAG, "default app state used.");
+        set_default_app_state();
     }
 }
 
@@ -511,8 +545,10 @@ void set_default_pump()
     for(size_t i = 0; i < MAX_PUMP; i++)
     {
         app_settings_apply_default_pump(i);
+        pump_aging_config[i] = pump[i].aging;
     }
     save_pump();
+    save_pump_aging_config();
 }
 
 void set_default_schedule()
@@ -559,6 +595,13 @@ void set_default_stepper_board_config(void)
     }
 
     save_stepper_board_config();
+}
+
+void set_default_app_state(void)
+{
+    memset(&app_state, 0, sizeof(app_state));
+    app_state.onboarding_completed = false;
+    save_app_state();
 }
 
 void save_network(void)
@@ -618,6 +661,29 @@ void save_stepper_board_config(void)
     }
 }
 
+void save_pump_aging_config(void)
+{
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        pump_aging_config[i] = pump[i].aging;
+    }
+
+    esp_err_t err = app_settings_set_blob(APP_SETTINGS_PUMP_AGING_CFG_KEY,
+                                          &pump_aging_config,
+                                          sizeof(pump_aging_config),
+                                          true);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save pump aging config.");
+    }
+}
+
+void save_app_state(void)
+{
+    esp_err_t err = app_settings_set_blob(APP_SETTINGS_APP_STATE_KEY, &app_state, sizeof(app_state), true);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save app state.");
+    }
+}
+
 void erase_settings(void) {
     ESP_ERROR_CHECK(nvs_flash_erase());
 }
@@ -656,6 +722,19 @@ auth_t *get_auth_config(void) {
 stepper_board_config_t *get_stepper_board_config(void)
 {
     return &stepper_board_config;
+}
+
+pump_aging_config_t *get_pump_aging_config(uint8_t pump_id)
+{
+    if (pump_id >= MAX_PUMP) {
+        return NULL;
+    }
+    return &pump[pump_id].aging;
+}
+
+app_state_t *get_app_state_config(void)
+{
+    return &app_state;
 }
 
 void ip_to_string(uint8_t ip[4], char *string) {

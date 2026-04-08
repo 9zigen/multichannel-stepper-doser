@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Edit, Globe, Network, PlusCircle, Router, ShieldCheck, Trash2, Wifi } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import NetworkForm from '@/components/network-form.tsx';
@@ -35,9 +36,12 @@ const getNetworkSummary = (network: NetworkState): string => {
 };
 
 const NetworkPage: React.FC = (): React.ReactElement => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const networks = useAppStore((state: AppStoreState) => state.settings.networks);
   const deleteNetwork = useAppStore((state: AppStoreState) => state.deleteNetwork);
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkState | null>(null);
+  const guidedMode = searchParams.get('guided') === '1';
 
   useEffect(() => {
     if (networks.length === 1) {
@@ -156,6 +160,26 @@ const NetworkPage: React.FC = (): React.ReactElement => {
         </Card>
 
         <div className="grid gap-6">
+          {guidedMode ? (
+            <Alert className="p-4">
+              <Network />
+              <AlertTitle>Guided onboarding step</AlertTitle>
+              <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>Configure at least one network, then return to onboarding to finish the first-run checklist.</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setSearchParams({});
+                    navigate('/onboarding');
+                  }}
+                >
+                  Return to onboarding
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
           <Card className="shadow-none animate-in fade-in zoom-in">
             <CardHeader>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

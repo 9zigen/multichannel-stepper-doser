@@ -128,7 +128,13 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
   };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
-    if (await updatePump(data, true)) {
+    const nextPump: PumpState = {
+      ...pump,
+      ...data,
+      aging: pump.aging,
+    };
+
+    if (await updatePump(nextPump, true)) {
       reset(data);
       toast.success('Schedule settings saved.');
       success?.();

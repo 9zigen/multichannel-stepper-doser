@@ -123,7 +123,13 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
       return;
     }
 
-    if (await updatePump(data, true)) {
+    const nextPump: PumpState = {
+      ...pump,
+      ...data,
+      aging: pump.aging,
+    };
+
+    if (await updatePump(nextPump, true)) {
       reset(data);
       setCalibrationChanged(false);
       toast.success('Pumps settings saved.');

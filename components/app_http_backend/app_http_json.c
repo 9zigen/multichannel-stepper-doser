@@ -259,6 +259,11 @@ char *get_settings_json(void)
         cJSON_AddItemToObject(pump_item, "tank_concentration_active", cJSON_CreateNumber((double)pump_config->tank_concentration_active));
         cJSON_AddItemToObject(pump_item, "tank_current_vol", cJSON_CreateNumber(pump_config->tank_current_vol));
 
+        cJSON *aging_item = cJSON_CreateObject();
+        cJSON_AddItemToObject(aging_item, "warning_hours", cJSON_CreateNumber(pump_config->aging.warning_hours));
+        cJSON_AddItemToObject(aging_item, "replace_hours", cJSON_CreateNumber(pump_config->aging.replace_hours));
+        cJSON_AddItemToObject(pump_item, "aging", aging_item);
+
         cJSON *schedule_item = cJSON_CreateObject();
         cJSON_AddItemToObject(schedule_item, "mode", cJSON_CreateNumber(schedule_config->mode));
 
@@ -414,6 +419,11 @@ char *get_settings_json(void)
     cJSON_AddItemToObject(user_json, "username", cJSON_CreateString(auth->username));
     cJSON_AddItemToObject(user_json, "password", cJSON_CreateString(auth->password));
     cJSON_AddItemToObject(root, "auth", user_json);
+
+    cJSON *app_json = cJSON_CreateObject();
+    app_state_t *app_state = get_app_state_config();
+    cJSON_AddItemToObject(app_json, "onboarding_completed", cJSON_CreateBool(app_state->onboarding_completed));
+    cJSON_AddItemToObject(root, "app", app_json);
 
     string = cJSON_Print(root);
 

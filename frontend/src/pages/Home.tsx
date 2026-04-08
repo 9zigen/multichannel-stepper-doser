@@ -12,6 +12,15 @@ import { cn } from '@/lib/utils';
 import { DeviceMaintenanceActions } from '@/components/device-maintenance-actions';
 
 const formatHours = (value: number) => `${value.toFixed(1)} h`;
+const formatAgingStatus = (runningHours: number, warningHours: number, replaceHours: number) => {
+  if (runningHours >= replaceHours) {
+    return 'Replacement due';
+  }
+  if (runningHours >= warningHours) {
+    return 'Service suggested';
+  }
+  return 'Nominal';
+};
 
 const Home: React.FC = (): React.ReactElement => {
   const deviceStatus = useAppStore((state: AppStoreState) => state.status);
@@ -73,7 +82,10 @@ const Home: React.FC = (): React.ReactElement => {
                   <span>Highest wear pump</span>
                   <Badge
                     variant={
-                      highestWearPump?.running_hours && highestWearPump.running_hours > 1000 ? 'destructive' : 'outline'
+                      highestWearPump &&
+                      highestWearPump.running_hours >= highestWearPump.aging.replace_hours
+                        ? 'destructive'
+                        : 'outline'
                     }
                   >
                     {highestWearPump ? highestWearPump.name : 'N/A'}
@@ -252,7 +264,12 @@ const Home: React.FC = (): React.ReactElement => {
                 {pumps.map((pump) => {
                   const percentage =
                     pump.tank_full_vol > 0 ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100) : 0;
-                  const warning = pump.running_hours >= 1000;
+                  const warning = pump.running_hours >= pump.aging.warning_hours;
+                  const replacementDue = pump.running_hours >= pump.aging.replace_hours;
+                  const agingProgress =
+                    pump.aging.replace_hours > 0
+                      ? Math.max(8, Math.min((pump.running_hours / pump.aging.replace_hours) * 100, 100))
+                      : 8;
 
                   return (
                     <Card
@@ -273,22 +290,34 @@ const Home: React.FC = (): React.ReactElement => {
                               </Badge>
                             </CardDescription>
                           </div>
-                          <Badge variant={warning ? 'destructive' : 'outline'}>{formatHours(pump.running_hours)}</Badge>
+                          <Badge variant={replacementDue ? 'destructive' : warning ? 'secondary' : 'outline'}>
+                            {formatHours(pump.running_hours)}
+                          </Badge>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-xs uppercase tracking-[0.14em] text-muted-foreground">
                             <span>Wear estimate</span>
-                            <span>{pump.running_hours >= 1000 ? 'Service suggested' : 'Nominal'}</span>
+                            <span>
+                              {formatAgingStatus(
+                                pump.running_hours,
+                                pump.aging.warning_hours,
+                                pump.aging.replace_hours
+                              )}
+                            </span>
                           </div>
                           <div className="h-2 overflow-hidden rounded-full bg-muted">
                             <div
                               className={cn(
                                 'h-full rounded-full bg-gradient-to-r transition-all',
-                                warning ? 'from-destructive to-destructive/70' : 'from-primary via-primary/85 to-accent'
+                                replacementDue
+                                  ? 'from-destructive to-destructive/70'
+                                  : warning
+                                    ? 'from-amber-500 to-amber-400'
+                                    : 'from-primary via-primary/85 to-accent'
                               )}
-                              style={{ width: `${Math.max(8, Math.min((pump.running_hours / 1200) * 100, 100))}%` }}
+                              style={{ width: `${agingProgress}%` }}
                             />
                           </div>
                         </div>
@@ -301,6 +330,12 @@ const Home: React.FC = (): React.ReactElement => {
                           <div className="flex items-center justify-between gap-3">
                             <span className="text-muted-foreground">Calibration points</span>
                             <span className="font-medium">{pump.calibration.length}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">Warning / replace</span>
+                            <span className="font-medium">
+                              {pump.aging.warning_hours}h / {pump.aging.replace_hours}h
+                            </span>
                           </div>
                         </div>
 

@@ -28,9 +28,12 @@ export function SiteHeader(): React.ReactElement {
     { path: '/settings', name: 'Settings' },
     { path: '/settings/firmware', name: 'Firmware' },
     { path: '/settings/network', name: 'Network' },
+    { path: '/settings/board', name: 'Board' },
+    { path: '/settings/aging', name: 'Aging' },
     { path: '/settings/services', name: 'Services' },
     { path: '/settings/pumps', name: 'Pumps' },
     { path: '/settings/api', name: 'API' },
+    { path: '/onboarding', name: 'Onboarding' },
   ];
 
   const Breadcrumbs: React.FC = () => {
