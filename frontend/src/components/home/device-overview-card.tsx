@@ -22,7 +22,7 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
   const totalRunningHours = useMemo(() => pumps.reduce((sum, pump) => sum + pump.running_hours, 0), [pumps]);
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
+    <Card className="flex h-full flex-col overflow-hidden border-white/45 bg-card/82 shadow-lg">
       <CardHeader>
         <CardTitle className="text-xl">Device Overview</CardTitle>
         <CardDescription>

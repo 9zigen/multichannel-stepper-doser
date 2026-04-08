@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 const MaintenanceActionsCard = (): React.ReactElement => {
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
+    <Card className="flex h-full flex-col overflow-hidden border-white/45 bg-card/82 shadow-lg">
       <CardHeader>
         <CardTitle className="text-lg">Maintenance Actions</CardTitle>
         <CardDescription>
