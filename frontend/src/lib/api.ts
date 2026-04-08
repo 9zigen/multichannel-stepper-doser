@@ -205,6 +205,22 @@ export type SettingsSaveResponse = {
   success: boolean;
 };
 
+export type BoardConfigChannel = {
+  id: number;
+  dir_pin: number;
+  en_pin: number;
+  step_pin: number;
+  micro_steps: number;
+};
+
+export type BoardConfigState = {
+  uart: number;
+  tx_pin: number;
+  rx_pin: number;
+  motors_num: number;
+  channels: BoardConfigChannel[];
+};
+
 export type CalibrationResponse = {
   success: boolean;
 };
@@ -230,6 +246,16 @@ export const getSettings = async <T>(): Promise<T> => {
 
 export const setSettings = async <T>(payload: Partial<SettingsState>): Promise<T> => {
   const data = await http.post('/api/settings', payload);
+  return data.data as T;
+};
+
+export const getBoardConfig = async <T>(): Promise<T> => {
+  const data = await http.get('/api/board-config');
+  return data.data as T;
+};
+
+export const setBoardConfig = async <T>(payload: BoardConfigState): Promise<T> => {
+  const data = await http.post('/api/board-config', payload);
   return data.data as T;
 };
 

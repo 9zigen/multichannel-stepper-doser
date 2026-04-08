@@ -25,6 +25,7 @@ static SemaphoreHandle_t datagram_rx_sem;
 
 static gptimer_handle_t gptimer[] = {NULL, NULL, NULL, NULL};
 static int64_t steps_left[] = {0, 0, 0, 0};
+static callback_arg_t cb_arg[4];
 
 static const uint32_t timer_N = sizeof(gptimer) / sizeof(gptimer[0]); // number of timers
 
@@ -346,10 +347,7 @@ void tmc2209_init(tms2209_t *cfg)
     xSemaphoreGive(datagram_tx_sem);
     xSemaphoreGive(datagram_rx_sem);
 
-    /* allocate memory for callback arguments */
-    callback_arg_t* cb_arg = malloc(sizeof(callback_arg_t) * timer_N);
-
-    for (uint8_t i = 0; i < 4; i++)
+    for (uint8_t i = 0; i < cfg->motors_num; i++)
     {
         // configure step and dir pins
 
@@ -469,8 +467,12 @@ void TMC2209_deinit(tms2209_t *cfg)
         tmc2209_backend_rmt_deinit(cfg, i);
 #endif
 
-        ESP_ERROR_CHECK(gptimer_disable(gptimer[i]));
-        ESP_ERROR_CHECK(gptimer_del_timer(gptimer[i]));
+        if (gptimer[i] != NULL) {
+            gptimer_stop(gptimer[i]);
+            ESP_ERROR_CHECK(gptimer_disable(gptimer[i]));
+            ESP_ERROR_CHECK(gptimer_del_timer(gptimer[i]));
+            gptimer[i] = NULL;
+        }
     }
 
     ESP_ERROR_CHECK(uart_driver_delete(cfg->uart));

@@ -130,18 +130,35 @@ typedef struct {
     float running_hours[MAX_PUMP];
 } pump_aging_state_t;
 
+typedef struct {
+    int32_t dir_pin;
+    int32_t en_pin;
+    int32_t step_pin;
+    uint16_t micro_steps;
+} stepper_channel_config_t;
+
+typedef struct {
+    uint8_t uart;
+    int32_t tx_pin;
+    int32_t rx_pin;
+    uint8_t motors_num;
+    stepper_channel_config_t channels[MAX_PUMP];
+} stepper_board_config_t;
+
 void init_settings(void);
 void set_default_network(void);
 void set_default_service(void);
 void set_default_pump(void);
 void set_default_schedule(void);
 void set_default_auth(void);
+void set_default_stepper_board_config(void);
 
 void save_network(void);
 void save_service(void);
 void save_pump(void);
 void save_schedule(void);
 void save_auth(void);
+void save_stepper_board_config(void);
 void load_pump_aging_state(void);
 void save_pump_aging_state(uint32_t day_stamp);
 uint32_t get_pump_aging_day_stamp(void);
@@ -153,6 +170,7 @@ services_t *get_service_config(void);
 pump_t *get_pump_config(uint8_t pump_id);
 schedule_t *get_schedule_config(uint8_t schedule_id);
 auth_t *get_auth_config(void);
+stepper_board_config_t *get_stepper_board_config(void);
 
 void ip_to_string(uint8_t ip[4], char* string);
 void string_to_ip(const char *ip_string, uint8_t *octets);

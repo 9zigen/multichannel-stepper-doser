@@ -17,6 +17,8 @@
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_http_server.h"
+#include "driver/gpio.h"
+#include "soc/gpio_num.h"
 
 #include "app_settings.h"
 #include "auth.h"
@@ -27,6 +29,7 @@
 #include "mqtt.h"
 #include "pumps.h"
 #include "rtc.h"
+#include "stepper_task.h"
 
 #include "app_http_backend_priv.h"
 
@@ -46,6 +49,101 @@ static uint32_t calibration_to_100ml_units(const pump_t *pump)
 static esp_err_t websocket_send_json(httpd_req_t *req, const char *payload)
 {
     return app_http_ws_send_json_to_client(req->handle, httpd_req_to_sockfd(req), payload);
+}
+
+static bool board_config_microsteps_valid(uint16_t micro_steps)
+{
+    switch (micro_steps) {
+        case 1:
+        case 2:
+        case 4:
+        case 8:
+        case 16:
+        case 32:
+        case 64:
+        case 128:
+        case 256:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static esp_err_t board_config_validate(const stepper_board_config_t *config, char *error, size_t error_size)
+{
+    if (config->motors_num == 0 || config->motors_num > MAX_PUMP) {
+        snprintf(error, error_size, "motors_num must be between 1 and %u", (unsigned)MAX_PUMP);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (config->uart > 2) {
+        snprintf(error, error_size, "uart must be 0, 1, or 2");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(config->tx_pin)) {
+        snprintf(error, error_size, "tx_pin must be a valid output GPIO");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!GPIO_IS_VALID_GPIO(config->rx_pin)) {
+        snprintf(error, error_size, "rx_pin must be a valid GPIO");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (config->tx_pin == config->rx_pin) {
+        snprintf(error, error_size, "tx_pin and rx_pin must be different");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    for (uint8_t i = 0; i < config->motors_num; ++i) {
+        const stepper_channel_config_t *channel = &config->channels[i];
+        if (!GPIO_IS_VALID_OUTPUT_GPIO(channel->dir_pin) ||
+            !GPIO_IS_VALID_OUTPUT_GPIO(channel->en_pin) ||
+            !GPIO_IS_VALID_OUTPUT_GPIO(channel->step_pin)) {
+            snprintf(error, error_size, "channel %u contains invalid GPIO", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!board_config_microsteps_valid(channel->micro_steps)) {
+            snprintf(error, error_size, "channel %u has invalid micro_steps", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (channel->dir_pin == channel->step_pin ||
+            channel->dir_pin == channel->en_pin ||
+            channel->step_pin == channel->en_pin) {
+            snprintf(error, error_size, "channel %u pins must be unique", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (channel->dir_pin == config->tx_pin || channel->dir_pin == config->rx_pin ||
+            channel->step_pin == config->tx_pin || channel->step_pin == config->rx_pin ||
+            channel->en_pin == config->tx_pin || channel->en_pin == config->rx_pin) {
+            snprintf(error, error_size, "channel %u pins must not overlap UART pins", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    for (uint8_t i = 0; i < config->motors_num; ++i) {
+        const stepper_channel_config_t *left = &config->channels[i];
+        for (uint8_t j = i + 1; j < config->motors_num; ++j) {
+            const stepper_channel_config_t *right = &config->channels[j];
+            if (left->step_pin == right->step_pin ||
+                left->step_pin == right->dir_pin ||
+                left->step_pin == right->en_pin ||
+                left->dir_pin == right->step_pin ||
+                left->dir_pin == right->dir_pin ||
+                left->dir_pin == right->en_pin ||
+                left->en_pin == right->step_pin ||
+                left->en_pin == right->dir_pin) {
+                snprintf(error, error_size, "channels %u and %u have conflicting pins", (unsigned)i, (unsigned)j);
+                return ESP_ERR_INVALID_ARG;
+            }
+        }
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t websocket_pre_handshake_cb(httpd_req_t *req)
@@ -369,6 +467,127 @@ esp_err_t settings_get_handler(httpd_req_t *req)
 
     app_http_set_cors_headers(req);
     char *response = get_settings_json();
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
+    return ESP_OK;
+}
+
+esp_err_t board_config_get_handler(httpd_req_t *req)
+{
+    if (app_http_validate_request(req) != ESP_OK) {
+        send_unauthorized(req);
+        return ESP_OK;
+    }
+
+    app_http_set_cors_headers(req);
+    char *response = get_board_config_json();
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
+    return ESP_OK;
+}
+
+esp_err_t board_config_post_handler(httpd_req_t *req)
+{
+    int total_len = (int)req->content_len;
+    char *buf = malloc(req->content_len + 1);
+    if (buf == NULL || total_len >= SCRATCH_BUFSIZE) {
+        free(buf);
+        return ESP_FAIL;
+    }
+
+    if (app_http_validate_request(req) != ESP_OK) {
+        send_unauthorized(req);
+        free(buf);
+        return ESP_OK;
+    }
+
+    app_http_set_cors_headers(req);
+    int cur_len = 0;
+    while (cur_len < total_len) {
+        int received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            free(buf);
+            return ESP_FAIL;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    stepper_board_config_t next_config = *get_stepper_board_config();
+    cJSON *uart = cJSON_GetObjectItem(root, "uart");
+    cJSON *tx_pin = cJSON_GetObjectItem(root, "tx_pin");
+    cJSON *rx_pin = cJSON_GetObjectItem(root, "rx_pin");
+    cJSON *motors_num = cJSON_GetObjectItem(root, "motors_num");
+    cJSON *channels = cJSON_GetObjectItem(root, "channels");
+
+    if (cJSON_IsNumber(uart)) {
+        next_config.uart = (uint8_t)uart->valueint;
+    }
+    if (cJSON_IsNumber(tx_pin)) {
+        next_config.tx_pin = tx_pin->valueint;
+    }
+    if (cJSON_IsNumber(rx_pin)) {
+        next_config.rx_pin = rx_pin->valueint;
+    }
+    if (cJSON_IsNumber(motors_num)) {
+        next_config.motors_num = (uint8_t)motors_num->valueint;
+    }
+
+    if (cJSON_IsArray(channels)) {
+        cJSON *channel_item;
+        cJSON_ArrayForEach(channel_item, channels) {
+            cJSON *id = cJSON_GetObjectItem(channel_item, "id");
+            if (!cJSON_IsNumber(id) || id->valueint < 0 || id->valueint >= MAX_PUMP) {
+                continue;
+            }
+
+            stepper_channel_config_t *channel = &next_config.channels[id->valueint];
+            cJSON *dir_pin_item = cJSON_GetObjectItem(channel_item, "dir_pin");
+            cJSON *en_pin_item = cJSON_GetObjectItem(channel_item, "en_pin");
+            cJSON *step_pin_item = cJSON_GetObjectItem(channel_item, "step_pin");
+            cJSON *micro_steps_item = cJSON_GetObjectItem(channel_item, "micro_steps");
+
+            if (cJSON_IsNumber(dir_pin_item)) {
+                channel->dir_pin = dir_pin_item->valueint;
+            }
+            if (cJSON_IsNumber(en_pin_item)) {
+                channel->en_pin = en_pin_item->valueint;
+            }
+            if (cJSON_IsNumber(step_pin_item)) {
+                channel->step_pin = step_pin_item->valueint;
+            }
+            if (cJSON_IsNumber(micro_steps_item)) {
+                channel->micro_steps = (uint16_t)micro_steps_item->valueint;
+            }
+        }
+    }
+
+    char validation_error[128] = {0};
+    esp_err_t validation_result = board_config_validate(&next_config, validation_error, sizeof(validation_error));
+    if (validation_result != ESP_OK) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, validation_error);
+        return ESP_FAIL;
+    }
+
+    *get_stepper_board_config() = next_config;
+    save_stepper_board_config();
+    cJSON_Delete(root);
+
+    esp_err_t reload_result = stepper_task_reload_config();
+    if (reload_result != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to reload stepper board config");
+        return ESP_FAIL;
+    }
+
+    char *response = app_http_success_response_json(true);
     httpd_resp_send(req, response, (ssize_t)strlen(response));
     free(response);
     return ESP_OK;

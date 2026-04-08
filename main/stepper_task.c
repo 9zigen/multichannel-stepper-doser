@@ -8,12 +8,19 @@
 
 #include "esp_log.h"
 
+#include "app_settings.h"
 #include "stepper_task.h"
+#include "tmc2209.h"
 
 static const char *TAG = "stepper_task";
 static QueueHandle_t control_queue;
 static tms2209_t stepper_cfg;
 static bool stepper_cfg_ready = false;
+
+typedef enum {
+    STEPPER_COMMAND_CONTROL = 0,
+    STEPPER_COMMAND_RELOAD_CONFIG,
+} stepper_command_type_t;
 
 typedef struct {
     uint8_t id;
@@ -21,6 +28,24 @@ typedef struct {
     bool direction;
     int32_t duration_ms;
 } motor_control_t;
+
+typedef struct {
+    stepper_command_type_t type;
+    motor_control_t control;
+} stepper_command_t;
+
+static gpio_num_t dir_pin_config[MAX_PUMP];
+static gpio_num_t en_pin_config[MAX_PUMP];
+static gpio_num_t step_pin_config[MAX_PUMP];
+static tmc2209_microsteps_t microstep_config[MAX_PUMP];
+
+#if defined(USE_RMT) && USE_RMT
+#if defined(RMT_LEGACY) && RMT_LEGACY
+static rmt_channel_t rmt_channels[MAX_PUMP] = {RMT_CHANNEL_0, RMT_CHANNEL_1, RMT_CHANNEL_2, RMT_CHANNEL_3};
+#else
+static rmt_channel_handle_t rmt_channels[MAX_PUMP] = {NULL, NULL, NULL, NULL};
+#endif
+#endif
 
 static uint32_t microsteps_to_uint(tmc2209_microsteps_t micro_steps)
 {
@@ -51,6 +76,102 @@ static uint32_t calc_frequency(uint32_t micro_steps, float rpm)
     return (uint32_t)((rpm / 60.0f) * 200.0f * (float)micro_steps + 0.5f);
 }
 
+static tmc2209_microsteps_t microsteps_from_uint(uint16_t micro_steps)
+{
+    switch (micro_steps) {
+        case 1: return MICROSTEPS_1;
+        case 2: return MICROSTEPS_2;
+        case 4: return MICROSTEPS_4;
+        case 8: return MICROSTEPS_8;
+        case 16: return MICROSTEPS_16;
+        case 32: return MICROSTEPS_32;
+        case 64: return MICROSTEPS_64;
+        case 128: return MICROSTEPS_128;
+        case 256:
+        default:
+            return MICROSTEPS_256;
+    }
+}
+
+static float clamp_rpm_for_microsteps(float rpm, uint32_t micro_steps)
+{
+    if (micro_steps == 256 && rpm > 30.0f) {
+        ESP_LOGW(TAG, "Clamping RPM %.2f to 30.00 for 256 microsteps", (double)rpm);
+        return 30.0f;
+    }
+
+    return rpm;
+}
+
+static void stepper_deinit_current_config(void)
+{
+    if (!stepper_cfg_ready) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < stepper_cfg.motors_num; ++i) {
+        TMC2209_start(&stepper_cfg, i, 0);
+        TMC2209_enable(&stepper_cfg, i, 1);
+    }
+
+    TMC2209_deinit(&stepper_cfg);
+    memset(&stepper_cfg, 0, sizeof(stepper_cfg));
+    stepper_cfg_ready = false;
+}
+
+static esp_err_t stepper_apply_board_config(void)
+{
+    stepper_board_config_t *board_config = get_stepper_board_config();
+    uint8_t motors_num = board_config->motors_num;
+    if (motors_num > MAX_PUMP) {
+        motors_num = MAX_PUMP;
+    }
+
+    stepper_deinit_current_config();
+
+    if (motors_num == 0) {
+        ESP_LOGW(TAG, "No active stepper channels configured");
+        return ESP_OK;
+    }
+
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        dir_pin_config[i] = (gpio_num_t)board_config->channels[i].dir_pin;
+        en_pin_config[i] = (gpio_num_t)board_config->channels[i].en_pin;
+        step_pin_config[i] = (gpio_num_t)board_config->channels[i].step_pin;
+        microstep_config[i] = microsteps_from_uint(board_config->channels[i].micro_steps);
+    }
+
+    memset(&stepper_cfg, 0, sizeof(stepper_cfg));
+    stepper_cfg.baud_rate = 115200;
+    stepper_cfg.dir_pin = dir_pin_config;
+    stepper_cfg.en_pin = en_pin_config;
+    stepper_cfg.step_pin = step_pin_config;
+    stepper_cfg.micro_steps = microstep_config;
+    stepper_cfg.uart = (uart_port_t)board_config->uart;
+    stepper_cfg.tx_pin = (gpio_num_t)board_config->tx_pin;
+    stepper_cfg.rx_pin = (gpio_num_t)board_config->rx_pin;
+    stepper_cfg.motors_num = motors_num;
+#if defined(USE_RMT) && USE_RMT
+    stepper_cfg.rmt_channel = rmt_channels;
+#endif
+
+    tmc2209_init(&stepper_cfg);
+    stepper_cfg_ready = true;
+
+    for (uint8_t i = 0; i < stepper_cfg.motors_num; ++i) {
+        tmc2209_gconf_reg_t reg = tmc2209_get_gconf(&stepper_cfg, i);
+        ESP_LOGI(TAG, "Motor %u GCONF: 0x%lx", (unsigned)i, (reg.value & 0x1FF));
+        TMC2209_uart_move(&stepper_cfg, i, 0);
+    }
+
+    ESP_LOGI(TAG, "Applied stepper board config: uart=%u tx=%ld rx=%ld motors=%u",
+             (unsigned)board_config->uart,
+             (long)board_config->tx_pin,
+             (long)board_config->rx_pin,
+             (unsigned)stepper_cfg.motors_num);
+    return ESP_OK;
+}
+
 static void stepper_stop(uint8_t motor_num)
 {
     if (!stepper_cfg_ready || motor_num >= stepper_cfg.motors_num) {
@@ -67,8 +188,9 @@ static void stepper_start(uint8_t motor_num, float rpm, bool direction, int32_t 
         return;
     }
 
-    uint32_t micro_steps = microsteps_to_uint(stepper_cfg.micro_steps[motor_num]);
-    uint32_t freq = calc_frequency(micro_steps, rpm);
+    uint32_t microstep_value = microsteps_to_uint(stepper_cfg.micro_steps[motor_num]);
+    rpm = clamp_rpm_for_microsteps(rpm, microstep_value);
+    uint32_t freq = calc_frequency(microstep_value, rpm);
     if (freq == 0) {
         ESP_LOGW(TAG, "Ignoring zero-frequency command for motor %u", (unsigned)motor_num);
         return;
@@ -77,7 +199,7 @@ static void stepper_start(uint8_t motor_num, float rpm, bool direction, int32_t 
     uint32_t period_us = 1000000UL / freq;
     uint32_t steps = UINT_MAX / 4U;
     if (duration_ms > 0) {
-        steps = calc_steps((uint32_t)duration_ms, micro_steps, rpm);
+        steps = calc_steps((uint32_t)duration_ms, microstep_value, rpm);
         if (steps == 0) {
             steps = 1;
         }
@@ -97,11 +219,27 @@ esp_err_t stepper_task_control(uint8_t id, float rpm, bool direction, int32_t du
         return ESP_ERR_INVALID_STATE;
     }
 
-    motor_control_t message = {
-        .id = id,
-        .rpm = rpm,
-        .direction = direction,
-        .duration_ms = duration_ms,
+    stepper_command_t message = {
+        .type = STEPPER_COMMAND_CONTROL,
+        .control = {
+            .id = id,
+            .rpm = rpm,
+            .direction = direction,
+            .duration_ms = duration_ms,
+        },
+    };
+
+    return xQueueSend(control_queue, &message, pdMS_TO_TICKS(1000)) == pdTRUE ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t stepper_task_reload_config(void)
+{
+    if (control_queue == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    stepper_command_t message = {
+        .type = STEPPER_COMMAND_RELOAD_CONFIG,
     };
 
     return xQueueSend(control_queue, &message, pdMS_TO_TICKS(1000)) == pdTRUE ? ESP_OK : ESP_FAIL;
@@ -109,49 +247,27 @@ esp_err_t stepper_task_control(uint8_t id, float rpm, bool direction, int32_t du
 
 void stepper_task(void *pvParameter)
 {
-    gpio_num_t dir_pins[] = {GPIO_NUM_12, GPIO_NUM_26, GPIO_NUM_17, GPIO_NUM_32};
-    gpio_num_t en_pins[] = {GPIO_NUM_25, GPIO_NUM_25, GPIO_NUM_25, GPIO_NUM_25};
-    gpio_num_t step_pins[] = {GPIO_NUM_14, GPIO_NUM_27, GPIO_NUM_16, GPIO_NUM_33};
-    tmc2209_microsteps_t micro_steps[] = {MICROSTEPS_256, MICROSTEPS_256, MICROSTEPS_256, MICROSTEPS_256};
+    (void)pvParameter;
 
-#if defined(USE_RMT) && USE_RMT
-#if defined(RMT_LEGACY) && RMT_LEGACY
-    rmt_channel_t rmt_channels[] = {RMT_CHANNEL_0, RMT_CHANNEL_1, RMT_CHANNEL_2, RMT_CHANNEL_3};
-#else
-    rmt_channel_handle_t rmt_channels[] = {NULL, NULL, NULL, NULL};
-#endif
-#endif
-
-    tms2209_t cfg = {
-        .baud_rate = 115200,
-        .dir_pin = dir_pins,
-        .en_pin = en_pins,
-        .step_pin = step_pins,
-        .micro_steps = micro_steps,
-        .uart = UART_NUM_2,
-        .tx_pin = GPIO_NUM_22,
-        .rx_pin = GPIO_NUM_21,
-        .motors_num = 4,
-#if defined(USE_RMT) && USE_RMT
-        .rmt_channel = rmt_channels,
-#endif
-    };
-
-    tmc2209_init(&cfg);
-    memcpy(&stepper_cfg, &cfg, sizeof(stepper_cfg));
-    stepper_cfg_ready = true;
-
-    for (int i = 0; i < cfg.motors_num; ++i) {
-        tmc2209_gconf_reg_t reg = tmc2209_get_gconf(&cfg, i);
-        ESP_LOGI(TAG, "Motor %d GCONF: 0x%lx", i, (reg.value & 0x1FF));
-        TMC2209_uart_move(&cfg, i, 0);
+    control_queue = xQueueCreate(10, sizeof(stepper_command_t));
+    if (control_queue == NULL) {
+        ESP_LOGE(TAG, "Failed to create stepper control queue");
+        vTaskDelete(NULL);
+        return;
     }
 
-    control_queue = xQueueCreate(10, sizeof(motor_control_t));
-    motor_control_t control_packet;
+    ESP_ERROR_CHECK(stepper_apply_board_config());
+    stepper_command_t command;
 
     while (1) {
-        if (xQueueReceive(control_queue, &control_packet, portMAX_DELAY) == pdTRUE) {
+        if (xQueueReceive(control_queue, &command, portMAX_DELAY) == pdTRUE) {
+            if (command.type == STEPPER_COMMAND_RELOAD_CONFIG) {
+                ESP_LOGI(TAG, "Reloading stepper board config");
+                ESP_ERROR_CHECK(stepper_apply_board_config());
+                continue;
+            }
+
+            motor_control_t control_packet = command.control;
             ESP_LOGI(TAG, "Control packet: id=%u rpm=%.2f dir=%u duration_ms=%ld",
                      control_packet.id,
                      control_packet.rpm,

@@ -353,7 +353,7 @@ esp_err_t options_handler(httpd_req_t *req)
 httpd_handle_t start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 32;
+    config.max_uri_handlers = 36;
     config.lru_purge_enable = true;
     config.recv_wait_timeout = 30;
     config.send_wait_timeout = 60;
@@ -554,6 +554,20 @@ httpd_handle_t start_webserver(void)
             .user_ctx = NULL,
         };
 
+        httpd_uri_t get_board_config = {
+            .uri = "/api/board-config",
+            .method = HTTP_GET,
+            .handler = board_config_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t post_board_config = {
+            .uri = "/api/board-config",
+            .method = HTTP_POST,
+            .handler = board_config_post_handler,
+            .user_ctx = NULL,
+        };
+
         httpd_uri_t websocket = {
             .uri = "/ws",
             .method = HTTP_GET,
@@ -640,6 +654,8 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &get_woff2);
         httpd_register_uri_handler(server, &get_status);
         httpd_register_uri_handler(server, &get_pumps_runtime);
+        httpd_register_uri_handler(server, &get_board_config);
+        httpd_register_uri_handler(server, &post_board_config);
         httpd_register_uri_handler(server, &websocket);
         httpd_register_uri_handler(server, &get_wifi_scan);
         httpd_register_uri_handler(server, &post_run);

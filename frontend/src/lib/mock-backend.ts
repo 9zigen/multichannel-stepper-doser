@@ -8,6 +8,7 @@ import type {
 
 import type {
   AuthState,
+  BoardConfigState,
   NetworkState,
   PumpRuntimeEntry,
   PumpRunState,
@@ -22,6 +23,7 @@ import { emitMockRealtimeMessage } from '@/lib/realtime-mock.ts';
 
 type MockState = {
   auth: AuthState;
+  boardConfig: BoardConfigState;
   networks: NetworkState[];
   pumps: PumpState[];
   services: ServiceState;
@@ -68,6 +70,18 @@ const initialState: MockState = {
   auth: {
     username: 'admin',
     password: 'admin',
+  },
+  boardConfig: {
+    uart: 2,
+    tx_pin: 22,
+    rx_pin: 21,
+    motors_num: 4,
+    channels: [
+      { id: 0, dir_pin: 12, en_pin: 25, step_pin: 14, micro_steps: 256 },
+      { id: 1, dir_pin: 26, en_pin: 25, step_pin: 27, micro_steps: 256 },
+      { id: 2, dir_pin: 17, en_pin: 25, step_pin: 16, micro_steps: 256 },
+      { id: 3, dir_pin: 32, en_pin: 25, step_pin: 33, micro_steps: 256 },
+    ],
   },
   networks: [
     {
@@ -579,6 +593,22 @@ export const mockAdapter: AxiosAdapter = async (config) => {
     ensureAuthorized(config, method, url, requestBody);
     const payload = parseRequestBody<Partial<SettingsState>>(config.data);
     applySettingsPatch(payload);
+    const mockResponse = response(config, { success: true });
+    debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
+    return mockResponse;
+  }
+
+  if (url === '/api/board-config' && method === 'get') {
+    ensureAuthorized(config, method, url, requestBody);
+    const mockResponse = response(config, clone(state.boardConfig));
+    debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
+    return mockResponse;
+  }
+
+  if (url === '/api/board-config' && method === 'post') {
+    ensureAuthorized(config, method, url, requestBody);
+    const payload = parseRequestBody<BoardConfigState>(config.data);
+    state.boardConfig = clone(payload);
     const mockResponse = response(config, { success: true });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;

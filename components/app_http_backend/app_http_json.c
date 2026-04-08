@@ -210,6 +210,34 @@ char *get_pumps_runtime_json(void)
     return string;
 }
 
+char *get_board_config_json(void)
+{
+    char *string = NULL;
+    cJSON *root = cJSON_CreateObject();
+    stepper_board_config_t *config = get_stepper_board_config();
+
+    cJSON_AddNumberToObject(root, "uart", config->uart);
+    cJSON_AddNumberToObject(root, "tx_pin", config->tx_pin);
+    cJSON_AddNumberToObject(root, "rx_pin", config->rx_pin);
+    cJSON_AddNumberToObject(root, "motors_num", config->motors_num);
+
+    cJSON *channels = cJSON_CreateArray();
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddNumberToObject(item, "id", i);
+        cJSON_AddNumberToObject(item, "dir_pin", config->channels[i].dir_pin);
+        cJSON_AddNumberToObject(item, "en_pin", config->channels[i].en_pin);
+        cJSON_AddNumberToObject(item, "step_pin", config->channels[i].step_pin);
+        cJSON_AddNumberToObject(item, "micro_steps", config->channels[i].micro_steps);
+        cJSON_AddItemToArray(channels, item);
+    }
+
+    cJSON_AddItemToObject(root, "channels", channels);
+    string = cJSON_Print(root);
+    cJSON_Delete(root);
+    return string;
+}
+
 char *get_settings_json(void)
 {
     char *string = NULL;

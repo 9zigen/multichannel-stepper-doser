@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { Home, Network, CalendarClock, LogOut, Cpu, Play, Disc, BookText } from 'lucide-react';
+import { Home, Network, CalendarClock, LogOut, Cpu, Play, Disc, BookText, CircuitBoard } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -36,6 +36,11 @@ const navigation = {
       name: 'Network',
       url: '/settings/network',
       icon: Network,
+    },
+    {
+      name: 'Board',
+      url: '/settings/board',
+      icon: CircuitBoard,
     },
     {
       name: 'Services',

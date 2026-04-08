@@ -31,6 +31,7 @@ services_t service;
 pump_t pump[MAX_PUMP];
 schedule_t schedule[MAX_SCHEDULE];
 auth_t auth;
+stepper_board_config_t stepper_board_config;
 static pump_aging_state_t pump_aging_state;
 
 extern esp_event_loop_handle_t app_event_loop;
@@ -451,6 +452,16 @@ void init_settings()
         ESP_LOGI(TAG, "defauld auth config used.");
         set_default_auth();
     }
+
+    /* Read Stepper Board Config */
+    required_size = sizeof(stepper_board_config_t);
+    ret = app_settings_get_blob("stepper_cfg", &stepper_board_config, &required_size);
+    if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND && ret != ESP_ERR_NVS_INVALID_LENGTH) {
+        ESP_LOGE(TAG, "config not saved yet! error: %s", esp_err_to_name(ret));
+    } else if (ret == ESP_ERR_NVS_NOT_FOUND || ret == ESP_ERR_NVS_INVALID_LENGTH) {
+        ESP_LOGI(TAG, "default stepper board config used.");
+        set_default_stepper_board_config();
+    }
 }
 
 void set_default_network()
@@ -528,6 +539,28 @@ void set_default_auth()
     save_auth();
 }
 
+void set_default_stepper_board_config(void)
+{
+    static const int32_t default_dir_pins[MAX_PUMP] = {GPIO_NUM_12, GPIO_NUM_26, GPIO_NUM_17, GPIO_NUM_32};
+    static const int32_t default_en_pins[MAX_PUMP] = {GPIO_NUM_25, GPIO_NUM_25, GPIO_NUM_25, GPIO_NUM_25};
+    static const int32_t default_step_pins[MAX_PUMP] = {GPIO_NUM_14, GPIO_NUM_27, GPIO_NUM_16, GPIO_NUM_33};
+
+    memset(&stepper_board_config, 0, sizeof(stepper_board_config));
+    stepper_board_config.uart = 2;
+    stepper_board_config.tx_pin = GPIO_NUM_22;
+    stepper_board_config.rx_pin = GPIO_NUM_21;
+    stepper_board_config.motors_num = MAX_PUMP;
+
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        stepper_board_config.channels[i].dir_pin = default_dir_pins[i];
+        stepper_board_config.channels[i].en_pin = default_en_pins[i];
+        stepper_board_config.channels[i].step_pin = default_step_pins[i];
+        stepper_board_config.channels[i].micro_steps = 256;
+    }
+
+    save_stepper_board_config();
+}
+
 void save_network(void)
 {
     esp_err_t err = app_settings_set_blob("network", network, sizeof(network_t) * MAX_NETWORKS, true);
@@ -577,6 +610,14 @@ void save_auth(void)
     }
 }
 
+void save_stepper_board_config(void)
+{
+    esp_err_t err = app_settings_set_blob("stepper_cfg", &stepper_board_config, sizeof(stepper_board_config), true);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save stepper board config.");
+    }
+}
+
 void erase_settings(void) {
     ESP_ERROR_CHECK(nvs_flash_erase());
 }
@@ -610,6 +651,11 @@ schedule_t *get_schedule_config(uint8_t schedule_id)
 
 auth_t *get_auth_config(void) {
     return &auth;
+}
+
+stepper_board_config_t *get_stepper_board_config(void)
+{
+    return &stepper_board_config;
 }
 
 void ip_to_string(uint8_t ip[4], char *string) {
