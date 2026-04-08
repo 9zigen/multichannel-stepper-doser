@@ -31,6 +31,24 @@ static void format_iso_time(const datetime_t *datetime, char *buffer, size_t siz
     snprintf(buffer, size, "%02u:%02u:%02u", datetime->hour, datetime->min, datetime->sec);
 }
 
+static void format_day_stamp(uint32_t day_stamp, char *buffer, size_t size)
+{
+    if (day_stamp == 0) {
+        strlcpy(buffer, "", size);
+        return;
+    }
+
+    struct tm timeinfo = {
+        .tm_year = (int)(day_stamp / 1000U) - 1900,
+        .tm_mon = 0,
+        .tm_mday = 1,
+    };
+    time_t raw = mktime(&timeinfo);
+    raw += (time_t)((day_stamp % 1000U) * 24U * 60U * 60U);
+    localtime_r(&raw, &timeinfo);
+    strftime(buffer, size, "%Y-%m-%d", &timeinfo);
+}
+
 char *get_status_json(void)
 {
     char *string = NULL;
@@ -205,6 +223,68 @@ char *get_pumps_runtime_json(void)
     }
 
     cJSON_AddItemToObject(root, "pumps", runtime);
+    string = cJSON_Print(root);
+    cJSON_Delete(root);
+    return string;
+}
+
+char *get_pumps_history_json(void)
+{
+    char *string = NULL;
+    cJSON *root = cJSON_CreateObject();
+    cJSON *pumps_json = cJSON_CreateArray();
+    const uint32_t current_day_stamp = app_pumps_history_get_current_day_stamp();
+
+    cJSON_AddItemToObject(root, "retention_days", cJSON_CreateNumber(APP_PUMP_HISTORY_RETAINED_DAYS));
+    cJSON_AddItemToObject(root, "current_day_stamp", cJSON_CreateNumber(current_day_stamp));
+
+    for (uint8_t pump_id = 0; pump_id < MAX_PUMP; ++pump_id) {
+        cJSON *pump_json = cJSON_CreateObject();
+        cJSON *days_json = cJSON_CreateArray();
+        pump_t *pump_config = get_pump_config(pump_id);
+
+        cJSON_AddItemToObject(pump_json, "id", cJSON_CreateNumber(pump_id));
+        cJSON_AddItemToObject(pump_json, "name", cJSON_CreateString(pump_config->name));
+
+        for (int offset = APP_PUMP_HISTORY_RETAINED_DAYS - 1; offset >= 0; --offset) {
+            if (current_day_stamp < (uint32_t)offset) {
+                continue;
+            }
+
+            const uint32_t day_stamp = current_day_stamp - (uint32_t)offset;
+            pump_history_day_t day = {0};
+            if (!app_pumps_history_get_day(pump_id, day_stamp, &day)) {
+                continue;
+            }
+
+            cJSON *day_json = cJSON_CreateObject();
+            cJSON *hours_json = cJSON_CreateArray();
+            char date_string[16];
+
+            format_day_stamp(day.day_stamp, date_string, sizeof(date_string));
+            cJSON_AddItemToObject(day_json, "day_stamp", cJSON_CreateNumber(day.day_stamp));
+            cJSON_AddItemToObject(day_json, "date", cJSON_CreateString(date_string));
+
+            for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
+                const pump_history_hour_t *slot = &day.hours[hour];
+                cJSON *hour_json = cJSON_CreateObject();
+                cJSON_AddItemToObject(hour_json, "hour", cJSON_CreateNumber(hour));
+                cJSON_AddItemToObject(hour_json, "scheduled_volume_ml", cJSON_CreateNumber(slot->scheduled_volume_ml));
+                cJSON_AddItemToObject(hour_json, "manual_volume_ml", cJSON_CreateNumber(slot->manual_volume_ml));
+                cJSON_AddItemToObject(hour_json, "total_runtime_s", cJSON_CreateNumber(slot->total_runtime_s));
+                cJSON_AddItemToObject(hour_json, "flags", cJSON_CreateNumber(slot->flags));
+                cJSON_AddItemToArray(hours_json, hour_json);
+            }
+
+            cJSON_AddItemToObject(day_json, "hours", hours_json);
+            cJSON_AddItemToArray(days_json, day_json);
+        }
+
+        cJSON_AddItemToObject(pump_json, "days", days_json);
+        cJSON_AddItemToArray(pumps_json, pump_json);
+    }
+
+    cJSON_AddItemToObject(root, "pumps", pumps_json);
     string = cJSON_Print(root);
     cJSON_Delete(root);
     return string;

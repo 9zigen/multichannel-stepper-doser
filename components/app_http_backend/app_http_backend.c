@@ -554,6 +554,20 @@ httpd_handle_t start_webserver(void)
             .user_ctx = NULL,
         };
 
+        httpd_uri_t get_pumps_history = {
+            .uri = "/api/pumps/history",
+            .method = HTTP_GET,
+            .handler = pumps_history_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t post_pumps_history_backup = {
+            .uri = "/api/pumps/history/backup",
+            .method = HTTP_POST,
+            .handler = pumps_history_backup_post_handler,
+            .user_ctx = NULL,
+        };
+
         httpd_uri_t get_board_config = {
             .uri = "/api/board-config",
             .method = HTTP_GET,
@@ -654,12 +668,14 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &get_woff2);
         httpd_register_uri_handler(server, &get_status);
         httpd_register_uri_handler(server, &get_pumps_runtime);
+        httpd_register_uri_handler(server, &get_pumps_history);
         httpd_register_uri_handler(server, &get_board_config);
         httpd_register_uri_handler(server, &post_board_config);
         httpd_register_uri_handler(server, &websocket);
         httpd_register_uri_handler(server, &get_wifi_scan);
         httpd_register_uri_handler(server, &post_run);
         httpd_register_uri_handler(server, &post_calibrate);
+        httpd_register_uri_handler(server, &post_pumps_history_backup);
         httpd_register_uri_handler(server, &get_schedule);
         httpd_register_uri_handler(server, &post_schedule);
         httpd_register_uri_handler(server, &get_settings);

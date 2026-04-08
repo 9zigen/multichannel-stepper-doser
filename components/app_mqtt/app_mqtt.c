@@ -305,6 +305,53 @@ static void publish_all_pump_states(void)
     }
 }
 
+static void publish_today_history(void)
+{
+    if (!s_mqtt_connected) {
+        return;
+    }
+
+    services_t *services = get_service_config();
+    char topic_base[48];
+    char topic[128];
+    cJSON *root = cJSON_CreateObject();
+    cJSON *pumps_json = cJSON_CreateArray();
+    const uint32_t day_stamp = app_pumps_history_get_current_day_stamp();
+
+    build_topic_base(topic_base, sizeof(topic_base));
+    snprintf(topic, sizeof(topic), "%s/history/today", topic_base);
+
+    cJSON_AddNumberToObject(root, "day_stamp", (double)day_stamp);
+
+    for (uint8_t pump_id = 0; pump_id < MAX_PUMP; ++pump_id) {
+        pump_history_day_t day = {0};
+        if (!app_pumps_history_get_today(pump_id, &day)) {
+            continue;
+        }
+
+        cJSON *pump_json = cJSON_CreateObject();
+        cJSON *hours_json = cJSON_CreateArray();
+
+        cJSON_AddNumberToObject(pump_json, "id", pump_id);
+        for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
+            const pump_history_hour_t *slot = &day.hours[hour];
+            cJSON *hour_json = cJSON_CreateObject();
+            cJSON_AddNumberToObject(hour_json, "hour", hour);
+            cJSON_AddNumberToObject(hour_json, "scheduled_volume_ml", slot->scheduled_volume_ml);
+            cJSON_AddNumberToObject(hour_json, "manual_volume_ml", slot->manual_volume_ml);
+            cJSON_AddNumberToObject(hour_json, "total_runtime_s", slot->total_runtime_s);
+            cJSON_AddNumberToObject(hour_json, "flags", slot->flags);
+            cJSON_AddItemToArray(hours_json, hour_json);
+        }
+
+        cJSON_AddItemToObject(pump_json, "hours", hours_json);
+        cJSON_AddItemToArray(pumps_json, pump_json);
+    }
+
+    cJSON_AddItemToObject(root, "pumps", pumps_json);
+    publish_json_topic(topic, root, services->mqtt_qos, services->mqtt_retain);
+}
+
 static void publish_discovery_if_needed(void)
 {
     if (!s_mqtt_connected || s_discovery_published) {
@@ -370,6 +417,30 @@ static void handle_restart_command(void)
     ESP_LOGI(TAG, "MQTT restart command received");
     vTaskDelay(pdMS_TO_TICKS(200));
     esp_restart();
+}
+
+static void handle_history_backup_command(void)
+{
+    services_t *services = get_service_config();
+    char topic_base[48];
+    char topic[128];
+    size_t written_days = 0;
+    cJSON *root = cJSON_CreateObject();
+
+    build_topic_base(topic_base, sizeof(topic_base));
+    snprintf(topic, sizeof(topic), "%s/history/backup/status", topic_base);
+
+    esp_err_t err = app_pumps_history_backup(&written_days);
+    cJSON_AddBoolToObject(root, "success", err == ESP_OK);
+    cJSON_AddNumberToObject(root, "written_days", (double)written_days);
+    if (err != ESP_OK) {
+        cJSON_AddStringToObject(root, "error", esp_err_to_name(err));
+    }
+
+    publish_json_topic(topic, root, services->mqtt_qos, services->mqtt_retain);
+    if (err == ESP_OK) {
+        publish_today_history();
+    }
 }
 
 static void handle_pump_run_command(uint8_t pump_id, const char *payload)
@@ -439,6 +510,14 @@ static void handle_incoming_message(esp_mqtt_event_handle_t event)
         return;
     }
 
+    snprintf(expected, sizeof(expected), "%s/command/history_backup", topic_base);
+    if (strcmp(topic, expected) == 0) {
+        if (strcmp(data, "backup") == 0 || strcmp(data, "1") == 0 || strcmp(data, "true") == 0) {
+            handle_history_backup_command();
+        }
+        return;
+    }
+
     snprintf(expected, sizeof(expected), "%s/pumps/%%u/run", topic_base);
     if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
         handle_pump_run_command((uint8_t)pump_id, data);
@@ -502,6 +581,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             publish_discovery_if_needed();
             publish_status();
             publish_all_pump_states();
+            publish_today_history();
             if (s_status_timer != NULL) {
                 xTimerStart(s_status_timer, 0);
             }
@@ -536,6 +616,7 @@ static void on_pump_runtime_event(void *arg, esp_event_base_t event_base, int32_
 
     const pump_runtime_event_t *runtime = (const pump_runtime_event_t *)event_data;
     publish_pump_state(runtime->pump_id);
+    publish_today_history();
 }
 
 static esp_err_t create_client(void)

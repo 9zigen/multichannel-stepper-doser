@@ -298,6 +298,51 @@ esp_err_t pumps_runtime_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t pumps_history_get_handler(httpd_req_t *req)
+{
+    if (app_http_validate_request(req) != ESP_OK) {
+        send_unauthorized(req);
+        return ESP_OK;
+    }
+
+    app_http_set_cors_headers(req);
+    char *response = get_pumps_history_json();
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
+    return ESP_OK;
+}
+
+esp_err_t pumps_history_backup_post_handler(httpd_req_t *req)
+{
+    if (app_http_validate_request(req) != ESP_OK) {
+        send_unauthorized(req);
+        return ESP_OK;
+    }
+
+    app_http_set_cors_headers(req);
+
+    size_t written_days = 0;
+    if (app_pumps_history_backup(&written_days) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to backup pump history");
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddBoolToObject(root, "success", true);
+    cJSON_AddNumberToObject(root, "written_days", (double)written_days);
+    char *response = cJSON_Print(root);
+    cJSON_Delete(root);
+    if (response == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to build response");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
+    return ESP_OK;
+}
+
 esp_err_t websocket_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
