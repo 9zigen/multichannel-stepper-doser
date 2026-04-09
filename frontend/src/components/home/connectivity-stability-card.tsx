@@ -21,7 +21,7 @@ const ConnectivityStabilityCard = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="grid flex-1 gap-4">
-        <div className="rounded-2xl border border-white/45 bg-gradient-to-br from-card via-card to-secondary/30 p-4 shadow-sm">
+        <div className="rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 p-4 -mx-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-medium">
             <Wifi className="size-4 text-primary" />
             Wi-Fi health

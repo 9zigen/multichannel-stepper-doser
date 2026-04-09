@@ -51,25 +51,27 @@ const Home: React.FC = (): React.ReactElement => {
             }}
           />
         </div>
-
-        <div className="xl:col-span-5 xl:h-full">
-          <PumpControlCard pumps={pumps} />
-        </div>
-
-        <div className="xl:col-span-4 xl:h-full">
-          <MaintenanceActionsCard />
-        </div>
-
+        
         <div className="xl:col-span-3 xl:h-full">
-          <SystemCard deviceStatus={deviceStatus} />
-        </div>
-
-        <div className="xl:col-span-3 xl:h-full">
-          <ConnectivityStabilityCard deviceStatus={deviceStatus} />
-        </div>
-
-        <div className="xl:col-span-9 xl:h-full">
           <PumpHistoryTodayCard pumps={pumps} />
+        </div>
+
+        <div className="xl:col-span-6 grid grid-cols-12 gap-6">
+          <div className="xl:col-span-12">
+            <PumpControlCard pumps={pumps} />
+          </div>
+          
+          <div className="xl:col-span-6 xl:h-full">
+            <SystemCard deviceStatus={deviceStatus} />
+          </div>
+          
+          <div className="xl:col-span-6 xl:h-full">
+            <ConnectivityStabilityCard deviceStatus={deviceStatus} />
+          </div>
+          
+          <div className="xl:col-span-12 xl:h-full">
+            <MaintenanceActionsCard />
+          </div>
         </div>
       </section>
     </div>

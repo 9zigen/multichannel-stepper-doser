@@ -30,7 +30,7 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
-        <div className="rounded-2xl border border-white/45 bg-linear-to-br from-accent/20 via-card to-card p-5 shadow-sm">
+        <div className="rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 p-4 -mx-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 font-medium">
               <Activity className="size-4 text-muted-foreground" />
@@ -62,7 +62,7 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
           </div>
         </div>
 
-        <Alert className="border-white/45 bg-linear-to-br from-card via-card to-accent/10 shadow-sm">
+        <Alert className="border-white/10 bg-linear-to-br from-card via-card to-accent/10">
           <TimerReset />
           <AlertTitle>Aging control</AlertTitle>
           <AlertDescription>
