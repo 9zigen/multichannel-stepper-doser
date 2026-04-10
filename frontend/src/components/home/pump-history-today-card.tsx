@@ -162,7 +162,7 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
             {busiestHours.length > 0 && (
               <>
                 <Separator />
-                <div className="space-y-1.5">
+                <div className="grid gap-3 text-sm">
                   <div className="text-xs text-muted-foreground">Busiest hours</div>
                   {busiestHours.map((hour) => (
                     <div key={hour.hour} className="flex items-center justify-between text-sm">
