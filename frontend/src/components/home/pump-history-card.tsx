@@ -78,7 +78,7 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
             )}
           </div>
 
-          <div className="rounded-2xl border border-border bg-gradient-to-br from-card via-card to-accent/10 p-4 shadow-sm">
+          <div className="rounded-2xl border border-border bg-linear-to-br from-card via-card to-accent/10 p-4 shadow-sm">
             {loading ? <DayDetailSkeleton /> : <DayDetail day={selectedDay} />}
           </div>
         </div>

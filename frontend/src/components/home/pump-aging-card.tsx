@@ -68,20 +68,20 @@ const PumpAgingCard = ({
                     className="animate-fade-in-up border-b border-border/50 last:border-0"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <td className="whitespace-nowrap py-3 pr-4">
+                    <td className="whitespace-nowrap py-2 pr-4">
                       <span className="font-medium">{pump.name}</span>
                     </td>
-                    <td className="whitespace-nowrap py-3 px-4 text-right">
+                    <td className="whitespace-nowrap py-2 px-4 text-right">
                       <Badge variant={wear.variant} className="font-semibold tabular-nums">
                         {pump.running_hours.toFixed(1)} h
                       </Badge>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-4">
                       <div className="flex items-center gap-3">
                         <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
                           <div
                             className={cn(
-                              'h-full rounded-full bg-gradient-to-r transition-all',
+                              'h-full rounded-full bg-linear-to-r transition-all',
                               wear.barClass
                             )}
                             style={{ width: `${Math.max(agingProgress, agingProgress > 0 ? 6 : 0)}%` }}
@@ -108,7 +108,7 @@ const PumpAgingCard = ({
                         </span>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap py-3 px-4 text-right">
+                    <td className="whitespace-nowrap py-2 px-4 text-right">
                       <span className={cn(
                         'tabular-nums',
                         tankPercent <= 15 ? 'font-semibold text-destructive' :
@@ -118,12 +118,12 @@ const PumpAgingCard = ({
                         {tankPercent}%
                       </span>
                     </td>
-                    <td className="whitespace-nowrap py-3 px-4 text-center">
+                    <td className="whitespace-nowrap py-2 px-4 text-center">
                       <Badge variant={pump.state ? 'default' : 'outline'} className="text-xs">
                         {pump.state ? 'On' : 'Off'}
                       </Badge>
                     </td>
-                    <td className="whitespace-nowrap py-3 pl-4 text-right">
+                    <td className="whitespace-nowrap py-2 pl-4 text-right">
                       <Button
                         type="button"
                         variant="ghost"

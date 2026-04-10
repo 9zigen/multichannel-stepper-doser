@@ -62,7 +62,7 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
           </div>
         </div>
 
-        <Alert className="border-border/40 bg-linear-to-br from-card via-card to-accent/10">
+        <Alert>
           <TimerReset />
           <AlertTitle>Aging control</AlertTitle>
           <AlertDescription>

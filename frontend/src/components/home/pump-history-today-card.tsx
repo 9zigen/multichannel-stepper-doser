@@ -135,7 +135,7 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
               })}
             </div>
 
-            <div className="grid gap-2 text-sm">
+            <div className="grid gap-3 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <span className="flex items-center gap-2 text-muted-foreground">
                   <Droplets className="size-3.5" />

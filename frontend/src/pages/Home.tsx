@@ -36,8 +36,8 @@ const Home: React.FC = (): React.ReactElement => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
-      <section className="container grid gap-6 px-4 md:px-4 xl:grid-cols-12">
+    <div className="flex flex-col gap-8 py-4 md:py-6">
+      <section className="mx-auto grid w-full max-w-screen-2xl gap-6 px-4 xl:grid-cols-12">
         <div className="xl:col-span-3 xl:row-span-3 xl:h-full">
           <DeviceOverviewCard pumps={pumps} deviceStatus={deviceStatus} />
         </div>
@@ -56,20 +56,20 @@ const Home: React.FC = (): React.ReactElement => {
           <PumpHistoryTodayCard pumps={pumps} />
         </div>
 
-        <div className="xl:col-span-6 grid grid-cols-12 gap-6">
-          <div className="xl:col-span-12">
+        <div className="grid gap-6 md:grid-cols-2 xl:col-span-6 xl:grid-cols-12">
+          <div className="md:col-span-2 xl:col-span-12">
             <PumpControlCard pumps={pumps} />
           </div>
-          
-          <div className="xl:col-span-6 xl:h-full">
+
+          <div className="md:col-span-1 xl:col-span-6 xl:h-full">
             <SystemCard deviceStatus={deviceStatus} />
           </div>
-          
-          <div className="xl:col-span-6 xl:h-full">
+
+          <div className="md:col-span-1 xl:col-span-6 xl:h-full">
             <ConnectivityStabilityCard deviceStatus={deviceStatus} />
           </div>
-          
-          <div className="xl:col-span-12 xl:h-full">
+
+          <div className="md:col-span-2 xl:col-span-12 xl:h-full">
             <MaintenanceActionsCard />
           </div>
         </div>

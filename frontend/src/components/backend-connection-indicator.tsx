@@ -18,8 +18,8 @@ export function BackendConnectionIndicator(): React.ReactElement {
 
   if (status === 'connected') {
     return (
-      <Badge variant="outline" className="gap-2 border-emerald-500/30 bg-emerald-500/10 text-emerald-700">
-        <span className="size-2 rounded-full bg-emerald-500" />
+      <Badge variant="outline" className="gap-2 border-border bg-secondary/60 text-foreground">
+        <span className="size-2 rounded-full bg-primary" />
         {labels[status]}
       </Badge>
     );

@@ -29,7 +29,7 @@ export function CalibrationStatusIndicator(): React.ReactElement | null {
 
   return (
     <div className="flex items-center gap-2">
-      <Badge variant="outline" className="gap-2 border-amber-500/30 bg-amber-500/10 text-amber-700">
+      <Badge variant="outline" className="gap-2 border-border bg-secondary/60 text-foreground">
         <FlaskConical className="size-4" />
         {pumpName} calibrating
       </Badge>
