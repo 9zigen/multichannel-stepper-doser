@@ -13,16 +13,14 @@ type PumpAgingCardProps = {
   onResetPumpCounter: (pumpId: number) => void;
 };
 
-const formatHours = (value: number) => `${value.toFixed(1)} h`;
-
-const formatAgingStatus = (runningHours: number, warningHours: number, replaceHours: number) => {
-  if (runningHours >= replaceHours) {
-    return 'Replacement due';
+const getWearStatus = (hours: number, warningHours: number, replaceHours: number) => {
+  if (hours >= replaceHours) {
+    return { label: 'Replace', variant: 'destructive' as const, barClass: 'from-destructive to-destructive/70' };
   }
-  if (runningHours >= warningHours) {
-    return 'Service suggested';
+  if (hours >= warningHours) {
+    return { label: 'Warning', variant: 'secondary' as const, barClass: 'from-amber-500 to-amber-400' };
   }
-  return 'Nominal';
+  return { label: 'Nominal', variant: 'outline' as const, barClass: 'from-primary via-primary/85 to-accent' };
 };
 
 const PumpAgingCard = ({
@@ -31,97 +29,118 @@ const PumpAgingCard = ({
   onResetPumpCounter,
 }: PumpAgingCardProps): React.ReactElement => {
   return (
-    <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg">
+    <Card className="overflow-hidden border-border bg-card shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl">Pump Aging</CardTitle>
+        <CardTitle className="text-lg">Pump Aging</CardTitle>
         <CardDescription>
-          Track head wear and reset the running-hours counter after replacing tubing, rotor, or dosing line
-          components.
+          Track head wear and reset the running-hours counter after replacing tubing, rotor, or dosing line components.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-6 sm:grid-cols-2 2xl:grid-cols-4">
-          {pumps.map((pump) => {
-            const percentage = pump.tank_full_vol > 0 ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100) : 0;
-            const warning = pump.running_hours >= pump.aging.warning_hours;
-            const replacementDue = pump.running_hours >= pump.aging.replace_hours;
-            const agingProgress =
-              pump.aging.replace_hours > 0 ? Math.max(8, Math.min((pump.running_hours / pump.aging.replace_hours) * 100, 100)) : 8;
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="whitespace-nowrap py-2 pr-4 text-left font-medium">Pump</th>
+                <th className="whitespace-nowrap py-2 px-4 text-right font-medium">Hours</th>
+                <th className="whitespace-nowrap py-2 px-4 text-left font-medium min-w-[180px]">Wear</th>
+                <th className="whitespace-nowrap py-2 px-4 text-right font-medium">Tank</th>
+                <th className="whitespace-nowrap py-2 px-4 text-center font-medium">Status</th>
+                <th className="whitespace-nowrap py-2 pl-4 text-right font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pumps.map((pump, index) => {
+                const tankPercent = pump.tank_full_vol > 0
+                  ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100)
+                  : 0;
+                const wear = getWearStatus(pump.running_hours, pump.aging.warning_hours, pump.aging.replace_hours);
+                const agingProgress = pump.aging.replace_hours > 0
+                  ? Math.min((pump.running_hours / pump.aging.replace_hours) * 100, 100)
+                  : 0;
+                const warningMark = pump.aging.replace_hours > 0
+                  ? (pump.aging.warning_hours / pump.aging.replace_hours) * 100
+                  : 0;
 
-            return (
-              <Card
-                key={pump.id}
-                className={cn(
-                  'overflow-hidden border-white/45 bg-gradient-to-br from-card via-card to-secondary/25 shadow-md',
-                  warning && 'to-destructive/10'
-                )}
-              >
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex flex-col gap-2">
-                      <CardTitle className="text-lg">{pump.name}</CardTitle>
-                      <CardDescription className="flex flex-wrap items-center gap-2">
-                        <Badge variant="secondary">{percentage}% full</Badge>
-                        <Badge variant={pump.state ? 'default' : 'outline'}>{pump.state ? 'Enabled' : 'Disabled'}</Badge>
-                      </CardDescription>
-                    </div>
-                    <Badge variant={replacementDue ? 'destructive' : warning ? 'secondary' : 'outline'}>
-                      {formatHours(pump.running_hours)}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                      <span>Wear estimate</span>
-                      <span>{formatAgingStatus(pump.running_hours, pump.aging.warning_hours, pump.aging.replace_hours)}</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={cn(
-                          'h-full rounded-full bg-gradient-to-r transition-all',
-                          replacementDue
-                            ? 'from-destructive to-destructive/70'
-                            : warning
-                              ? 'from-amber-500 to-amber-400'
-                              : 'from-primary via-primary/85 to-accent'
-                        )}
-                        style={{ width: `${agingProgress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">Current volume</span>
-                      <span className="font-medium">{pump.tank_current_vol.toFixed(0)} ml</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">Calibration points</span>
-                      <span className="font-medium">{pump.calibration.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">Warning / replace</span>
-                      <span className="font-medium">
-                        {pump.aging.warning_hours}h / {pump.aging.replace_hours}h
-                      </span>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={resettingPumpId === pump.id}
-                    onClick={() => onResetPumpCounter(pump.id)}
+                return (
+                  <tr
+                    key={pump.id}
+                    className="animate-fade-in-up border-b border-border/50 last:border-0"
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <TimerReset data-icon="inline-start" />
-                    {resettingPumpId === pump.id ? 'Resetting...' : 'Reset running hours'}
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
+                    <td className="whitespace-nowrap py-3 pr-4">
+                      <span className="font-medium">{pump.name}</span>
+                    </td>
+                    <td className="whitespace-nowrap py-3 px-4 text-right">
+                      <Badge variant={wear.variant} className="font-semibold tabular-nums">
+                        {pump.running_hours.toFixed(1)} h
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={cn(
+                              'h-full rounded-full bg-gradient-to-r transition-all',
+                              wear.barClass
+                            )}
+                            style={{ width: `${Math.max(agingProgress, agingProgress > 0 ? 6 : 0)}%` }}
+                          />
+                          {warningMark > 0 && warningMark < 100 && (
+                            <div
+                              className="absolute top-0 h-full w-0.5 bg-amber-500/70"
+                              style={{ left: `${warningMark}%` }}
+                              title={`Warning at ${pump.aging.warning_hours}h`}
+                            />
+                          )}
+                          <div
+                            className="absolute top-0 right-0 h-full w-0.5 bg-destructive/70"
+                            title={`Replace at ${pump.aging.replace_hours}h`}
+                          />
+                        </div>
+                        <span className={cn(
+                          'w-16 text-right text-xs',
+                          wear.variant === 'destructive' ? 'font-semibold text-destructive' :
+                          wear.variant === 'secondary' ? 'font-medium text-amber-600' :
+                          'text-muted-foreground'
+                        )}>
+                          {wear.label}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap py-3 px-4 text-right">
+                      <span className={cn(
+                        'tabular-nums',
+                        tankPercent <= 15 ? 'font-semibold text-destructive' :
+                        tankPercent <= 30 ? 'font-medium text-amber-600' :
+                        'text-muted-foreground'
+                      )}>
+                        {tankPercent}%
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap py-3 px-4 text-center">
+                      <Badge variant={pump.state ? 'default' : 'outline'} className="text-xs">
+                        {pump.state ? 'On' : 'Off'}
+                      </Badge>
+                    </td>
+                    <td className="whitespace-nowrap py-3 pl-4 text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        disabled={resettingPumpId === pump.id}
+                        title="Reset running hours"
+                        onClick={() => onResetPumpCounter(pump.id)}
+                      >
+                        <TimerReset className={cn('size-4', resettingPumpId === pump.id && 'animate-spin')} />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>

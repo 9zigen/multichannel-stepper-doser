@@ -13,7 +13,7 @@ const ConnectivityStabilityCard = ({
   deviceStatus,
 }: ConnectivityStabilityCardProps): React.ReactElement => {
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-white/45 bg-card/82 shadow-lg">
+    <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
       <CardHeader>
         <CardTitle className="text-lg">Connectivity Stability</CardTitle>
         <CardDescription>

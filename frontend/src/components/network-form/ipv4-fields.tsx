@@ -47,7 +47,7 @@ const IPv4Fields = (props: Ipv4Props): React.ReactElement => {
   return (
     <React.Fragment>
       {isWifi ? (
-        <Card className="mb-6 overflow-hidden border-white/45 bg-card/70 shadow-none">
+        <Card className="mb-6 overflow-hidden border-border bg-card/70 shadow-none">
           <CardHeader className="pb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -111,7 +111,7 @@ const IPv4Fields = (props: Ipv4Props): React.ReactElement => {
                 Keep the device access point active while joining your router. This improves first-time provisioning and
                 gives you a fallback path if the station link is unstable.
               </div>
-              <div className="flex items-center justify-between gap-4 rounded-lg border bg-card/80 px-3 py-3">
+              <div className="flex items-center justify-between gap-4 rounded-lg border bg-card px-3 py-3">
                 <div>
                   <div className="text-sm font-medium">Simultaneous AP + Station mode</div>
                   <div className="text-xs text-muted-foreground">

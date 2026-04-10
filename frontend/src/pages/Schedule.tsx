@@ -1,114 +1,129 @@
 import React from 'react';
+import { ChevronDown, CalendarClock, Clock3, Waves } from 'lucide-react';
 
 import { useAppStore } from '@/hooks/use-store.ts';
 import ScheduleForm from '@/components/schedule-form.tsx';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarClock, Clock3, Droplets, Waves } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import { SCHEDULE_MODE } from '@/lib/api.ts';
 
-const modeBadge = {
+const modeConfig = {
   [SCHEDULE_MODE.OFF]: { label: 'Off', variant: 'outline' as const, icon: Clock3 },
   [SCHEDULE_MODE.PERIODIC]: { label: 'Periodic', variant: 'secondary' as const, icon: CalendarClock },
   [SCHEDULE_MODE.CONTINUOUS]: { label: 'Continuous', variant: 'default' as const, icon: Waves },
+};
+
+const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const formatHourRange = (hours: number[]) => {
+  if (hours.length === 0) {
+    return 'No hours';
+  }
+  if (hours.length > 6) {
+    return `${hours.length} hours`;
+  }
+
+  return hours
+    .slice()
+    .sort((a, b) => a - b)
+    .map((h) => `${String(h).padStart(2, '0')}`)
+    .join(', ');
+};
+
+const formatWeekdays = (days: number[]) => {
+  if (days.length === 0) {
+    return 'No days';
+  }
+  if (days.length === 7) {
+    return 'Every day';
+  }
+
+  return days
+    .slice()
+    .sort((a, b) => a - b)
+    .map((d) => weekdayLabels[d])
+    .join(', ');
 };
 
 const Schedule: React.FC = (): React.ReactElement => {
   const appStore = useAppStore();
   const { settings } = appStore;
   const { pumps } = settings;
-  const periodicCount = pumps.filter((pump) => pump.schedule.mode === SCHEDULE_MODE.PERIODIC).length;
-  const continuousCount = pumps.filter((pump) => pump.schedule.mode === SCHEDULE_MODE.CONTINUOUS).length;
+  const [openId, setOpenId] = React.useState<number | null>(pumps[0]?.id ?? null);
 
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
-      <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
+      <section className="container grid gap-6 px-4 md:px-4">
+        <Card className="overflow-hidden border-border bg-card shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl">Scheduler Overview</CardTitle>
+            <CardTitle className="text-lg">Pump Schedules</CardTitle>
             <CardDescription>
-              Each pump can be disabled, run continuously, or follow a periodic dosing plan.
+              Configure dosing mode for each pump. Tap a row to expand its settings.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="rounded-xl border border-white/10 bg-linear-to-br from-accent/20 via-card to-card p-6 shadow-sm dark:shadow-none">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 font-medium">
-                  <CalendarClock className="size-4 text-muted-foreground" />
-                  Active modes
-                </div>
-                <Badge variant="secondary">{pumps.length} pumps</Badge>
-              </div>
-              <div className="grid gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-3">
-                  <span>Periodic plans</span>
-                  <Badge variant="secondary">{periodicCount}</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Continuous dosing</span>
-                  <Badge variant="default">{continuousCount}</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Disabled pumps</span>
-                  <Badge variant="outline">{pumps.length - periodicCount - continuousCount}</Badge>
-                </div>
-              </div>
-            </div>
+          <CardContent className="space-y-2">
+            {pumps.map((pump, index) => {
+              const mode = modeConfig[pump.schedule.mode];
+              const ModeIcon = mode.icon;
+              const isOpen = openId === pump.id;
 
-            <Alert className="border-white/10 bg-linear-to-br from-card via-card to-accent/10 p-6 shadow-sm dark:shadow-none">
-              <CalendarClock />
-              <AlertTitle>Modern scheduling pattern</AlertTitle>
-              <AlertDescription>
-                Use visible mode chips instead of a dropdown. The operator should understand the state before opening
-                the fine-grained controls.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
-          <CardHeader>
-            <CardTitle className="text-xl">Schedules</CardTitle>
-            <CardDescription>
-              Each card shows the current schedule mode first, then reveals only the controls relevant to that mode.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-6 sm:grid-cols-1 2xl:grid-cols-2">
-              {pumps?.map((pump) => {
-                const percentage = (pump.tank_current_vol / pump.tank_full_vol) * 100;
-                const mode = modeBadge[pump.schedule.mode];
-                const ModeIcon = mode.icon;
-                return (
-                  <Card
-                    key={pump.id}
-                    className="overflow-hidden border-white/45 bg-linear-to-br from-card via-card to-secondary/30 shadow-md"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex flex-col gap-2">
-                          <CardTitle>{pump.name}</CardTitle>
-                          <CardDescription className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">
-                              <Droplets data-icon="inline-start" />
-                              {Math.round(percentage)}%
-                            </Badge>
-                            <Badge variant={mode.variant}>
-                              <ModeIcon data-icon="inline-start" />
-                              {mode.label}
-                            </Badge>
-                          </CardDescription>
-                        </div>
+              return (
+                <Collapsible
+                  key={pump.id}
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: `${index * 60}ms` }}
+                  open={isOpen}
+                  onOpenChange={(open) => setOpenId(open ? pump.id : null)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex w-full items-center gap-4 rounded-xl border border-border bg-gradient-to-br from-card via-card to-secondary/20 px-4 py-3 text-left transition-all hover:bg-accent/5',
+                        isOpen && 'rounded-b-none border-b-0 bg-accent/5'
+                      )}
+                    >
+                      <div className="flex flex-1 items-center gap-3">
+                        <span className="text-sm font-semibold">{pump.name}</span>
+                        <Badge variant={mode.variant} className="gap-1 text-xs">
+                          <ModeIcon className="size-3" />
+                          {mode.label}
+                        </Badge>
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <ScheduleForm pump={pump} />
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+
+                      <div className="hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
+                        {pump.schedule.mode === SCHEDULE_MODE.PERIODIC && (
+                          <>
+                            <span>{pump.schedule.volume} ml/day</span>
+                            <span>{pump.schedule.speed} rpm</span>
+                            <span>{formatHourRange(pump.schedule.work_hours)}</span>
+                            <span>{formatWeekdays(pump.schedule.weekdays)}</span>
+                          </>
+                        )}
+                        {pump.schedule.mode === SCHEDULE_MODE.CONTINUOUS && (
+                          <span>{pump.schedule.speed} rpm</span>
+                        )}
+                      </div>
+
+                      <ChevronDown
+                        className={cn(
+                          'size-4 shrink-0 text-muted-foreground transition-transform',
+                          isOpen && 'rotate-180'
+                        )}
+                      />
+                    </button>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+                    <div className="rounded-b-xl border border-t-0 border-border bg-gradient-to-br from-card via-card to-secondary/10 px-4 pb-4 pt-2">
+                      <ScheduleForm pump={pump} success={() => {}} />
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </CardContent>
         </Card>
       </section>

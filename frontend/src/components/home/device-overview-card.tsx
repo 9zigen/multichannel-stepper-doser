@@ -22,7 +22,7 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
   const totalRunningHours = useMemo(() => pumps.reduce((sum, pump) => sum + pump.running_hours, 0), [pumps]);
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-white/45 bg-card/82 shadow-lg">
+    <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
       <CardHeader>
         <CardTitle className="text-xl">Device Overview</CardTitle>
         <CardDescription>
@@ -62,7 +62,7 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
           </div>
         </div>
 
-        <Alert className="border-white/10 bg-linear-to-br from-card via-card to-accent/10">
+        <Alert className="border-border/40 bg-linear-to-br from-card via-card to-accent/10">
           <TimerReset />
           <AlertTitle>Aging control</AlertTitle>
           <AlertDescription>

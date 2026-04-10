@@ -194,7 +194,7 @@ export default function PumpControlCard(props: PumpControlProps) {
   }
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-white/45 bg-card/82 shadow-lg">
+    <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
       <CardHeader>
         <CardTitle>Pump Control</CardTitle>
         <CardDescription>Manual control of pumps with live runtime feedback and immediate stop support.</CardDescription>

@@ -40,7 +40,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
       <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
+        <Card className="overflow-hidden border-border bg-card shadow-lg animate-in fade-in zoom-in">
           <CardHeader>
             <CardTitle className="text-xl">Pump Overview</CardTitle>
             <CardDescription>
@@ -74,7 +74,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-linear-to-br from-secondary/45 via-card to-card p-5 shadow-sm dark:shadow-none">
+            <div className="rounded-xl border border-border/40 bg-linear-to-br from-secondary/45 via-card to-card p-5 shadow-sm dark:shadow-none">
               <div className="mb-2 font-medium">Quick guidance</div>
               <div className="grid gap-3 text-muted-foreground">
                 <div>
@@ -92,7 +92,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
               </div>
             </div>
 
-            <Alert className="border-white/10 bg-linear-to-br from-card via-card to-accent/10 p-4 shadow-sm dark:shadow-none">
+            <Alert className="border-border/40 bg-linear-to-br from-card via-card to-accent/10 p-4 shadow-sm dark:shadow-none">
               <Settings2 />
               <AlertTitle>Useful IoT defaults</AlertTitle>
               <AlertDescription>
@@ -104,7 +104,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
         </Card>
 
         <div className="grid gap-6">
-          <Card className="overflow-hidden border-white/45 bg-card/82 shadow-lg animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border bg-card shadow-lg animate-in fade-in zoom-in">
             <CardHeader>
               <CardTitle className="text-xl">Pumps</CardTitle>
               <CardDescription>
@@ -121,7 +121,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                   return (
                     <Card
                       key={pump.id}
-                      className="overflow-hidden border-white/50 bg-linear-to-br from-card via-card to-secondary/30 shadow-md transition-transform duration-200 hover:-translate-y-0.5"
+                      className="overflow-hidden border-border bg-linear-to-br from-card via-card to-secondary/30 shadow-md transition-transform duration-200 hover:-translate-y-0.5"
                     >
                       <div
                         className="h-1.5 w-full bg-linear-to-r from-primary via-primary/80 to-accent"
@@ -213,7 +213,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
 
         {isMobile ? (
           <Drawer open={selectedPump !== null} onClose={() => setSelectedPump(null)}>
-            <DrawerContent className="h-[calc(100vh-10px)] border-white/45 bg-card/95 px-4 pb-4 backdrop-blur-xl">
+            <DrawerContent className="h-[calc(100vh-10px)] border-border bg-card/95 px-4 pb-4 backdrop-blur-xl">
               <div className="mx-auto flex w-full flex-col items-center sm:w-[400px]">
                 <DrawerHeader className="text-center">
                   <DrawerTitle>Edit: {selectedPump?.name}</DrawerTitle>
@@ -231,7 +231,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
           </Drawer>
         ) : (
           <Dialog open={selectedPump !== null} onOpenChange={() => setSelectedPump(null)}>
-            <DialogContent className="border-white/45 bg-card/96 shadow-xl backdrop-blur-xl sm:max-w-[425px] lg:max-w-[500px] xl:max-w-[800px]">
+            <DialogContent className="border-border bg-card/96 shadow-xl backdrop-blur-xl sm:max-w-[425px] lg:max-w-[500px] xl:max-w-[800px]">
               <DialogHeader>
                 <DialogTitle>Edit: {selectedPump?.name}</DialogTitle>
                 <DialogDescription>
