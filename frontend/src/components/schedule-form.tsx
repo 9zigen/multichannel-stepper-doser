@@ -156,9 +156,9 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
 
   return (
     <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
-      <FieldGroup className="gap-6">
-        <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-4">
-          <div className="mb-5 flex flex-col gap-4">
+      <FieldGroup className="gap-3">
+        <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-3">
+          <div className="mb-3 flex flex-col gap-3">
             <div className="flex items-start gap-3">
               <div className="flex size-10 items-center justify-center rounded-xl bg-background shadow-xs">
                 <modeDetails.icon className="text-primary" />
@@ -205,17 +205,15 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                         key={value}
                         value={value}
                         className={cn(
-                          'h-auto min-h-18 rounded-xl border border-transparent bg-background px-4 py-3 text-left text-sm font-medium shadow-none transition-all',
-                          'flex items-start justify-start hover:bg-secondary/25',
+                          'h-9 rounded-xl border border-transparent px-3 py-2 text-sm font-medium shadow-none transition-all',
+                          'flex items-center gap-2 hover:bg-secondary/25',
                           selected
                             ? 'border-primary/20 bg-secondary/45 text-foreground shadow-sm'
                             : 'text-foreground/80'
                         )}
                       >
-                        <div className="flex flex-col gap-1">
-                          <span>{meta.label}</span>
-                          <span className="text-xs leading-5 text-muted-foreground">{meta.description}</span>
-                        </div>
+                        <meta.icon className="size-3.5 shrink-0" />
+                        <span>{meta.label}</span>
                       </ToggleGroupItem>
                     );
                   })}
@@ -237,8 +235,8 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
         ) : null}
 
         {modeActual !== SCHEDULE_MODE.OFF ? (
-          <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-4">
-            <FieldSet className="gap-4">
+          <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-3">
+            <FieldSet className="gap-3">
               <div className="flex flex-col gap-1">
                 <FieldLegend>Output target</FieldLegend>
                 <FieldDescription>
@@ -248,7 +246,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                 </FieldDescription>
               </div>
 
-              <FieldGroup className={cn('gap-4', modeActual === SCHEDULE_MODE.PERIODIC ? 'md:grid md:grid-cols-2' : undefined)}>
+              <FieldGroup className={cn('gap-3', modeActual === SCHEDULE_MODE.PERIODIC ? 'md:grid md:grid-cols-2' : undefined)}>
                 <Field>
                   <FieldLabel htmlFor={`speed-${pump.id}`}>Speed [rpm]</FieldLabel>
                   <FieldContent>
@@ -294,14 +292,14 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
         ) : null}
 
         {modeActual === SCHEDULE_MODE.PERIODIC ? (
-          <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-4">
-            <div className="mb-5 flex items-center gap-2">
+          <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-3">
+            <div className="mb-3 flex items-center gap-2">
               <Repeat className="size-4 text-primary" />
               <FieldTitle className="text-base">Timing rules</FieldTitle>
             </div>
 
-            <FieldGroup className="gap-6">
-              <FieldSet className="gap-4">
+            <FieldGroup className="gap-3">
+              <FieldSet className="gap-3">
                 <div className="flex flex-col gap-1">
                   <FieldLegend>Weekdays</FieldLegend>
                   <FieldDescription>Limit dosing to the weekdays that match your routine.</FieldDescription>
@@ -326,7 +324,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                 />
               </FieldSet>
 
-              <FieldSet className="gap-4">
+              <FieldSet className="gap-3">
                 <div className="flex flex-col gap-1">
                   <FieldLegend>Hours</FieldLegend>
                   <FieldDescription>Choose the hours when this pump is allowed to dose.</FieldDescription>
