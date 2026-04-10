@@ -198,21 +198,10 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
             )}
           />
 
-          <div className="mt-4 rounded-xl bg-background/70 p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/12 text-primary">
-                <modeDetails.icon className="size-4" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <div className="text-sm font-medium">{modeDetails.label} mode</div>
-                <p className="text-sm leading-relaxed text-muted-foreground">{modeDetails.description}</p>
-              </div>
-            </div>
-          </div>
         </section>
 
         {modeActual === SCHEDULE_MODE.PERIODIC ? (
-          <section className="rounded-xl border border-white/15 bg-card/85 p-4 shadow-sm dark:shadow-none">
+          <section className="rounded-xl border border-border bg-card/85 p-4 shadow-sm dark:shadow-none">
             <div className="mb-4 flex items-center gap-2">
               <Repeat className="size-4 text-primary" />
               <FieldTitle className="text-base">Periodic timing</FieldTitle>
@@ -273,7 +262,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
         ) : null}
 
         {modeActual !== SCHEDULE_MODE.OFF ? (
-          <section className="rounded-xl border border-white/15 bg-card/85 p-4 shadow-sm dark:shadow-none">
+          <section className="rounded-xl border border-border bg-card/85 p-4 shadow-sm dark:shadow-none">
             <div className="mb-4 flex items-center gap-2">
               <Clock3 className="size-4 text-primary" />
               <FieldTitle className="text-base">
