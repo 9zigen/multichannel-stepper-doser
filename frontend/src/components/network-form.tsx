@@ -206,13 +206,11 @@ const NetworkForm = (props: NetworkFormProps): React.ReactElement => {
 
   return (
     <>
-      <form className="w-full flex flex-col" onSubmit={handleSubmit(onSubmit)}>
+      <form className="flex w-full flex-col gap-3" onSubmit={handleSubmit(onSubmit)}>
         {renderFormFields()}
-        <div className="flex flex-row mt-8">
-          <Button type="submit" className="w-full duration-400 transition-all ease-in-out">
-            Save connection
-          </Button>
-        </div>
+        <Button type="submit" size="sm" className="w-full">
+          Save connection
+        </Button>
       </form>
 
       <AlertDialog open={restartPromptOpen} onOpenChange={setRestartPromptOpen}>

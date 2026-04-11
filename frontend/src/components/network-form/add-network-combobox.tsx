@@ -40,9 +40,9 @@ export function AddNetworkCombobox(): React.ReactElement {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-[200px] justify-between">
-          <Plus /> Add new connection
-          <ChevronsUpDown className="opacity-50" />
+        <Button variant="outline" size="sm" role="combobox" aria-expanded={open} className="justify-between gap-1.5">
+          <Plus className="size-3.5" /> Add
+          <ChevronsUpDown className="size-3 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0">

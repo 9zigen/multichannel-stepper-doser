@@ -32,7 +32,7 @@ export const Layout = ({ children }: LayoutProps): React.ReactElement => {
   return (
     <SidebarProvider>
       <AppSidebar variant="inset" collapsible="icon" />
-      <SidebarInset className="overflow-hidden border border-border bg-background/75 backdrop-blur-sm">
+      <SidebarInset className="max-h-svh overflow-y-auto border border-border bg-background/75 backdrop-blur-sm">
         <SiteHeader />
         <div className="flex flex-1 flex-col px-2 pb-2 md:px-3 md:pb-3">{children}</div>
         <Toaster />
