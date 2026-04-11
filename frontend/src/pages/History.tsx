@@ -7,8 +7,8 @@ const HistoryPage: React.FC = (): React.ReactElement => {
   const pumps = useAppStore((state: AppStoreState) => state.settings.pumps);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
-      <section className="container grid gap-6 px-4 md:px-4">
+    <div className="flex flex-col gap-4 py-2 md:py-3">
+      <section className="mx-auto w-full max-w-screen-2xl px-3">
         <PumpHistoryCard pumps={pumps} />
       </section>
     </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Waves } from 'lucide-react';
+import { CalendarDays, Clock3, Droplets } from 'lucide-react';
 
 import type { PumpHistoryDay } from '@/lib/api.ts';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,8 @@ import {
   formatRuntime,
   formatShortDate,
   getActiveHours,
+  getDayRuntime,
+  getDayVolume,
   parseHistoryDate,
   renderFlags,
 } from './utils';
@@ -20,68 +22,97 @@ type DayDetailProps = {
 const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
   if (!day) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        Select a day on the heatmap to see hourly breakdown.
+      <div className="flex h-full min-h-32 items-center justify-center text-sm text-muted-foreground">
+        Select a day on the heatmap.
       </div>
     );
   }
 
   const activeHours = getActiveHours(day);
+  const dayDate = parseHistoryDate(day.date);
+  const totalVolume = getDayVolume(day);
+  const totalRuntime = getDayRuntime(day);
 
   if (activeHours.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-          No dosing activity recorded on {formatShortDate(parseHistoryDate(day.date))}. All 24 hours were idle.
-        </div>
+      <div className="flex h-full min-h-32 flex-col items-center justify-center gap-2">
+        <Badge variant="outline">{formatShortDate(dayDate)}</Badge>
+        <span className="text-xs text-muted-foreground">No activity recorded.</span>
       </div>
     );
   }
 
   return (
-    <ScrollArea className="h-full w-full">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
-            <th className="sticky top-0 whitespace-nowrap bg-card/95 py-2 pr-4 text-left font-medium">Hour</th>
-            <th className="sticky top-0 whitespace-nowrap bg-card/95 py-2 px-4 text-right font-medium">Total</th>
-            <th className="sticky top-0 whitespace-nowrap bg-card/95 py-2 px-4 text-right font-medium">Scheduled</th>
-            <th className="sticky top-0 whitespace-nowrap bg-card/95 py-2 px-4 text-right font-medium">Manual</th>
-            <th className="sticky top-0 whitespace-nowrap bg-card/95 py-2 px-4 text-right font-medium">Runtime</th>
-            <th className="sticky top-0 whitespace-nowrap bg-card/95 py-2 pl-4 text-left font-medium">Trigger</th>
-          </tr>
-        </thead>
-        <tbody>
-          {activeHours.map((hour, index) => {
-            const totalVolume = hour.scheduled_volume_ml + hour.manual_volume_ml;
-            const flags = renderFlags(hour.flags);
+    <div className="flex flex-col gap-2">
+      {/* Day summary header */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary" className="gap-1">
+          <CalendarDays className="size-3" />
+          {formatShortDate(dayDate)}
+        </Badge>
+        <Badge variant="outline" className="gap-1 tabular-nums">
+          <Droplets className="size-3" />
+          {totalVolume} ml
+        </Badge>
+        <Badge variant="outline" className="gap-1 tabular-nums">
+          <Clock3 className="size-3" />
+          {Math.round(totalRuntime / 60)} min
+        </Badge>
+        <Badge variant="outline" className="tabular-nums">
+          {activeHours.length}h active
+        </Badge>
+      </div>
 
-            return (
-              <tr key={hour.hour} className="animate-fade-in-up border-b border-border/50 last:border-0" style={{ animationDelay: `${index * 50}ms` }}>
-                <td className="whitespace-nowrap py-2 pr-4 font-medium">{formatHourLabel(hour.hour)}</td>
-                <td className="whitespace-nowrap py-2 px-4 text-right">
-                  <Badge variant="secondary" className="font-semibold">{totalVolume} ml</Badge>
-                </td>
-                <td className="whitespace-nowrap py-2 px-4 text-right text-muted-foreground">{hour.scheduled_volume_ml} ml</td>
-                <td className="whitespace-nowrap py-2 px-4 text-right text-muted-foreground">{hour.manual_volume_ml} ml</td>
-                <td className="whitespace-nowrap py-2 px-4 text-right text-muted-foreground">{formatRuntime(hour.total_runtime_s)}</td>
-                <td className="whitespace-nowrap py-2 pl-4">
-                  <div className="flex flex-wrap gap-1">
-                    {flags.map((flag) => (
-                      <Badge key={`${hour.hour}-${flag}`} variant="outline" className="text-xs">
-                        <Waves className="mr-1 size-3" />
-                        {flag}
-                      </Badge>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <ScrollBar orientation="horizontal" />
-    </ScrollArea>
+      {/* Hourly table */}
+      <ScrollArea className="w-full">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-border/50 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <th className="whitespace-nowrap py-1.5 pr-3 text-left font-medium">Hour</th>
+              <th className="whitespace-nowrap px-2 py-1.5 text-right font-medium">Total</th>
+              <th className="whitespace-nowrap px-2 py-1.5 text-right font-medium">Sched</th>
+              <th className="whitespace-nowrap px-2 py-1.5 text-right font-medium">Manual</th>
+              <th className="whitespace-nowrap pl-2 py-1.5 text-right font-medium">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeHours.map((hour, index) => {
+              const hourTotal = hour.scheduled_volume_ml + hour.manual_volume_ml;
+              const flags = renderFlags(hour.flags);
+
+              return (
+                <tr
+                  key={hour.hour}
+                  className="animate-fade-in-up border-b border-border/30 last:border-0"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <td className="whitespace-nowrap py-1.5 pr-3 font-medium tabular-nums">
+                    {formatHourLabel(hour.hour)}
+                    {flags.length > 0 && (
+                      <span className="ml-1.5 text-[9px] text-muted-foreground">{flags.join(' ')}</span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                    <span className="font-semibold tabular-nums">{hourTotal}</span>
+                    <span className="text-muted-foreground"> ml</span>
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums">
+                    {hour.scheduled_volume_ml}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums">
+                    {hour.manual_volume_ml}
+                  </td>
+                  <td className="whitespace-nowrap pl-2 py-1.5 text-right text-muted-foreground tabular-nums">
+                    {formatRuntime(hour.total_runtime_s)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    </div>
   );
 };
 
