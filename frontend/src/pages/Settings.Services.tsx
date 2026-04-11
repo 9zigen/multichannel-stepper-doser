@@ -16,7 +16,7 @@ const ServicesPage: React.FC = (): React.ReactElement => {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
       <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="shadow-none animate-in fade-in zoom-in">
+        <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">Service Overview</CardTitle>
             <CardDescription>
@@ -96,7 +96,7 @@ const ServicesPage: React.FC = (): React.ReactElement => {
           </CardContent>
         </Card>
 
-        <Card className="w-full shadow-none animate-in fade-in zoom-in">
+        <Card className="w-full overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">Services</CardTitle>
             <CardDescription>

@@ -40,7 +40,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
       <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="overflow-hidden border-border bg-card shadow-lg animate-in fade-in zoom-in">
+        <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">Pump Overview</CardTitle>
             <CardDescription>
@@ -104,7 +104,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
         </Card>
 
         <div className="grid gap-6">
-          <Card className="overflow-hidden border-border bg-card shadow-lg animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle className="text-xl">Pumps</CardTitle>
               <CardDescription>
@@ -121,7 +121,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                   return (
                     <Card
                       key={pump.id}
-                      className="animate-fade-in-up overflow-hidden border-border bg-linear-to-br from-card via-card to-secondary/30 shadow-md transition-transform duration-200 hover:-translate-y-0.5"
+                      className="animate-fade-in-up overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm transition-transform duration-200 hover:-translate-y-0.5"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div

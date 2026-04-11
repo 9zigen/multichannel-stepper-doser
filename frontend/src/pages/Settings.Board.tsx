@@ -166,7 +166,7 @@ const BoardPage: React.FC = (): React.ReactElement => {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
       <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="shadow-none animate-in fade-in zoom-in">
+        <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -243,7 +243,7 @@ const BoardPage: React.FC = (): React.ReactElement => {
         </Card>
 
         <div className="grid gap-6">
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle className="text-xl">Shared Driver Settings</CardTitle>
               <CardDescription>These values are common to all active TMC2209 channels on the board.</CardDescription>
@@ -319,7 +319,7 @@ const BoardPage: React.FC = (): React.ReactElement => {
             </CardContent>
           </Card>
 
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle className="text-xl">Channel Wiring</CardTitle>
               <CardDescription>All four channel slots stay visible so inactive outputs can be prepared ahead of time.</CardDescription>
@@ -437,7 +437,7 @@ const BoardPage: React.FC = (): React.ReactElement => {
             </CardContent>
           </Card>
 
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle className="text-xl">Apply Changes</CardTitle>
               <CardDescription>Saving posts the new board model to the backend and triggers live stepper reinitialization.</CardDescription>

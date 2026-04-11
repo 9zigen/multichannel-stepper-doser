@@ -82,7 +82,7 @@ const OnboardingPage: React.FC = (): React.ReactElement => {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
       <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="shadow-none animate-in fade-in zoom-in">
+        <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">Initial Setup</CardTitle>
             <CardDescription>
@@ -133,7 +133,7 @@ const OnboardingPage: React.FC = (): React.ReactElement => {
         </Card>
 
         <div className="grid gap-6">
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle className="text-xl">Step 1: Secure Admin Access</CardTitle>
               <CardDescription>Change the default login before the controller joins your normal network.</CardDescription>
@@ -167,7 +167,7 @@ const OnboardingPage: React.FC = (): React.ReactElement => {
             </CardContent>
           </Card>
 
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle className="text-xl">Step 2: Configure Network</CardTitle>
               <CardDescription>Bring the device onto your intended network before marking onboarding complete.</CardDescription>
@@ -188,7 +188,7 @@ const OnboardingPage: React.FC = (): React.ReactElement => {
             </CardContent>
           </Card>
 
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle className="text-xl">Optional: Board Wiring Review</CardTitle>
               <CardDescription>The board step is prefilled from defaults and can be skipped for now.</CardDescription>
@@ -204,7 +204,7 @@ const OnboardingPage: React.FC = (): React.ReactElement => {
             </CardContent>
           </Card>
 
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle className="text-xl">Finish</CardTitle>
               <CardDescription>Once the network is configured, this first-run page will stay hidden until the next factory reset.</CardDescription>

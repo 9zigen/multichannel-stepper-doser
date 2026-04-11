@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Copy, ClipboardPaste, TimerReset, TriangleAlert, Wrench } from 'lucide-react';
+import { Check, ClipboardPaste, Copy, LoaderCircle, RotateCcw, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { PumpAgingState, PumpState } from '@/lib/api.ts';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 function parseHours(value: string): number {
   const parsed = Number(value);
@@ -17,21 +17,23 @@ function parseHours(value: string): number {
 }
 
 function getStatus(pump: PumpState): 'nominal' | 'warning' | 'replace' {
-  if (pump.running_hours >= pump.aging.replace_hours) {
-    return 'replace';
-  }
-  if (pump.running_hours >= pump.aging.warning_hours) {
-    return 'warning';
-  }
+  if (pump.running_hours >= pump.aging.replace_hours) return 'replace';
+  if (pump.running_hours >= pump.aging.warning_hours) return 'warning';
   return 'nominal';
 }
+
+const statusConfig = {
+  nominal: { label: 'Nominal', badgeVariant: 'outline' as const, barClass: 'from-primary via-primary/85 to-accent' },
+  warning: { label: 'Warning', badgeVariant: 'secondary' as const, barClass: 'from-amber-500 to-amber-400' },
+  replace: { label: 'Replace', badgeVariant: 'destructive' as const, barClass: 'from-destructive to-destructive/70' },
+};
 
 const AgingPage: React.FC = (): React.ReactElement => {
   const pumps = useAppStore((state: AppStoreState) => state.settings.pumps);
   const saveSettings = useAppStore((state: AppStoreState) => state.saveSettings);
   const loadSettings = useAppStore((state: AppStoreState) => state.loadSettings);
   const [draftPumps, setDraftPumps] = useState<PumpState[]>([]);
-  const [clipboard, setClipboard] = useState<{ sourceName: string; aging: PumpAgingState } | null>(null);
+  const [clipboard, setClipboard] = useState<PumpAgingState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -43,51 +45,26 @@ const AgingPage: React.FC = (): React.ReactElement => {
   const updatePumpAging = (pumpId: number, field: keyof PumpAgingState, value: number) => {
     setDraftPumps((current) =>
       current.map((pump) =>
-        pump.id === pumpId
-          ? {
-              ...pump,
-              aging: {
-                ...pump.aging,
-                [field]: value,
-              },
-            }
-          : pump
-      )
+        pump.id === pumpId ? { ...pump, aging: { ...pump.aging, [field]: value } } : pump,
+      ),
     );
   };
 
-  const copyPumpAging = (pump: PumpState) => {
-    setClipboard({
-      sourceName: pump.name,
-      aging: { ...pump.aging },
-    });
-    toast.success(`${pump.name} aging thresholds copied.`);
+  const copyAging = (pump: PumpState) => {
+    setClipboard({ ...pump.aging });
+    toast.success(`${pump.name} thresholds copied.`);
   };
 
-  const pastePumpAging = (pumpId: number) => {
-    if (!clipboard) {
-      return;
-    }
-
+  const pasteAging = (pumpId: number) => {
+    if (!clipboard) return;
     setDraftPumps((current) =>
-      current.map((pump) => (pump.id === pumpId ? { ...pump, aging: { ...clipboard.aging } } : pump))
+      current.map((pump) => (pump.id === pumpId ? { ...pump, aging: { ...clipboard } } : pump)),
     );
   };
 
   const applyToAll = (pump: PumpState) => {
     setDraftPumps((current) => current.map((item) => ({ ...item, aging: { ...pump.aging } })));
-    toast.success(`${pump.name} thresholds applied to all pumps.`);
-  };
-
-  const copyFromPump = (sourcePumpId: number, targetPumpId: number) => {
-    const source = draftPumps.find((pump) => pump.id === sourcePumpId);
-    if (!source) {
-      return;
-    }
-
-    setDraftPumps((current) =>
-      current.map((pump) => (pump.id === targetPumpId ? { ...pump, aging: { ...source.aging } } : pump))
-    );
+    toast.success(`${pump.name} thresholds applied to all.`);
   };
 
   const saveDraft = async () => {
@@ -95,12 +72,11 @@ const AgingPage: React.FC = (): React.ReactElement => {
       setIsSaving(true);
       const success = await saveSettings('pumps', { pumps: draftPumps });
       if (!success) {
-        toast.error('Pump aging settings not saved.');
+        toast.error('Aging settings not saved.');
         return;
       }
-
       await loadSettings();
-      toast.success('Pump aging settings saved.');
+      toast.success('Aging settings saved.');
     } finally {
       setIsSaving(false);
     }
@@ -110,168 +86,168 @@ const AgingPage: React.FC = (): React.ReactElement => {
     setDraftPumps(JSON.parse(JSON.stringify(pumps)) as PumpState[]);
   };
 
-  const dueForReplacement = draftPumps.filter((pump) => getStatus(pump) === 'replace').length;
-  const approachingService = draftPumps.filter((pump) => getStatus(pump) === 'warning').length;
+  const stats = useMemo(() => {
+    const replace = draftPumps.filter((p) => getStatus(p) === 'replace').length;
+    const warning = draftPumps.filter((p) => getStatus(p) === 'warning').length;
+    const nominal = draftPumps.length - replace - warning;
+    return { replace, warning, nominal };
+  }, [draftPumps]);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
-      <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="shadow-none animate-in fade-in zoom-in">
-          <CardHeader>
-            <CardTitle className="text-xl">Aging Overview</CardTitle>
-            <CardDescription>
-              Configure per-pump hose service thresholds so wear warnings follow your hardware and chemistry.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="rounded-xl border bg-muted/20 p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 font-medium">
-                  <TimerReset className="size-4 text-muted-foreground" />
-                  Service state
-                </div>
-                <Badge variant="secondary">{draftPumps.length}</Badge>
-              </div>
-              <div className="grid gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-3">
-                  <span>Approaching service</span>
-                  <Badge variant={approachingService > 0 ? 'secondary' : 'outline'}>{approachingService}</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Replacement due</span>
-                  <Badge variant={dueForReplacement > 0 ? 'destructive' : 'outline'}>{dueForReplacement}</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Clipboard preset</span>
-                  <Badge variant={clipboard ? 'default' : 'outline'}>{clipboard?.sourceName ?? 'Empty'}</Badge>
-                </div>
+    <div className="flex flex-col gap-4 py-2 md:py-3">
+      <section className="mx-auto w-full max-w-screen-2xl px-3">
+        <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-lg">Aging Thresholds</CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="gap-1.5 tabular-nums">
+                  {stats.nominal} nominal
+                </Badge>
+                {stats.warning > 0 && (
+                  <Badge variant="secondary" className="gap-1.5 tabular-nums">
+                    {stats.warning} warning
+                  </Badge>
+                )}
+                {stats.replace > 0 && (
+                  <Badge variant="destructive" className="gap-1.5 tabular-nums">
+                    {stats.replace} replace
+                  </Badge>
+                )}
               </div>
             </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {/* Pump rows */}
+            <div className="flex flex-col gap-2">
+              {draftPumps.map((pump, index) => {
+                const status = getStatus(pump);
+                const config = statusConfig[status];
+                const progress = pump.aging.replace_hours > 0
+                  ? Math.min((pump.running_hours / pump.aging.replace_hours) * 100, 100)
+                  : 0;
+                const warningMark = pump.aging.replace_hours > 0
+                  ? (pump.aging.warning_hours / pump.aging.replace_hours) * 100
+                  : 0;
 
-            <Alert className="p-4">
-              <TriangleAlert />
-              <AlertTitle>Recommended starting point</AlertTitle>
-              <AlertDescription>
-                A standard 3-roller hose at 60 RPM lasts ~2000–3000 hours.
-                Set a warning at 2000 h and replacement at 2500 h, then refine based on real usage.
-                At 10 RPM, lifetime increases ~5× to ~12,500 hours.
-              </AlertDescription>
-            </Alert>
+                return (
+                  <div
+                    key={pump.id}
+                    className="animate-fade-in-up rounded-lg border border-border/40 bg-secondary/10 p-3"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    {/* Row 1: Name + status + actions */}
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-sm font-medium">{pump.name}</span>
+                        <Badge variant={config.badgeVariant} className="text-xs">
+                          {config.label}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => copyAging(pump)}>
+                              <Copy className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Copy thresholds</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon" className="size-7" disabled={!clipboard} onClick={() => pasteAging(pump.id)}>
+                              <ClipboardPaste className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Paste thresholds</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => applyToAll(pump)}>
+                              <Wrench className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Apply to all pumps</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+
+                    {/* Row 2: Progress bar + runtime */}
+                    <div className="mb-3 flex items-center gap-3">
+                      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn('h-full rounded-full bg-linear-to-r transition-all', config.barClass)}
+                          style={{ width: `${Math.max(progress, progress > 0 ? 6 : 0)}%` }}
+                        />
+                        {warningMark > 0 && warningMark < 100 && (
+                          <div
+                            className="absolute top-0 h-full w-0.5 bg-amber-500/70"
+                            style={{ left: `${warningMark}%` }}
+                          />
+                        )}
+                        <div className="absolute top-0 right-0 h-full w-0.5 bg-destructive/70" />
+                      </div>
+                      <span className="min-w-16 text-right text-xs tabular-nums text-muted-foreground">
+                        {pump.running_hours.toFixed(1)} h
+                      </span>
+                    </div>
+
+                    {/* Row 3: Inline inputs */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-2">
+                        <label htmlFor={`warn_${pump.id}`} className="shrink-0 text-xs text-muted-foreground">
+                          Warn
+                        </label>
+                        <Input
+                          id={`warn_${pump.id}`}
+                          type="number"
+                          className="h-7 text-xs tabular-nums"
+                          value={pump.aging.warning_hours}
+                          onChange={(e) => updatePumpAging(pump.id, 'warning_hours', parseHours(e.target.value))}
+                        />
+                        <span className="text-xs text-muted-foreground">h</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label htmlFor={`repl_${pump.id}`} className="shrink-0 text-xs text-muted-foreground">
+                          Replace
+                        </label>
+                        <Input
+                          id={`repl_${pump.id}`}
+                          type="number"
+                          className="h-7 text-xs tabular-nums"
+                          value={pump.aging.replace_hours}
+                          onChange={(e) => updatePumpAging(pump.id, 'replace_hours', parseHours(e.target.value))}
+                        />
+                        <span className="text-xs text-muted-foreground">h</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Save / Reset bar */}
+            <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
+              <Button type="button" variant="outline" size="sm" onClick={resetDraft} disabled={!isDirty || isSaving}>
+                <RotateCcw className="size-3.5" data-icon="inline-start" />
+                Reset
+              </Button>
+              <Button type="button" size="sm" onClick={() => void saveDraft()} disabled={!isDirty || isSaving}>
+                {isSaving ? (
+                  <>
+                    <LoaderCircle className="size-3.5 animate-spin" data-icon="inline-start" />
+                    Saving
+                  </>
+                ) : (
+                  <>
+                    <Check className="size-3.5" data-icon="inline-start" />
+                    Save thresholds
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
-
-        <div className="grid gap-6">
-          <Card className="shadow-none animate-in fade-in zoom-in">
-            <CardHeader>
-              <CardTitle className="text-xl">Pump Thresholds</CardTitle>
-              <CardDescription>Each pump can keep its own warning and replacement schedule, with quick copy actions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {draftPumps.map((pump, index) => {
-                  const status = getStatus(pump);
-
-                  return (
-                    <div key={pump.id} className="animate-fade-in-up rounded-xl border bg-card p-4" style={{ animationDelay: `${index * 50}ms` }}>
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="font-medium">{pump.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Current runtime: {pump.running_hours.toFixed(1)} h
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant={status === 'replace' ? 'destructive' : status === 'warning' ? 'secondary' : 'outline'}>
-                            {status === 'replace' ? 'Replace now' : status === 'warning' ? 'Plan service' : 'Nominal'}
-                          </Badge>
-                          <Button type="button" variant="outline" size="sm" onClick={() => copyPumpAging(pump)}>
-                            <Copy data-icon="inline-start" />
-                            Copy
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" disabled={!clipboard} onClick={() => pastePumpAging(pump.id)}>
-                            <ClipboardPaste data-icon="inline-start" />
-                            Paste
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => applyToAll(pump)}>
-                            <Wrench data-icon="inline-start" />
-                            Copy to all
-                          </Button>
-                        </div>
-                      </div>
-
-                      <FieldGroup className="gap-4">
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
-                          <Field>
-                            <FieldLabel htmlFor={`warning_${pump.id}`}>Warning hours</FieldLabel>
-                            <FieldContent>
-                              <Input
-                                id={`warning_${pump.id}`}
-                                type="number"
-                                value={pump.aging.warning_hours}
-                                onChange={(event) => updatePumpAging(pump.id, 'warning_hours', parseHours(event.target.value))}
-                              />
-                              <FieldDescription>Show service planning state once runtime crosses this point.</FieldDescription>
-                            </FieldContent>
-                          </Field>
-
-                          <Field>
-                            <FieldLabel htmlFor={`replace_${pump.id}`}>Replace hours</FieldLabel>
-                            <FieldContent>
-                              <Input
-                                id={`replace_${pump.id}`}
-                                type="number"
-                                value={pump.aging.replace_hours}
-                                onChange={(event) => updatePumpAging(pump.id, 'replace_hours', parseHours(event.target.value))}
-                              />
-                              <FieldDescription>Mark the hose as due once runtime reaches this threshold.</FieldDescription>
-                            </FieldContent>
-                          </Field>
-
-                          <Field>
-                            <FieldLabel>Copy from another pump</FieldLabel>
-                            <FieldContent className="gap-2">
-                              <div className="grid gap-2">
-                                {draftPumps
-                                  .filter((candidate) => candidate.id !== pump.id)
-                                  .map((candidate) => (
-                                    <Button
-                                      key={candidate.id}
-                                      type="button"
-                                      variant="outline"
-                                      className="justify-start"
-                                      onClick={() => copyFromPump(candidate.id, pump.id)}
-                                    >
-                                      {candidate.name}
-                                    </Button>
-                                  ))}
-                              </div>
-                            </FieldContent>
-                          </Field>
-                        </div>
-                      </FieldGroup>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-none animate-in fade-in zoom-in">
-            <CardHeader>
-              <CardTitle className="text-xl">Apply Changes</CardTitle>
-              <CardDescription>Saving updates pump aging thresholds without touching board or network configuration.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row">
-              <Button type="button" onClick={() => void saveDraft()} disabled={!isDirty || isSaving}>
-                {isSaving ? 'Saving...' : 'Save thresholds'}
-              </Button>
-              <Button type="button" variant="outline" onClick={resetDraft} disabled={!isDirty || isSaving}>
-                Reset changes
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
       </section>
     </div>
   );

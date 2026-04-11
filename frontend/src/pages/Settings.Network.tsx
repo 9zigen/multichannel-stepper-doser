@@ -76,7 +76,7 @@ const NetworkPage: React.FC = (): React.ReactElement => {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
       <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="shadow-none animate-in fade-in zoom-in">
+        <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">Network Overview</CardTitle>
             <CardDescription>
@@ -180,7 +180,7 @@ const NetworkPage: React.FC = (): React.ReactElement => {
             </Alert>
           ) : null}
 
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex flex-col gap-1">
@@ -245,7 +245,7 @@ const NetworkPage: React.FC = (): React.ReactElement => {
           </Card>
 
           {networks.length > 0 ? (
-            <Card className="shadow-none animate-in fade-in zoom-in">
+            <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
               <CardHeader>
                 <CardTitle className="text-xl">
                   {selectedNetwork ? `Edit ${NetworkType[selectedNetwork.type]} connection` : 'Select a connection'}

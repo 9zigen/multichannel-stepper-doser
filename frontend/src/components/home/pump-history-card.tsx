@@ -45,7 +45,7 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
   const selectedPumpName = pumps.find((pump) => pump.id === selectedPump?.id)?.name ?? selectedPump?.name ?? 'Pump';
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
+    <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">Dosing History</CardTitle>
         <CardDescription>

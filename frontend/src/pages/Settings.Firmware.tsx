@@ -91,7 +91,7 @@ const FirmwarePage: React.FC = (): React.ReactElement => {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-8">
       <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="shadow-none animate-in fade-in zoom-in">
+        <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">Firmware Overview</CardTitle>
             <CardDescription>
@@ -156,7 +156,7 @@ const FirmwarePage: React.FC = (): React.ReactElement => {
         </Card>
 
         <div className="grid gap-6">
-          <Card className="w-full shadow-none animate-in fade-in zoom-in">
+          <Card className="w-full overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle>Manual Firmware Upload</CardTitle>
               <CardDescription>Upload a binary package directly to the device on your local network.</CardDescription>
@@ -274,7 +274,7 @@ const FirmwarePage: React.FC = (): React.ReactElement => {
             </CardContent>
           </Card>
 
-          <Card className="shadow-none animate-in fade-in zoom-in">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardHeader>
               <CardTitle>Device Recovery</CardTitle>
               <CardDescription>
