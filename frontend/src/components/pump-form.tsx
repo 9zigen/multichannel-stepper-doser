@@ -170,115 +170,57 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
             className="flex flex-col xl:w-[50%]"
             onSubmit={handleSubmit(onSubmit, (errors) => console.log(errors))}
           >
-            <div className="flex flex-row gap-4 mb-4 justify-between items-center h-[38px]">
-              <span className="text-base">General</span>
-            </div>
-            <div className="flex flex-row gap-4 mb-4 justify-between">
-              <div className="w-[50%]">
-                <div className="pb-1 text-sm text-muted-foreground">
-                  <label>Name</label>
-                </div>
-                <Input type="text" placeholder="Name" {...register('name')} />
-                {errors.name && (
-                  <p role="alert" className="text-sm text-red-600">
-                    {errors.name?.message}
-                  </p>
-                )}
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex-1">
+                <Label htmlFor="pump-name" className="text-xs text-muted-foreground">Name</Label>
+                <Input id="pump-name" type="text" placeholder="Name" className="h-8 text-sm" {...register('name')} />
+                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
               </div>
-
-              <div className="flex flex-col items-center justify-between pb-2">
-                <div className="pb-1 text-sm text-muted-foreground">
-                  <Label htmlFor="pump-direction">{direction_actual ? 'CW' : 'CCW'}</Label>
-                </div>
+              <div className="flex flex-col items-center gap-1 pt-3">
+                <Label htmlFor="pump-direction" className="text-xs text-muted-foreground">{direction_actual ? 'CW' : 'CCW'}</Label>
                 <Controller
                   name="direction"
                   control={control}
                   render={({ field }) => (
-                    <Switch
-                      id="pump-direction"
-                      checked={field.value}
-                      onCheckedChange={(value) => field.onChange(Boolean(value))}
-                    />
+                    <Switch id="pump-direction" checked={field.value} onCheckedChange={(v) => field.onChange(Boolean(v))} />
                   )}
                 />
               </div>
-
-              <div className="flex flex-col items-center justify-between pb-2">
-                <div className="pb-1 text-sm text-muted-foreground">
-                  <Label htmlFor="pump-state">Enabled</Label>
-                </div>
+              <div className="flex flex-col items-center gap-1 pt-3">
+                <Label htmlFor="pump-state" className="text-xs text-muted-foreground">Enabled</Label>
                 <Controller
                   name="state"
                   control={control}
                   render={({ field }) => (
-                    <Switch
-                      id="pump-state"
-                      checked={field.value}
-                      onCheckedChange={(value) => field.onChange(Boolean(value))}
-                    />
+                    <Switch id="pump-state" checked={field.value} onCheckedChange={(v) => field.onChange(Boolean(v))} />
                   )}
                 />
               </div>
             </div>
 
-            <div className="flex flex-row gap-4 mb-6 justify-between">
-              <div className="w-[50%]">
-                <div className="pb-1 text-sm text-muted-foreground">
-                  <label>Tank full volume</label>
-                </div>
-                <Input type="number" placeholder="900" {...register('tank_full_vol', { valueAsNumber: true })} />
-                {errors.tank_full_vol && (
-                  <p role="alert" className="text-sm text-red-600">
-                    {errors.tank_full_vol?.message}
-                  </p>
-                )}
+            <div className="mb-3 grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="tank-full" className="text-xs text-muted-foreground">Tank full vol</Label>
+                <Input id="tank-full" type="number" placeholder="900" className="h-8 text-sm tabular-nums" {...register('tank_full_vol', { valueAsNumber: true })} />
+                {errors.tank_full_vol && <p className="text-xs text-destructive">{errors.tank_full_vol.message}</p>}
               </div>
-
-              <div className="w-[50%]">
-                <div className="pb-1 text-sm text-muted-foreground">
-                  <label>Tank current volume</label>
-                </div>
-                <Input type="number" placeholder="900" {...register('tank_current_vol', { valueAsNumber: true })} />
-                {errors.tank_current_vol && (
-                  <p role="alert" className="text-sm text-red-600">
-                    {errors.tank_current_vol?.message}
-                  </p>
-                )}
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="tank-current" className="text-xs text-muted-foreground">Tank current vol</Label>
+                <Input id="tank-current" type="number" placeholder="900" className="h-8 text-sm tabular-nums" {...register('tank_current_vol', { valueAsNumber: true })} />
+                {errors.tank_current_vol && <p className="text-xs text-destructive">{errors.tank_current_vol.message}</p>}
               </div>
             </div>
 
-            <span className="text-base">Notes</span>
-            <div className="flex flex-row gap-4 mb-6 justify-between">
-              <div className="w-[50%]">
-                <div className="pb-1 text-sm text-muted-foreground">
-                  <label>Solution concentration</label>
-                </div>
-                <Input
-                  type="number"
-                  placeholder="20"
-                  {...register('tank_concentration_total', { valueAsNumber: true })}
-                />
-                {errors.tank_concentration_total && (
-                  <p role="alert" className="text-sm text-red-600">
-                    {errors.tank_concentration_total?.message}
-                  </p>
-                )}
+            <div className="mb-4 grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="conc-total" className="text-xs text-muted-foreground">Solution conc.</Label>
+                <Input id="conc-total" type="number" placeholder="20" className="h-8 text-sm tabular-nums" {...register('tank_concentration_total', { valueAsNumber: true })} />
+                {errors.tank_concentration_total && <p className="text-xs text-destructive">{errors.tank_concentration_total.message}</p>}
               </div>
-
-              <div className="w-[50%]">
-                <div className="pb-1 text-sm text-muted-foreground">
-                  <label>Element concentration</label>
-                </div>
-                <Input
-                  type="number"
-                  placeholder="10"
-                  {...register('tank_concentration_active', { valueAsNumber: true })}
-                />
-                {errors.tank_concentration_active && (
-                  <p role="alert" className="text-sm text-red-600">
-                    {errors.tank_concentration_active?.message}
-                  </p>
-                )}
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="conc-active" className="text-xs text-muted-foreground">Element conc.</Label>
+                <Input id="conc-active" type="number" placeholder="10" className="h-8 text-sm tabular-nums" {...register('tank_concentration_active', { valueAsNumber: true })} />
+                {errors.tank_concentration_active && <p className="text-xs text-destructive">{errors.tank_concentration_active.message}</p>}
               </div>
             </div>
           </form>
@@ -312,30 +254,25 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
             ) : null}
             <PumpCalibration pump={pump} success={(cal) => addCalibration(cal)} />
             {errors.calibration && (
-              <p role="alert" className="text-sm text-red-600">
+              <p role="alert" className="text-xs text-destructive">
                 {errors.calibration?.message}
               </p>
             )}
             {pumpCalibrations.map((item, index) => (
-              <div key={index} className="animate-fade-in-up flex flex-row gap-4 mb-4 bg-gray-100 dark:bg-secondary/20 p-2 rounded-md justify-between" style={{ animationDelay: `${index * 50}ms` }}>
-                <div className="w-auto grid items-center">
-                  <span className="text-gray-500 text-sm">Speed</span>
-                  <span className="text-sm">{item.speed} RPM</span>
+              <div key={index} className="animate-fade-in-up mb-2 flex items-center justify-between gap-3 rounded-md bg-secondary/20 px-3 py-2" style={{ animationDelay: `${index * 50}ms` }}>
+                <div className="flex items-center gap-4 text-sm">
+                  <div>
+                    <span className="text-xs text-muted-foreground">Speed </span>
+                    <span className="tabular-nums font-medium">{item.speed} RPM</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Flow </span>
+                    <span className="tabular-nums font-medium">{item.flow} ml/min</span>
+                  </div>
                 </div>
-                <div className="w-auto grid items-center">
-                  <span className="text-gray-500 text-sm">Flow</span>
-                  <span className="text-sm">{item.flow} ml/min</span>
-                </div>
-                <div className="w-[100px] flex items-center">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="w-full h-full"
-                    onClick={() => removeCalibration(index)}
-                  >
-                    Delete
-                  </Button>
-                </div>
+                <Button type="button" variant="destructive" size="sm" onClick={() => removeCalibration(index)}>
+                  Delete
+                </Button>
               </div>
             ))}
           </div>

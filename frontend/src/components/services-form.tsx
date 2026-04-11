@@ -6,16 +6,8 @@ import { Clock3, Globe, RadioTower, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button.tsx';
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  FieldTitle,
-} from '@/components/ui/field';
 import { Input } from '@/components/ui/input.tsx';
+import { Label } from '@/components/ui/label.tsx';
 import {
   Select,
   SelectContent,
@@ -23,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { ServiceState } from '@/lib/api.ts';
@@ -56,7 +47,7 @@ const FormSchema = z.object({
     .string()
     .refine(
       (value) => value === '' || (/^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535),
-      'Port must be between 1 and 65535.'
+      'Port must be between 1 and 65535.',
     ),
   mqtt_user: z.string().max(64, 'User must be 64 characters or fewer.'),
   mqtt_password: z.string().max(64, 'Password must be 64 characters or fewer.'),
@@ -69,29 +60,6 @@ const FormSchema = z.object({
 type ServicesPageProps = {
   services: ServiceState;
   success?: () => void;
-};
-
-type SectionProps = {
-  title: string;
-  description: string;
-  icon: React.ComponentType<React.ComponentProps<'svg'>>;
-  children: React.ReactNode;
-};
-
-const SettingsSection = ({ title, description, icon: Icon, children }: SectionProps) => {
-  return (
-    <section className="rounded-xl border bg-card p-5">
-      <div className="flex flex-col gap-1">
-        <FieldTitle className="text-base">
-          <Icon data-icon="inline-start" />
-          {title}
-        </FieldTitle>
-        <FieldDescription>{description}</FieldDescription>
-      </div>
-      <Separator className="my-4" />
-      {children}
-    </section>
-  );
 };
 
 const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElement => {
@@ -128,228 +96,194 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
       success?.();
       return;
     }
-
     toast.error('Services settings not saved.');
   };
 
   return (
-    <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
-      <FieldGroup className="gap-5">
-        <SettingsSection
-          title="Device Identity"
-          description="Settings that help other devices discover and identify this doser on the local network."
-          icon={Globe}
-        >
-          <Field>
-            <FieldLabel htmlFor="hostname">Hostname</FieldLabel>
-            <FieldContent>
-              <Input
-                id="hostname"
-                type="text"
-                placeholder="reef-doser"
-                {...register('hostname')}
-                aria-invalid={!!errors.hostname}
-              />
-              <FieldDescription>Used for network discovery, dashboards, and local troubleshooting.</FieldDescription>
-              <FieldError errors={[errors.hostname]} />
-            </FieldContent>
-          </Field>
-        </SettingsSection>
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
+      {/* Device Identity */}
+      <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <Globe className="size-3" />
+          Identity
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="hostname" className="text-xs text-muted-foreground">Hostname</Label>
+          <Input
+            id="hostname"
+            type="text"
+            placeholder="reef-doser"
+            className="h-8 text-sm"
+            {...register('hostname')}
+            aria-invalid={!!errors.hostname}
+          />
+          {errors.hostname && <p className="text-xs text-destructive">{errors.hostname.message}</p>}
+        </div>
+      </div>
 
-        <SettingsSection
-          title="Time Sync"
-          description="Keep schedules and logs accurate by syncing the device clock from an NTP source."
-          icon={Clock3}
-        >
-          <Field orientation="horizontal" className="items-start justify-between rounded-xl border bg-muted/20 p-4">
-            <FieldContent className="gap-1">
-              <FieldLabel htmlFor="enable-ntp">Enable NTP</FieldLabel>
-              <FieldDescription>Recommended for scheduled dosing and consistent timestamps.</FieldDescription>
-            </FieldContent>
+      {/* Time Sync */}
+      <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <Clock3 className="size-3" />
+            Time Sync
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="enable-ntp" className="text-xs text-muted-foreground">NTP</Label>
             <Controller
               name="enable_ntp"
               control={control}
               render={({ field }) => <Switch id="enable-ntp" checked={field.value} onCheckedChange={field.onChange} />}
             />
-          </Field>
-
-          <div className={cn('grid gap-4 md:grid-cols-2', !enableNtp && 'opacity-60')}>
-            <Field data-disabled={!enableNtp}>
-              <FieldLabel htmlFor="ntp_server">NTP server</FieldLabel>
-              <FieldContent>
-                <Input
-                  id="ntp_server"
-                  type="text"
-                  placeholder="pool.ntp.org"
-                  {...register('ntp_server')}
-                  disabled={!enableNtp}
-                  aria-invalid={!!errors.ntp_server}
-                />
-                <FieldDescription>Use a public pool or your local gateway if it provides time sync.</FieldDescription>
-                <FieldError errors={[errors.ntp_server]} />
-              </FieldContent>
-            </Field>
-
-            <Field data-disabled={!enableNtp}>
-              <FieldLabel htmlFor="time_zone">Time zone</FieldLabel>
-              <FieldContent>
-                <Controller
-                  name="time_zone"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange} disabled={!enableNtp}>
-                      <SelectTrigger id="time_zone" className="w-full" aria-invalid={!!errors.time_zone}>
-                        <SelectValue placeholder="Select time zone" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIME_ZONE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldDescription>Uses the selected region&apos;s DST rules automatically when applicable.</FieldDescription>
-                <FieldError errors={[errors.time_zone]} />
-              </FieldContent>
-            </Field>
           </div>
-        </SettingsSection>
+        </div>
+        <div className={cn('grid gap-3 sm:grid-cols-2', !enableNtp && 'opacity-40 pointer-events-none')}>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="ntp_server" className="text-xs text-muted-foreground">NTP Server</Label>
+            <Input
+              id="ntp_server"
+              type="text"
+              placeholder="pool.ntp.org"
+              className="h-8 text-sm"
+              {...register('ntp_server')}
+              disabled={!enableNtp}
+            />
+            {errors.ntp_server && <p className="text-xs text-destructive">{errors.ntp_server.message}</p>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="time_zone" className="text-xs text-muted-foreground">Time Zone</Label>
+            <Controller
+              name="time_zone"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange} disabled={!enableNtp}>
+                  <SelectTrigger id="time_zone" className="h-8 text-sm">
+                    <SelectValue placeholder="Select time zone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIME_ZONE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.time_zone && <p className="text-xs text-destructive">{errors.time_zone.message}</p>}
+          </div>
+        </div>
+      </div>
 
-        <SettingsSection
-          title="MQTT Telemetry"
-          description="Publish device state into your local automation stack, broker, or observability pipeline."
-          icon={RadioTower}
-        >
-          <Field orientation="horizontal" className="items-start justify-between rounded-xl border bg-muted/20 p-4">
-            <FieldContent className="gap-1">
-              <FieldLabel htmlFor="enable-mqtt">Enable MQTT</FieldLabel>
-              <FieldDescription>
-                Turn this on when the doser should report to Home Assistant, Node-RED, or another broker.
-              </FieldDescription>
-            </FieldContent>
+      {/* MQTT */}
+      <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <RadioTower className="size-3" />
+            MQTT Telemetry
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="enable-mqtt" className="text-xs text-muted-foreground">MQTT</Label>
             <Controller
               name="enable_mqtt"
               control={control}
               render={({ field }) => <Switch id="enable-mqtt" checked={field.value} onCheckedChange={field.onChange} />}
             />
-          </Field>
-
-          <div className={cn('grid gap-4 md:grid-cols-[minmax(0,1fr)_120px_120px]', !enableMqtt && 'opacity-60')}>
-            <Field data-disabled={!enableMqtt}>
-              <FieldLabel htmlFor="mqtt_ip_address">Broker host</FieldLabel>
-              <FieldContent>
-                <Input
-                  id="mqtt_ip_address"
-                  type="text"
-                  placeholder="mqtt.local or 192.168.1.10"
-                  {...register('mqtt_ip_address')}
-                  disabled={!enableMqtt}
-                  aria-invalid={!!errors.mqtt_ip_address}
-                />
-                <FieldDescription>Accepts a LAN IP or a resolvable local hostname.</FieldDescription>
-                <FieldError errors={[errors.mqtt_ip_address]} />
-              </FieldContent>
-            </Field>
-
-            <Field data-disabled={!enableMqtt}>
-              <FieldLabel htmlFor="mqtt_port">Port</FieldLabel>
-              <FieldContent>
-                <Input
-                  id="mqtt_port"
-                  type="text"
-                  placeholder="1883"
-                  {...register('mqtt_port')}
-                  disabled={!enableMqtt}
-                  aria-invalid={!!errors.mqtt_port}
-                />
-                <FieldError errors={[errors.mqtt_port]} />
-              </FieldContent>
-            </Field>
-
-            <Field data-disabled={!enableMqtt}>
-              <FieldLabel htmlFor="mqtt_qos">QoS</FieldLabel>
-              <FieldContent>
-                <Input
-                  id="mqtt_qos"
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={1}
-                  placeholder="0"
-                  {...register('mqtt_qos', { valueAsNumber: true })}
-                  disabled={!enableMqtt}
-                  aria-invalid={!!errors.mqtt_qos}
-                />
-                <FieldError errors={[errors.mqtt_qos]} />
-              </FieldContent>
-            </Field>
           </div>
-
-          <div className={cn('grid gap-4 md:grid-cols-2', !enableMqtt && 'opacity-60')}>
-            <Field data-disabled={!enableMqtt}>
-              <FieldLabel htmlFor="mqtt_user">User</FieldLabel>
-              <FieldContent>
-                <Input
-                  id="mqtt_user"
-                  type="text"
-                  placeholder="optional"
-                  {...register('mqtt_user')}
-                  disabled={!enableMqtt}
-                  aria-invalid={!!errors.mqtt_user}
-                />
-                <FieldError errors={[errors.mqtt_user]} />
-              </FieldContent>
-            </Field>
-
-            <Field data-disabled={!enableMqtt}>
-              <FieldLabel htmlFor="mqtt_password">Password</FieldLabel>
-              <FieldContent>
-                <Input
-                  id="mqtt_password"
-                  type="password"
-                  placeholder="optional"
-                  {...register('mqtt_password')}
-                  disabled={!enableMqtt}
-                  aria-invalid={!!errors.mqtt_password}
-                />
-                <FieldError errors={[errors.mqtt_password]} />
-              </FieldContent>
-            </Field>
-          </div>
-        </SettingsSection>
-
-        <SettingsSection
-          title="Firmware Delivery"
-          description="Point the device to a firmware source on your LAN so OTA updates are predictable and recoverable."
-          icon={RefreshCcw}
-        >
-          <Field>
-            <FieldLabel htmlFor="ota_url">OTA URL</FieldLabel>
-            <FieldContent>
-              <Input
-                id="ota_url"
-                type="text"
-                placeholder="http://192.168.1.10/device.ota.bin"
-                {...register('ota_url')}
-                aria-invalid={!!errors.ota_url}
-              />
-              <FieldDescription>
-                Prefer a stable local URL so field updates do not depend on internet access.
-              </FieldDescription>
-              <FieldError errors={[errors.ota_url]} />
-            </FieldContent>
-          </Field>
-        </SettingsSection>
-
-        <div className="flex justify-end">
-          <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save services'}
-          </Button>
         </div>
-      </FieldGroup>
+        <div className={cn('flex flex-col gap-3', !enableMqtt && 'opacity-40 pointer-events-none')}>
+          <div className="grid gap-3 sm:grid-cols-[1fr_100px_80px]">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mqtt_ip_address" className="text-xs text-muted-foreground">Broker Host</Label>
+              <Input
+                id="mqtt_ip_address"
+                type="text"
+                placeholder="192.168.1.10"
+                className="h-8 text-sm"
+                {...register('mqtt_ip_address')}
+                disabled={!enableMqtt}
+              />
+              {errors.mqtt_ip_address && <p className="text-xs text-destructive">{errors.mqtt_ip_address.message}</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mqtt_port" className="text-xs text-muted-foreground">Port</Label>
+              <Input
+                id="mqtt_port"
+                type="text"
+                placeholder="1883"
+                className="h-8 text-sm tabular-nums"
+                {...register('mqtt_port')}
+                disabled={!enableMqtt}
+              />
+              {errors.mqtt_port && <p className="text-xs text-destructive">{errors.mqtt_port.message}</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mqtt_qos" className="text-xs text-muted-foreground">QoS</Label>
+              <Input
+                id="mqtt_qos"
+                type="number"
+                min={0}
+                max={2}
+                step={1}
+                placeholder="0"
+                className="h-8 text-sm tabular-nums"
+                {...register('mqtt_qos', { valueAsNumber: true })}
+                disabled={!enableMqtt}
+              />
+              {errors.mqtt_qos && <p className="text-xs text-destructive">{errors.mqtt_qos.message}</p>}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mqtt_user" className="text-xs text-muted-foreground">User</Label>
+              <Input
+                id="mqtt_user"
+                type="text"
+                placeholder="optional"
+                className="h-8 text-sm"
+                {...register('mqtt_user')}
+                disabled={!enableMqtt}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mqtt_password" className="text-xs text-muted-foreground">Password</Label>
+              <Input
+                id="mqtt_password"
+                type="password"
+                placeholder="optional"
+                className="h-8 text-sm"
+                {...register('mqtt_password')}
+                disabled={!enableMqtt}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* OTA */}
+      <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <RefreshCcw className="size-3" />
+          Firmware Delivery
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="ota_url" className="text-xs text-muted-foreground">OTA URL</Label>
+          <Input
+            id="ota_url"
+            type="text"
+            placeholder="http://192.168.1.10/device.ota.bin"
+            className="h-8 text-sm"
+            {...register('ota_url')}
+            aria-invalid={!!errors.ota_url}
+          />
+          {errors.ota_url && <p className="text-xs text-destructive">{errors.ota_url.message}</p>}
+        </div>
+      </div>
+
+      {/* Save */}
+      <div className="border-t border-border/40 pt-3">
+        <Button type="submit" size="sm" className="w-full sm:w-auto" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving...' : 'Save services'}
+        </Button>
+      </div>
     </form>
   );
 };

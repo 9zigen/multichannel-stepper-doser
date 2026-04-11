@@ -1,219 +1,195 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { BookText, Cable, RadioTower, ShieldCheck, Webhook } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.tsx';
+import { Input } from '@/components/ui/input';
+import { BookText, Cable, RadioTower, Search, Webhook } from 'lucide-react';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 
-const codeClassName =
-  'overflow-x-auto rounded-xl border bg-muted/30 px-4 py-3 font-mono text-[12px] leading-5 text-foreground';
+const Code = ({ children }: { children: React.ReactNode }) => (
+  <pre className="overflow-x-auto rounded-md border border-border/30 bg-secondary/10 px-3 py-2 font-mono text-xs leading-5 text-foreground">
+    {children}
+  </pre>
+);
 
 const ApiDocsPage: React.FC = (): React.ReactElement => {
   const services = useAppStore((state: AppStoreState) => state.settings.services);
   const topicBase = services.hostname || 'stepper-doser';
+  const [filter, setFilter] = useState('');
+
+  const sections = useMemo(
+    () => [
+      {
+        id: 'rest',
+        title: 'REST API',
+        icon: Webhook,
+        badge: 'HTTP JSON',
+        keywords: 'rest api http json endpoints status settings run calibration pumps runtime upload restart factory reset post get bearer token authorization',
+        content: (
+          <>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Endpoints</div>
+              <Code>
+                {'GET  /api/status\nGET  /api/settings\nPOST /api/settings\nPOST /api/run\nPOST /api/calibration\nGET  /api/pumps/runtime\nPOST /api/device/restart\nPOST /api/device/factory-reset\nPOST /upload'}
+              </Code>
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Manual pump run</div>
+              <Code>
+                {'POST /api/run\nAuthorization: Bearer <token>\n{"id":0,"direction":true,"speed":1,"time":1}'}
+              </Code>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: 'websocket',
+        title: 'WebSocket',
+        icon: Cable,
+        badge: 'Realtime',
+        keywords: 'websocket ws realtime ping pong pump runtime push event connection heartbeat live',
+        content: (
+          <>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Connection</div>
+              <Code>{'ws://<device-ip>/ws?token=<bearer-token>'}</Code>
+            </div>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Heartbeat</div>
+              <Code>{'{"type":"ping"}'}</Code>
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Pump runtime event</div>
+              <Code>
+                {'{"type":"pump_runtime","pump":{"id":0,\n "active":true,"state":"timed","speed":1,\n "direction":true,"remaining_seconds":60,\n "volume_ml":1.2}}'}
+              </Code>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: 'mqtt',
+        title: 'MQTT',
+        icon: RadioTower,
+        badge: 'Pub/Sub',
+        keywords: `mqtt topic publish subscribe command availability status pumps run stop calibration start broker telemetry ${topicBase}`,
+        content: (
+          <>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Published topics</div>
+              <Code>
+                {`${topicBase}/availability\n${topicBase}/status\n${topicBase}/pumps/<id>/state`}
+              </Code>
+            </div>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Command topics</div>
+              <Code>
+                {`${topicBase}/command/restart\n${topicBase}/pumps/<id>/run\n${topicBase}/pumps/<id>/stop\n${topicBase}/pumps/<id>/calibration/start\n${topicBase}/pumps/<id>/calibration/stop`}
+              </Code>
+            </div>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Run payload</div>
+              <Code>{'{"speed":1,"time":1,"direction":true}'}</Code>
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">State payload</div>
+              <Code>
+                {'{"id":0,"name":"Pump 1","active":true,\n "state":"continuous","speed":12,\n "direction":true,"volume_ml":15.4,\n "tank_current_vol":840.5,\n "tank_full_vol":1000,\n "running_hours":124.3}'}
+              </Code>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: 'homeassistant',
+        title: 'Home Assistant',
+        icon: BookText,
+        badge: 'Discovery',
+        keywords: `homeassistant ha discovery sensor button config integration free heap wifi disconnects pump tank volume restart ${topicBase}`,
+        content: (
+          <>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Discovery topics</div>
+              <Code>
+                {`homeassistant/sensor/${topicBase}_free_heap/config\nhomeassistant/sensor/${topicBase}_wifi_disconnects/config\nhomeassistant/sensor/${topicBase}_pump_0_tank_volume/config\nhomeassistant/button/${topicBase}_restart/config`}
+              </Code>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Discovery models the device as a dosing controller. Pump tank volume, running hours, connectivity, and
+              restart actions are exposed as Home Assistant entities.
+            </p>
+          </>
+        ),
+      },
+    ],
+    [topicBase],
+  );
+
+  const filtered = filter
+    ? sections.filter(
+        (s) =>
+          s.title.toLowerCase().includes(filter.toLowerCase()) ||
+          s.keywords.toLowerCase().includes(filter.toLowerCase()),
+      )
+    : sections;
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
-      <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+    <div className="flex flex-col gap-4 py-2 md:py-3">
+      <section className="mx-auto w-full max-w-screen-2xl px-3">
         <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl">Integration Overview</CardTitle>
-            <CardDescription>
-              Firmware interfaces grouped by transport so local apps, dashboards, and Home Assistant can integrate
-              consistently.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="rounded-xl border bg-muted/20 p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 font-medium">
-                  <RadioTower className="size-4 text-muted-foreground" />
-                  MQTT topic base
-                </div>
-                <Badge variant="secondary">{topicBase}</Badge>
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <Webhook className="size-4 text-muted-foreground" />
+                <CardTitle className="text-lg">API Reference</CardTitle>
               </div>
-              <div className="grid gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-3">
-                  <span>REST API</span>
-                  <Badge variant="outline">HTTP JSON</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Realtime</span>
-                  <Badge variant="outline">WebSocket</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Automation</span>
-                  <Badge variant="outline">MQTT + HA Discovery</Badge>
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">{topicBase}</Badge>
+                <Badge variant="outline">REST</Badge>
+                <Badge variant="outline">WS</Badge>
+                <Badge variant="outline">MQTT</Badge>
               </div>
             </div>
-
-            <Alert className="p-4">
-              <ShieldCheck />
-              <AlertTitle>Authentication model</AlertTitle>
-              <AlertDescription>
-                REST and WebSocket use the current bearer token. MQTT currently assumes trusted LAN broker access and
-                uses broker username/password from device settings.
-              </AlertDescription>
-            </Alert>
+            {/* Search */}
+            <div className="relative mt-2">
+              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Filter docs... (e.g. mqtt, run, calibration)"
+                className="h-8 pl-8 text-sm"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              REST and WebSocket use bearer token auth. MQTT uses broker credentials from device settings.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {filtered.length > 0 ? (
+              filtered.map((section, index) => {
+                const Icon = section.icon;
+                return (
+                  <div
+                    key={section.id}
+                    className="animate-fade-in-up rounded-lg border border-border/40 bg-secondary/10 p-3"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <Icon className="size-3.5 text-muted-foreground" />
+                      <span className="text-sm font-medium">{section.title}</span>
+                      <Badge variant="outline" className="text-xs">{section.badge}</Badge>
+                    </div>
+                    {section.content}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="rounded-lg border border-dashed border-border/60 bg-secondary/10 px-4 py-6 text-center text-sm text-muted-foreground">
+                No matching sections for &ldquo;{filter}&rdquo;
+              </div>
+            )}
           </CardContent>
         </Card>
-
-        <div className="grid gap-6">
-          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Webhook className="size-5" />
-                REST API
-              </CardTitle>
-              <CardDescription>Primary configuration and control surface used by the Web UI.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 text-sm">
-              <div>
-                <div className="mb-2 font-medium">Endpoints</div>
-                <div className={codeClassName}>
-                  GET /api/status
-                  <br />
-                  GET /api/settings
-                  <br />
-                  POST /api/settings
-                  <br />
-                  POST /api/run
-                  <br />
-                  POST /api/calibration
-                  <br />
-                  GET /api/pumps/runtime
-                  <br />
-                  POST /api/device/restart
-                  <br />
-                  POST /api/device/factory-reset
-                  <br />
-                  POST /upload
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 font-medium">Manual pump run example</div>
-                <div className={codeClassName}>
-                  POST /api/run
-                  <br />
-                  Authorization: Bearer &lt;token&gt;
-                  <br />
-                  {`{"id":0,"direction":true,"speed":1,"time":1}`}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Cable className="size-5" />
-                WebSocket
-              </CardTitle>
-              <CardDescription>
-                Lightweight realtime channel used for connection health and live pump runtime updates.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 text-sm">
-              <div>
-                <div className="mb-2 font-medium">Connection</div>
-                <div className={codeClassName}>ws://&lt;device-ip&gt;/ws?token=&lt;bearer-token&gt;</div>
-              </div>
-
-              <div>
-                <div className="mb-2 font-medium">Client heartbeat</div>
-                <div className={codeClassName}>{`{"type":"ping"}`}</div>
-              </div>
-
-              <div>
-                <div className="mb-2 font-medium">Pump runtime push event</div>
-                <div className={codeClassName}>
-                  {`{"type":"pump_runtime","pump":{"id":0,"active":true,"state":"timed","speed":1,"direction":true,"remaining_ticks":6000,"remaining_seconds":60,"volume_ml":1.2}}`}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <RadioTower className="size-5" />
-                MQTT Contract
-              </CardTitle>
-              <CardDescription>
-                Device-centric topics for telemetry, runtime state, and remote commands. The topic base follows the
-                configured hostname.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 text-sm">
-              <div>
-                <div className="mb-2 font-medium">Published topics</div>
-                <div className={codeClassName}>
-                  {topicBase}/availability
-                  <br />
-                  {topicBase}/status
-                  <br />
-                  {topicBase}/pumps/&lt;id&gt;/state
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 font-medium">Subscribed command topics</div>
-                <div className={codeClassName}>
-                  {topicBase}/command/restart
-                  <br />
-                  {topicBase}/pumps/&lt;id&gt;/run
-                  <br />
-                  {topicBase}/pumps/&lt;id&gt;/stop
-                  <br />
-                  {topicBase}/pumps/&lt;id&gt;/calibration/start
-                  <br />
-                  {topicBase}/pumps/&lt;id&gt;/calibration/stop
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 font-medium">Run command payload</div>
-                <div className={codeClassName}>{`{"speed":1,"time":1,"direction":true}`}</div>
-              </div>
-
-              <div>
-                <div className="mb-2 font-medium">Pump state payload</div>
-                <div className={codeClassName}>
-                  {`{"id":0,"name":"Pump 1","active":true,"state":"continuous","speed":12,"direction":true,"remaining_ticks":0,"remaining_seconds":0,"volume_ml":15.4,"tank_current_vol":840.5,"tank_full_vol":1000,"running_hours":124.3}`}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <BookText className="size-5" />
-                Home Assistant
-              </CardTitle>
-              <CardDescription>
-                Discovery is published automatically under the standard Home Assistant prefix when MQTT connects.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 text-sm">
-              <div className={codeClassName}>
-                {`homeassistant/sensor/${topicBase}_free_heap/config`}
-                <br />
-                {`homeassistant/sensor/${topicBase}_wifi_disconnects/config`}
-                <br />
-                {`homeassistant/sensor/${topicBase}_pump_0_tank_volume/config`}
-                <br />
-                {`homeassistant/button/${topicBase}_restart/config`}
-              </div>
-              <p className="text-muted-foreground">
-                Discovery now models the device as a dosing controller rather than a light controller. Pump tank volume,
-                running hours, connectivity, and restart actions are exposed as first-class Home Assistant entities.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
       </section>
     </div>
   );
