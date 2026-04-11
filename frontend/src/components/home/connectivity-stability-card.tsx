@@ -13,7 +13,7 @@ const ConnectivityStabilityCard = ({
   deviceStatus,
 }: ConnectivityStabilityCardProps): React.ReactElement => {
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
+    <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">Connectivity Stability</CardTitle>
         <CardDescription>
@@ -21,7 +21,7 @@ const ConnectivityStabilityCard = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="grid flex-1 gap-4">
-        <div className="rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 p-4 -mx-4">
+        <div className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 p-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-medium">
             <Wifi className="size-4 text-primary" />
             Wi-Fi health

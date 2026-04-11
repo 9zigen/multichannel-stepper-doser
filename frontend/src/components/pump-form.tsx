@@ -317,7 +317,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
               </p>
             )}
             {pumpCalibrations.map((item, index) => (
-              <div key={index} className="flex flex-row gap-4 mb-4 bg-gray-100 p-2 rounded-md justify-between">
+              <div key={index} className="animate-fade-in-up flex flex-row gap-4 mb-4 bg-gray-100 dark:bg-secondary/20 p-2 rounded-md justify-between" style={{ animationDelay: `${index * 50}ms` }}>
                 <div className="w-auto grid items-center">
                   <span className="text-gray-500 text-sm">Speed</span>
                   <span className="text-sm">{item.speed} RPM</span>

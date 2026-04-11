@@ -136,8 +136,8 @@ const NetworkPage: React.FC = (): React.ReactElement => {
               <div className="mb-2 font-medium">Current summary</div>
               <div className="grid gap-3 text-muted-foreground">
                 {networks.length ? (
-                  networks.map((network) => (
-                    <div key={network.id}>
+                  networks.map((network, index) => (
+                    <div key={network.id} className="animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
                       <div className="text-xs uppercase tracking-wide">{NetworkType[network.type]}</div>
                       <div>{getNetworkSummary(network)}</div>
                     </div>
@@ -194,12 +194,12 @@ const NetworkPage: React.FC = (): React.ReactElement => {
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {networks.length ? (
-                networks.map((network) => {
+                networks.map((network, index) => {
                   const Icon = getNetworkIcon(network.type);
                   const isSelected = selectedNetwork?.id === network.id;
 
                   return (
-                    <div key={network.id} className="rounded-xl border bg-card p-4">
+                    <div key={network.id} className="animate-fade-in-up rounded-xl border bg-card p-4" style={{ animationDelay: `${index * 50}ms` }}>
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-start gap-3">
                           <div className="flex size-10 items-center justify-center rounded-lg bg-muted">

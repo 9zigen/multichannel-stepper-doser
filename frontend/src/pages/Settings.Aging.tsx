@@ -168,11 +168,11 @@ const AgingPage: React.FC = (): React.ReactElement => {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
-                {draftPumps.map((pump) => {
+                {draftPumps.map((pump, index) => {
                   const status = getStatus(pump);
 
                   return (
-                    <div key={pump.id} className="rounded-xl border bg-card p-4">
+                    <div key={pump.id} className="animate-fade-in-up rounded-xl border bg-card p-4" style={{ animationDelay: `${index * 50}ms` }}>
                       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <div className="font-medium">{pump.name}</div>

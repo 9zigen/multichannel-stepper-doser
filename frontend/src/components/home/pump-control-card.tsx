@@ -194,7 +194,7 @@ export default function PumpControlCard(props: PumpControlProps) {
   }
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
+    <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
       <CardHeader>
         <CardTitle>Pump Control</CardTitle>
         <CardDescription>Manual control of pumps with live runtime feedback and immediate stop support.</CardDescription>
@@ -224,7 +224,7 @@ export default function PumpControlCard(props: PumpControlProps) {
           <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-row gap-4">
               <div className="w-[50%] mb-2">
-                <div className="text-gray-500 pb-1">
+                <div className="text-muted-foreground pb-1">
                   <label>Pump</label>
                 </div>
                 <Controller
@@ -254,7 +254,7 @@ export default function PumpControlCard(props: PumpControlProps) {
                 {errors.pump_id && <p role="alert">{errors.pump_id?.message}</p>}
               </div>
               <div className="w-[50%] mb-2">
-                <div className="text-gray-500 pb-1">
+                <div className="text-muted-foreground pb-1">
                   <label>Direction</label>
                 </div>
                 <Controller
@@ -282,7 +282,7 @@ export default function PumpControlCard(props: PumpControlProps) {
 
             <div className="flex flex-row gap-4">
               <div className="mb-4 w-[50%]">
-                <div className="text-gray-500 pb-1">
+                <div className="text-muted-foreground pb-1">
                   <label>Speed [rpm]</label>
                 </div>
                 <Input
@@ -300,7 +300,7 @@ export default function PumpControlCard(props: PumpControlProps) {
               </div>
 
               <div className="mb-4 w-[50%]">
-                <div className="text-gray-500 pb-1">
+                <div className="text-muted-foreground pb-1">
                   <label>Working time [min]</label>
                 </div>
                 <Input

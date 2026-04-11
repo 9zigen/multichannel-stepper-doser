@@ -82,7 +82,7 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
   }, [today]);
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
+    <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">Today&apos;s Dosing</CardTitle>
         <CardDescription>Hourly activity for today.</CardDescription>
@@ -124,10 +124,11 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
                     key={hour}
                     title={`${formatHourLabel(hour)} · ${volume} ml`}
                     className={cn(
-                      'flex h-5 items-end justify-center rounded-[3px] text-[8px]',
+                      'animate-fade-in-up flex h-5 items-end justify-center rounded-[3px] text-[8px]',
                       getBarIntensityClass(volume, maxHourVolume),
                       volume > 0 ? 'text-emerald-950/70' : 'text-muted-foreground/50'
                     )}
+                    style={{ animationDelay: `${hour * 20}ms` }}
                   >
                     {hour % 3 === 0 ? String(hour).padStart(2, '0') : ''}
                   </div>
@@ -164,8 +165,8 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
                 <Separator />
                 <div className="grid gap-3 text-sm">
                   <div className="text-xs text-muted-foreground">Busiest hours</div>
-                  {busiestHours.map((hour) => (
-                    <div key={hour.hour} className="flex items-center justify-between text-sm">
+                  {busiestHours.map((hour, index) => (
+                    <div key={hour.hour} className="animate-fade-in-up flex items-center justify-between text-sm" style={{ animationDelay: `${index * 50}ms` }}>
                       <span className="font-medium">{formatHourLabel(hour.hour)}</span>
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary">{hour.volume} ml</Badge>

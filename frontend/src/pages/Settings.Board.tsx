@@ -326,16 +326,17 @@ const BoardPage: React.FC = (): React.ReactElement => {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
-                {config.channels.map((channel) => {
+                {config.channels.map((channel, index) => {
                   const isActive = channel.id < config.motors_num;
 
                   return (
                     <div
                       key={channel.id}
                       className={cn(
-                        'rounded-xl border bg-card p-4 transition-opacity',
+                        'animate-fade-in-up rounded-xl border bg-card p-4 transition-opacity',
                         !isActive && 'opacity-60'
                       )}
+                      style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-3">

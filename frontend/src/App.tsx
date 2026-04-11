@@ -40,7 +40,7 @@ const App = (): React.ReactElement => {
   }, []);
 
   return (
-    <ThemeProvider defaultTheme="light" storageKey="ui-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
       <TooltipProvider>
         <RealtimeProvider>
           <PumpRuntimeProvider>

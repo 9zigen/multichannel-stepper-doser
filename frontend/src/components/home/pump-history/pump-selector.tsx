@@ -12,13 +12,14 @@ type PumpSelectorProps = {
 
 const PumpSelector = ({ pumps, historyPumps, selectedPumpId, onSelect }: PumpSelectorProps): React.ReactElement => (
   <div className="flex flex-wrap gap-2">
-    {(historyPumps.length > 0 ? historyPumps : pumps).map((pump) => (
+    {(historyPumps.length > 0 ? historyPumps : pumps).map((pump, index) => (
       <Button
         key={pump.id}
         type="button"
         size="sm"
         variant={pump.id === selectedPumpId ? 'default' : 'outline'}
-        className="rounded-full"
+        className="animate-fade-in-up rounded-full"
+        style={{ animationDelay: `${index * 50}ms` }}
         onClick={() => onSelect(pump.id)}
       >
         {pump.name}

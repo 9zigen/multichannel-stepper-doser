@@ -113,7 +113,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
             </CardHeader>
             <CardContent>
               <div className="grid gap-6 sm:grid-cols-2 2xl:grid-cols-3">
-                {pumps?.map((pump) => {
+                {pumps?.map((pump, index) => {
                   const percentage =
                     pump.tank_full_vol > 0 ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100) : 0;
                   const lowInventory = percentage <= 25;
@@ -121,7 +121,8 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                   return (
                     <Card
                       key={pump.id}
-                      className="overflow-hidden border-border bg-linear-to-br from-card via-card to-secondary/30 shadow-md transition-transform duration-200 hover:-translate-y-0.5"
+                      className="animate-fade-in-up overflow-hidden border-border bg-linear-to-br from-card via-card to-secondary/30 shadow-md transition-transform duration-200 hover:-translate-y-0.5"
+                      style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div
                         className="h-1.5 w-full bg-linear-to-r from-primary via-primary/80 to-accent"

@@ -36,8 +36,8 @@ const Home: React.FC = (): React.ReactElement => {
   };
 
   return (
-    <div className="flex flex-col gap-8 py-4 md:py-6">
-      <section className="mx-auto grid w-full max-w-screen-2xl gap-6 px-4 xl:grid-cols-12">
+    <div className="flex flex-col gap-4 py-2 md:py-3">
+      <section className="mx-auto grid w-full max-w-screen-2xl gap-3 px-3 xl:grid-cols-12">
         <div className="xl:col-span-3 xl:row-span-3 xl:h-full">
           <DeviceOverviewCard pumps={pumps} deviceStatus={deviceStatus} />
         </div>
@@ -56,7 +56,7 @@ const Home: React.FC = (): React.ReactElement => {
           <PumpHistoryTodayCard pumps={pumps} />
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:col-span-6 xl:grid-cols-12">
+        <div className="grid gap-3 md:grid-cols-2 xl:col-span-6 xl:grid-cols-12">
           <div className="md:col-span-2 xl:col-span-12">
             <PumpControlCard pumps={pumps} />
           </div>

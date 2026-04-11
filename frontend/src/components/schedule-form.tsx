@@ -42,7 +42,7 @@ const SummaryRow = ({
 }): React.ReactElement => (
   <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-xl px-1">
     <div className="text-sm leading-6 text-muted-foreground">{label}</div>
-    <div className="justify-self-end text-sm font-medium leading-6 text-foreground">{value}</div>
+    <div className="justify-self-end text-sm font-medium tabular-nums leading-6 text-foreground">{value}</div>
   </div>
 );
 
@@ -157,7 +157,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
   return (
     <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
       <FieldGroup className="gap-3">
-        <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-3">
+        <section className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 px-4 py-3">
           <div className="mb-3 flex flex-col gap-3">
             <div className="flex items-start gap-3">
               <div className="flex size-10 items-center justify-center rounded-xl bg-background shadow-xs">
@@ -185,7 +185,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
             name="schedule.mode"
             control={control}
             render={({ field }) => (
-              <div className="rounded-2xl bg-background p-1.5 shadow-xs">
+              <div className="rounded-lg border border-border/30 bg-secondary/20 p-1">
                 <ToggleGroup
                   type="single"
                   spacing={3}
@@ -197,18 +197,20 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                     }
                   }}
                 >
-                  {Object.entries(scheduleModeMeta).map(([value, meta]) => {
+                  {Object.entries(scheduleModeMeta).map(([value, meta], index) => {
                     const selected = field.value === Number(value);
 
                     return (
                       <ToggleGroupItem
                         key={value}
                         value={value}
+                        style={{ animationDelay: `${index * 50}ms` }}
                         className={cn(
-                          'h-9 rounded-xl border border-transparent px-3 py-2 text-sm font-medium shadow-none transition-all',
+                          'animate-fade-in-up',
+                          'h-9 rounded-md border border-transparent px-3 py-2 text-sm font-medium shadow-none transition-all',
                           'flex items-center gap-2 hover:bg-secondary/25',
                           selected
-                            ? 'border-primary/20 bg-secondary/45 text-foreground shadow-sm'
+                            ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_12px_rgba(34,211,238,0.1)]'
                             : 'text-foreground/80'
                         )}
                       >
@@ -235,7 +237,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
         ) : null}
 
         {modeActual !== SCHEDULE_MODE.OFF ? (
-          <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-3">
+          <section className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 px-4 py-3">
             <FieldSet className="gap-3">
               <div className="flex flex-col gap-1">
                 <FieldLegend>Output target</FieldLegend>
@@ -292,7 +294,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
         ) : null}
 
         {modeActual === SCHEDULE_MODE.PERIODIC ? (
-          <section className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-3">
+          <section className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 px-4 py-3">
             <div className="mb-3 flex items-center gap-2">
               <Repeat className="size-4 text-primary" />
               <FieldTitle className="text-base">Timing rules</FieldTitle>
@@ -314,7 +316,8 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                           key={day}
                           pressed={field.value.includes(index)}
                           onClick={() => toggleDay(field, index)}
-                          className="h-10 rounded-xl text-sm"
+                          className="animate-fade-in-up h-10 rounded-xl text-sm"
+                          style={{ animationDelay: `${index * 50}ms` }}
                         >
                           {day}
                         </Toggle>
@@ -334,12 +337,13 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                   control={control}
                   render={({ field }) => (
                     <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-8">
-                      {hours.map((hour) => (
+                      {hours.map((hour, index) => (
                         <Toggle
                           key={hour}
                           pressed={field.value.includes(hour)}
                           onClick={() => toggleHour(field, hour)}
-                          className="h-10 rounded-xl text-sm"
+                          className="animate-fade-in-up h-10 rounded-xl text-sm"
+                          style={{ animationDelay: `${index * 20}ms` }}
                         >
                           {String(hour).padStart(2, '0')}
                         </Toggle>

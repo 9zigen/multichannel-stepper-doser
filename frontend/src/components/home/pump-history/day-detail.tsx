@@ -52,12 +52,12 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
           </tr>
         </thead>
         <tbody>
-          {activeHours.map((hour) => {
+          {activeHours.map((hour, index) => {
             const totalVolume = hour.scheduled_volume_ml + hour.manual_volume_ml;
             const flags = renderFlags(hour.flags);
 
             return (
-              <tr key={hour.hour} className="border-b border-border/50 last:border-0">
+              <tr key={hour.hour} className="animate-fade-in-up border-b border-border/50 last:border-0" style={{ animationDelay: `${index * 50}ms` }}>
                 <td className="whitespace-nowrap py-2 pr-4 font-medium">{formatHourLabel(hour.hour)}</td>
                 <td className="whitespace-nowrap py-2 px-4 text-right">
                   <Badge variant="secondary" className="font-semibold">{totalVolume} ml</Badge>

@@ -53,10 +53,10 @@ const Schedule: React.FC = (): React.ReactElement => {
   }, [pumps]);
 
   return (
-    <div className="flex flex-col gap-8 py-4 md:py-6">
-      <section className="mx-auto w-full max-w-screen-2xl px-4">
+    <div className="flex flex-col gap-4 py-2 md:py-3">
+      <section className="mx-auto w-full max-w-screen-2xl px-3">
         {firstPumpId === undefined ? (
-          <Card className="overflow-hidden border-border bg-card shadow-lg">
+          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
             <CardContent className="py-10">
               <Empty className="border-border bg-muted/20">
                 <EmptyHeader>
@@ -76,13 +76,13 @@ const Schedule: React.FC = (): React.ReactElement => {
             <div className="grid gap-6 xl:grid-cols-12">
               {/* Left: Pump list */}
               <div className="xl:col-span-4">
-                <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
+                <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg">Schedule Planner</CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-1 flex-col gap-4">
                     {/* Stats strip */}
-                    <div className="-mx-4 rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 px-4 py-2.5">
+                    <div className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 px-4 py-2.5">
                       <div className="grid grid-cols-3 divide-x divide-border/40">
                         <div className="flex flex-col items-center gap-0.5 pr-2">
                           <span className="text-sm font-semibold tabular-nums text-foreground">
@@ -109,7 +109,7 @@ const Schedule: React.FC = (): React.ReactElement => {
 
                     {/* Pump rows */}
                     <TabsList className="flex h-auto w-full flex-col gap-1.5 bg-transparent p-0">
-                      {pumps.map((pump) => {
+                      {pumps.map((pump, index) => {
                         const mode = scheduleModeMeta[pump.schedule.mode];
                         const ModeIcon = mode.icon;
                         const isSelected = String(pump.id) === selectedPumpId;
@@ -119,16 +119,17 @@ const Schedule: React.FC = (): React.ReactElement => {
                             key={pump.id}
                             value={String(pump.id)}
                             className={cn(
-                              'h-auto min-h-0 w-full flex-none flex-row items-center justify-between gap-3 self-auto rounded-xl border px-3 py-2.5 text-left after:hidden',
-                              'border-border/50 bg-background hover:bg-secondary/20',
-                              'data-active:border-primary/20 data-active:bg-secondary/35 data-active:text-foreground data-active:shadow-sm',
+                              'h-auto min-h-0 w-full flex-none flex-row items-center justify-between gap-3 self-auto rounded-lg border px-3 py-2.5 text-left after:hidden animate-fade-in-up',
+                              'border-border/40 bg-secondary/10 hover:bg-secondary/20',
+                              'data-active:border-primary/30 data-active:bg-primary/5 data-active:text-foreground data-active:shadow-[0_0_12px_rgba(34,211,238,0.1)]',
                             )}
+                            style={{ animationDelay: `${index * 50}ms` }}
                           >
                             <div className="flex min-w-0 items-center gap-2.5">
                               <div
                                 className={cn(
-                                  'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                                  isSelected ? 'bg-background shadow-xs' : 'bg-muted/50',
+                                  'flex size-8 shrink-0 items-center justify-center rounded-md',
+                                  isSelected ? 'bg-primary/10' : 'bg-secondary/50',
                                 )}
                               >
                                 <ModeIcon
@@ -166,7 +167,7 @@ const Schedule: React.FC = (): React.ReactElement => {
 
                   return (
                     <TabsContent key={pump.id} value={String(pump.id)} className="mt-0">
-                      <Card className="overflow-hidden border-border bg-card shadow-lg">
+                      <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
                         <CardHeader className="pb-3">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <CardTitle className="text-lg">{pump.name}</CardTitle>

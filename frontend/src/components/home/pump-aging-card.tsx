@@ -29,7 +29,7 @@ const PumpAgingCard = ({
   onResetPumpCounter,
 }: PumpAgingCardProps): React.ReactElement => {
   return (
-    <Card className="overflow-hidden border-border bg-card shadow-lg">
+    <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">Pump Aging</CardTitle>
         <CardDescription>

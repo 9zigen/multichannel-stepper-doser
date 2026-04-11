@@ -101,50 +101,50 @@
 }
 
 .dark {
-  --background: #1f272d;
-  --foreground: #ffffff;
-  --card: #2a3339;
-  --card-foreground: #ffffff;
-  --popover: #2a3339;
-  --popover-foreground: #ffffff;
-  --primary: #ffffff;
-  --primary-foreground: #36454f;
-  --secondary: #36454f;
-  --secondary-foreground: #ffffff;
-  --muted: #313c43;
-  --muted-foreground: #d3d3d3;
-  --accent: #708090;
-  --accent-foreground: #ffffff;
-  --destructive: oklch(0.704 0.191 22.216);
+  --background: #0b0e11;
+  --foreground: #e2e8f0;
+  --card: #131820;
+  --card-foreground: #e2e8f0;
+  --popover: #161b22;
+  --popover-foreground: #e2e8f0;
+  --primary: #22d3ee;
+  --primary-foreground: #0b0e11;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #64748b;
+  --accent: #06b6d4;
+  --accent-foreground: #0b0e11;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: rgb(211 211 211 / 0.12);
-  --input: rgb(211 211 211 / 0.18);
-  --ring: #708090;
-  --chart-1: #ffffff;
-  --chart-2: #d3d3d3;
-  --chart-3: #9aa5b1;
-  --chart-4: #708090;
-  --chart-5: #36454f;
-  --sidebar: #232c32;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #36454f;
-  --sidebar-accent: #708090;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgb(211 211 211 / 0.1);
-  --sidebar-ring: #708090;
+  --border: rgb(148 163 184 / 0.08);
+  --input: rgb(148 163 184 / 0.12);
+  --ring: #22d3ee;
+  --chart-1: #22d3ee;
+  --chart-2: #10b981;
+  --chart-3: #f59e0b;
+  --chart-4: #8b5cf6;
+  --chart-5: #64748b;
+  --sidebar: #0f1318;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #22d3ee;
+  --sidebar-primary-foreground: #0b0e11;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: rgb(148 163 184 / 0.06);
+  --sidebar-ring: #22d3ee;
   --font-sans: 'DejaVu Sans', sans-serif;
   --font-serif: Source Serif 4, serif;
   --font-mono: JetBrains Mono, monospace;
-  --radius: 0.75rem;
-  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
-  --shadow-xs: 0 6px 14px -10px rgb(0 0 0 / 0.26);
-  --shadow-sm: 0 14px 34px -18px rgb(0 0 0 / 0.32);
-  --shadow: 0 18px 42px -22px rgb(0 0 0 / 0.38);
-  --shadow-md: 0 22px 52px -24px rgb(0 0 0 / 0.42);
-  --shadow-lg: 0 28px 64px -28px rgb(0 0 0 / 0.48);
-  --shadow-xl: 0 36px 84px -32px rgb(0 0 0 / 0.54);
-  --shadow-2xl: 0 44px 110px -36px rgb(0 0 0 / 0.62);
+  --radius: 0.5rem;
+  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-xs: 0 0 0 1px rgb(148 163 184 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 0 0 1px rgb(148 163 184 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.5);
+  --shadow: 0 0 0 1px rgb(148 163 184 / 0.04), 0 8px 24px -6px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 0 0 1px rgb(148 163 184 / 0.04), 0 12px 32px -8px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 0 0 1px rgb(148 163 184 / 0.04), 0 16px 40px -10px rgb(0 0 0 / 0.6);
+  --shadow-xl: 0 0 0 1px rgb(148 163 184 / 0.04), 0 24px 56px -14px rgb(0 0 0 / 0.65);
+  --shadow-2xl: 0 0 0 1px rgb(148 163 184 / 0.04), 0 32px 72px -18px rgb(0 0 0 / 0.7);
 }
 
 @theme inline {
@@ -275,6 +275,18 @@
         transparent 26%
       ),
       linear-gradient(180deg, color-mix(in oklab, var(--color-secondary) 38%, transparent), transparent 30%),
+      var(--color-background);
+    min-height: 100vh;
+  }
+
+  .dark body {
+    background:
+      radial-gradient(circle at top left, color-mix(in oklab, var(--color-accent) 6%, transparent) 0, transparent 32%),
+      radial-gradient(
+        circle at top right,
+        color-mix(in oklab, var(--color-primary) 4%, transparent) 0,
+        transparent 26%
+      ),
       var(--color-background);
     min-height: 100vh;
   }

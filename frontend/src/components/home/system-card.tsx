@@ -11,7 +11,7 @@ type SystemCardProps = {
 
 const SystemCard = ({ deviceStatus }: SystemCardProps): React.ReactElement => {
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-border bg-card shadow-lg">
+    <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">System</CardTitle>
         <CardDescription>
@@ -19,7 +19,7 @@ const SystemCard = ({ deviceStatus }: SystemCardProps): React.ReactElement => {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid flex-1 gap-4">
-        <div className="rounded-2xl bg-linear-to-br from-card via-card to-secondary/30 p-4 -mx-4">
+        <div className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 p-4">
           <div className="grid gap-3 text-sm">
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-muted-foreground">
