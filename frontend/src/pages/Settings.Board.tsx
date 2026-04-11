@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Cable, CircuitBoard, RotateCw, Save } from 'lucide-react';
+import { AlertTriangle, Cable, CircuitBoard, Network, RotateCw, Save } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -15,17 +15,14 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 const parseNumericInput = (value: string): number => {
-  if (value.trim() === '') {
-    return 0;
-  }
-
+  if (value.trim() === '') return 0;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
@@ -49,9 +46,7 @@ const validateBoardConfig = (config: BoardConfigState): string[] => {
   const activeChannels = config.channels.slice(0, config.motors_num);
 
   const addPinUse = (pin: number, label: string) => {
-    if (!allPins.has(pin)) {
-      allPins.set(pin, []);
-    }
+    if (!allPins.has(pin)) allPins.set(pin, []);
     allPins.get(pin)?.push(label);
   };
 
@@ -73,16 +68,10 @@ const validateBoardConfig = (config: BoardConfigState): string[] => {
   });
 
   allPins.forEach((uses, pin) => {
-    if (uses.length < 2) {
-      return;
-    }
-
+    if (uses.length < 2) return;
     const nonEnUses = uses.filter((use) => !use.endsWith(' EN'));
     const enUses = uses.filter((use) => use.endsWith(' EN'));
-    if (nonEnUses.length === 0 && enUses.length > 1) {
-      return;
-    }
-
+    if (nonEnUses.length === 0 && enUses.length > 1) return;
     errors.push(`GPIO ${pin} is assigned multiple times: ${uses.join(', ')}.`);
   });
 
@@ -103,13 +92,12 @@ const BoardPage: React.FC = (): React.ReactElement => {
         const nextConfig = await getBoardConfig<BoardConfigState>();
         setConfig(nextConfig);
         setInitialConfig(nextConfig);
-      } catch (error) {
+      } catch {
         toast.error('Failed to load board configuration.');
       } finally {
         setIsLoading(false);
       }
     };
-
     void loadBoardConfig();
   }, []);
 
@@ -125,15 +113,13 @@ const BoardPage: React.FC = (): React.ReactElement => {
     setConfig((current) => ({
       ...current,
       channels: current.channels.map((channel) =>
-        channel.id === channelId ? { ...channel, [field]: value } : channel
+        channel.id === channelId ? { ...channel, [field]: value } : channel,
       ),
     }));
   };
 
   const resetDraft = () => {
-    if (initialConfig) {
-      setConfig(initialConfig);
-    }
+    if (initialConfig) setConfig(initialConfig);
   };
 
   const handleSave = async () => {
@@ -156,7 +142,6 @@ const BoardPage: React.FC = (): React.ReactElement => {
         toast.error(message || 'Board configuration not saved.');
         return;
       }
-
       toast.error('Board configuration not saved.');
     } finally {
       setIsSaving(false);
@@ -164,168 +149,112 @@ const BoardPage: React.FC = (): React.ReactElement => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 py-4 md:py-6">
-      <section className="container grid gap-8 px-4 md:px-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-          <CardHeader>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <CardTitle className="text-xl">Board Overview</CardTitle>
-                <CardDescription>
-                  Configure shared TMC2209 transport, per-channel wiring, and live hardware limits from one page.
-                </CardDescription>
-              </div>
-              <Button type="button" variant="outline" onClick={() => setSearchParams({ guided: '1' })}>
-                Run guided setup
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {guidedMode ? (
-              <Alert className="p-4">
-                <CircuitBoard />
-                <AlertTitle>Guided board setup</AlertTitle>
-                <AlertDescription>
-                  Review UART pins, active channels, and per-channel wiring. Save when the hardware matches reality, then
-                  return to the main app.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            <div className="rounded-xl border bg-muted/20 p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 font-medium">
-                  <CircuitBoard className="size-4 text-muted-foreground" />
-                  Active channels
-                </div>
-                <Badge variant="secondary">{config.motors_num}</Badge>
-              </div>
-
-              <div className="grid gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-3">
-                  <span>UART bus</span>
-                  <Badge variant="outline">UART{config.uart}</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>TX / RX pins</span>
-                  <Badge variant="outline">
-                    {config.tx_pin} / {config.rx_pin}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Shared EN reuse</span>
-                  <Badge variant="secondary">Allowed</Badge>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Runtime apply mode</span>
-                  <Badge variant="default">Live reload</Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-card p-4 text-sm">
-              <div className="mb-2 font-medium">Speed guardrail</div>
-                  <div className="text-muted-foreground">
-                Max RPM scales with microstep resolution: 256 = 30 RPM, 128 = 60 RPM, 64 = 120 RPM, and so on. The UI
-                mirrors the firmware limit so operators see it before saving.
-              </div>
-            </div>
-
-            <Alert className={cn('p-4', validationErrors.length > 0 && 'border-destructive/50')}>
-              <AlertTriangle />
-              <AlertTitle>{validationErrors.length > 0 ? 'Validation required' : 'Configuration looks consistent'}</AlertTitle>
-              <AlertDescription>
-                {validationErrors.length > 0
-                  ? validationErrors[0]
-                  : 'Duplicate enable pins are accepted, but UART and step/dir assignments must remain conflict-free.'}
+    <div className="flex flex-col gap-4 py-2 md:py-3">
+      <section className="mx-auto w-full max-w-screen-2xl px-3">
+        <div className="flex flex-col gap-4">
+          {guidedMode && (
+            <Alert className="p-4">
+              <Network />
+              <AlertTitle>Guided onboarding step</AlertTitle>
+              <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>Review UART pins, active channels, and per-channel wiring. Save when ready.</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchParams({});
+                    navigate('/onboarding');
+                  }}
+                >
+                  Return to onboarding
+                </Button>
               </AlertDescription>
             </Alert>
-          </CardContent>
-        </Card>
+          )}
 
-        <div className="grid gap-6">
           <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl">Shared Driver Settings</CardTitle>
-              <CardDescription>These values are common to all active TMC2209 channels on the board.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup className="gap-5">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Field>
-                    <FieldLabel htmlFor="uart">UART peripheral</FieldLabel>
-                    <FieldContent>
-                      <Select value={String(config.uart)} onValueChange={(value) => updateSharedField('uart', Number(value))}>
-                        <SelectTrigger id="uart">
-                          <SelectValue placeholder="Select UART" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">UART0</SelectItem>
-                          <SelectItem value="1">UART1</SelectItem>
-                          <SelectItem value="2">UART2</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FieldDescription>Shared serial bus used by all drivers.</FieldDescription>
-                    </FieldContent>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor="tx_pin">TX pin</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        id="tx_pin"
-                        type="number"
-                        value={config.tx_pin}
-                        onChange={(event) => updateSharedField('tx_pin', parseNumericInput(event.target.value))}
-                      />
-                      <FieldDescription>Controller transmit pin for driver UART.</FieldDescription>
-                    </FieldContent>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor="rx_pin">RX pin</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        id="rx_pin"
-                        type="number"
-                        value={config.rx_pin}
-                        onChange={(event) => updateSharedField('rx_pin', parseNumericInput(event.target.value))}
-                      />
-                      <FieldDescription>Controller receive pin for driver UART.</FieldDescription>
-                    </FieldContent>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor="motors_num">Active channels</FieldLabel>
-                    <FieldContent>
-                      <Select
-                        value={String(config.motors_num)}
-                        onValueChange={(value) => updateSharedField('motors_num', Number(value))}
-                      >
-                        <SelectTrigger id="motors_num">
-                          <SelectValue placeholder="Select active channels" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 channel</SelectItem>
-                          <SelectItem value="2">2 channels</SelectItem>
-                          <SelectItem value="3">3 channels</SelectItem>
-                          <SelectItem value="4">4 channels</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FieldDescription>Only active channels are initialized and validated for runtime use.</FieldDescription>
-                    </FieldContent>
-                  </Field>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <CircuitBoard className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-lg">Board Configuration</CardTitle>
                 </div>
-              </FieldGroup>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl">Channel Wiring</CardTitle>
-              <CardDescription>All four channel slots stay visible so inactive outputs can be prepared ahead of time.</CardDescription>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="gap-1.5 tabular-nums">
+                    {config.motors_num} {config.motors_num === 1 ? 'channel' : 'channels'}
+                  </Badge>
+                  <Badge variant="secondary">UART{config.uart}</Badge>
+                  <Badge variant="secondary" className="tabular-nums">
+                    TX {config.tx_pin} / RX {config.rx_pin}
+                  </Badge>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
+            <CardContent className="flex flex-col gap-4">
+              {/* Shared driver settings */}
+              <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  TMC2209 Shared Settings
+                </div>
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="uart" className="text-xs text-muted-foreground">UART</Label>
+                    <Select value={String(config.uart)} onValueChange={(v) => updateSharedField('uart', Number(v))}>
+                      <SelectTrigger id="uart" className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">UART0</SelectItem>
+                        <SelectItem value="1">UART1</SelectItem>
+                        <SelectItem value="2">UART2</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="tx_pin" className="text-xs text-muted-foreground">TX Pin</Label>
+                    <Input
+                      id="tx_pin"
+                      type="number"
+                      className="h-8 text-sm tabular-nums"
+                      value={config.tx_pin}
+                      onChange={(e) => updateSharedField('tx_pin', parseNumericInput(e.target.value))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="rx_pin" className="text-xs text-muted-foreground">RX Pin</Label>
+                    <Input
+                      id="rx_pin"
+                      type="number"
+                      className="h-8 text-sm tabular-nums"
+                      value={config.rx_pin}
+                      onChange={(e) => updateSharedField('rx_pin', parseNumericInput(e.target.value))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="motors_num" className="text-xs text-muted-foreground">Active Channels</Label>
+                    <Select
+                      value={String(config.motors_num)}
+                      onValueChange={(v) => updateSharedField('motors_num', Number(v))}
+                    >
+                      <SelectTrigger id="motors_num" className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4].map((n) => (
+                          <SelectItem key={n} value={String(n)}>{n} {n === 1 ? 'channel' : 'channels'}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Channel wiring */}
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground px-1">
+                  Channel Wiring
+                </div>
                 {config.channels.map((channel, index) => {
                   const isActive = channel.id < config.motors_num;
 
@@ -333,135 +262,110 @@ const BoardPage: React.FC = (): React.ReactElement => {
                     <div
                       key={channel.id}
                       className={cn(
-                        'animate-fade-in-up rounded-xl border bg-card p-4 transition-opacity',
-                        !isActive && 'opacity-60'
+                        'animate-fade-in-up rounded-lg border border-border/40 bg-secondary/10 p-3 transition-opacity',
+                        !isActive && 'opacity-40',
+                        isActive && 'border-border/50',
                       )}
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                            <Cable className="size-4 text-muted-foreground" />
+                      {/* Channel header */}
+                      <div className="mb-2.5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex size-6 items-center justify-center rounded bg-secondary/50">
+                            <Cable className="size-3 text-muted-foreground" />
                           </div>
-                          <div>
-                            <div className="font-medium">Channel {channel.id + 1}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {isActive ? 'Initialized at runtime' : 'Stored but currently inactive'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant={isActive ? 'default' : 'outline'}>{isActive ? 'Active' : 'Inactive'}</Badge>
-                          <Badge variant="secondary">
-                            <RotateCw data-icon="inline-start" />
-                            Max {getChannelMaxRpm(channel)} RPM
+                          <span className="text-sm font-medium">CH {channel.id + 1}</span>
+                          <Badge variant={isActive ? 'default' : 'outline'} className="text-xs">
+                            {isActive ? 'Active' : 'Idle'}
                           </Badge>
                         </div>
+                        <Badge variant="secondary" className="text-xs tabular-nums">
+                          <RotateCw className="mr-1 size-3" />
+                          {getChannelMaxRpm(channel)} RPM
+                        </Badge>
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <Field>
-                          <FieldLabel htmlFor={`dir_pin_${channel.id}`}>DIR pin</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id={`dir_pin_${channel.id}`}
-                              type="number"
-                              value={channel.dir_pin}
-                              onChange={(event) =>
-                                updateChannelField(channel.id, 'dir_pin', parseNumericInput(event.target.value))
-                              }
-                            />
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor={`en_pin_${channel.id}`}>EN pin</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id={`en_pin_${channel.id}`}
-                              type="number"
-                              value={channel.en_pin}
-                              onChange={(event) =>
-                                updateChannelField(channel.id, 'en_pin', parseNumericInput(event.target.value))
-                              }
-                            />
-                            <FieldDescription>Shared enable pins are allowed across channels.</FieldDescription>
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor={`step_pin_${channel.id}`}>STEP pin</FieldLabel>
-                          <FieldContent>
-                            <Input
-                              id={`step_pin_${channel.id}`}
-                              type="number"
-                              value={channel.step_pin}
-                              onChange={(event) =>
-                                updateChannelField(channel.id, 'step_pin', parseNumericInput(event.target.value))
-                              }
-                            />
-                          </FieldContent>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor={`micro_steps_${channel.id}`}>Microsteps</FieldLabel>
-                          <FieldContent>
-                            <Select
-                              value={String(channel.micro_steps)}
-                              onValueChange={(value) => updateChannelField(channel.id, 'micro_steps', Number(value))}
-                            >
-                              <SelectTrigger id={`micro_steps_${channel.id}`}>
-                                <SelectValue placeholder="Select microsteps" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {MICROSTEP_OPTIONS.map((option) => (
-                                  <SelectItem key={option} value={String(option)}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FieldDescription>
-                              {channel.micro_steps === 256
-                                ? '256 microsteps forces a 30 RPM firmware cap.'
-                                : `Max RPM scales to ${getMaxRpmForMicrosteps(channel.micro_steps)} at this microstep setting.`}
-                            </FieldDescription>
-                          </FieldContent>
-                        </Field>
+                      {/* Pin inputs */}
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`dir_${channel.id}`} className="text-xs text-muted-foreground">DIR</Label>
+                          <Input
+                            id={`dir_${channel.id}`}
+                            type="number"
+                            className="h-8 text-sm tabular-nums"
+                            value={channel.dir_pin}
+                            onChange={(e) => updateChannelField(channel.id, 'dir_pin', parseNumericInput(e.target.value))}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`en_${channel.id}`} className="text-xs text-muted-foreground">EN</Label>
+                          <Input
+                            id={`en_${channel.id}`}
+                            type="number"
+                            className="h-8 text-sm tabular-nums"
+                            value={channel.en_pin}
+                            onChange={(e) => updateChannelField(channel.id, 'en_pin', parseNumericInput(e.target.value))}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`step_${channel.id}`} className="text-xs text-muted-foreground">STEP</Label>
+                          <Input
+                            id={`step_${channel.id}`}
+                            type="number"
+                            className="h-8 text-sm tabular-nums"
+                            value={channel.step_pin}
+                            onChange={(e) => updateChannelField(channel.id, 'step_pin', parseNumericInput(e.target.value))}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`ustep_${channel.id}`} className="text-xs text-muted-foreground">μstep</Label>
+                          <Select
+                            value={String(channel.micro_steps)}
+                            onValueChange={(v) => updateChannelField(channel.id, 'micro_steps', Number(v))}
+                          >
+                            <SelectTrigger id={`ustep_${channel.id}`} className="h-8 text-sm tabular-nums">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MICROSTEP_OPTIONS.map((opt) => (
+                                <SelectItem key={opt} value={String(opt)}>
+                                  {opt} → {getMaxRpmForMicrosteps(opt)} RPM
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl">Apply Changes</CardTitle>
-              <CardDescription>Saving posts the new board model to the backend and triggers live stepper reinitialization.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {validationErrors.length > 0 ? (
-                <Alert className="border-destructive/50">
-                  <AlertTriangle />
-                  <AlertTitle>Resolve validation issues first</AlertTitle>
-                  <AlertDescription>{validationErrors.join(' ')}</AlertDescription>
-                </Alert>
-              ) : null}
+              {/* Validation error */}
+              {validationErrors.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <span>{validationErrors[0]}</span>
+                </div>
+              )}
 
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button onClick={() => void handleSave()} disabled={isLoading || isSaving || validationErrors.length > 0 || !isDirty}>
-                  <Save data-icon="inline-start" />
-                  {isSaving ? 'Saving...' : 'Save and reload drivers'}
+              {/* Save / Reset footer */}
+              <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-3">
+                <Button
+                  size="sm"
+                  onClick={() => void handleSave()}
+                  disabled={isLoading || isSaving || validationErrors.length > 0 || !isDirty}
+                >
+                  <Save className="size-3.5" data-icon="inline-start" />
+                  {isSaving ? 'Saving...' : 'Save & reload'}
                 </Button>
-                <Button variant="outline" onClick={resetDraft} disabled={!isDirty || isSaving || initialConfig === null}>
-                  Reset changes
+                <Button variant="outline" size="sm" onClick={resetDraft} disabled={!isDirty || isSaving || initialConfig === null}>
+                  Reset
                 </Button>
-                {guidedMode ? (
+                {guidedMode && (
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => {
                       setSearchParams({});
                       navigate('/onboarding');
@@ -469,7 +373,7 @@ const BoardPage: React.FC = (): React.ReactElement => {
                   >
                     Return to onboarding
                   </Button>
-                ) : null}
+                )}
               </div>
             </CardContent>
           </Card>
