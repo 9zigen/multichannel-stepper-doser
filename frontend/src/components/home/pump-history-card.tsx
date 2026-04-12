@@ -69,9 +69,9 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
         />
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3">
-        <div className="grid gap-3 xl:grid-cols-[minmax(220px,auto)_minmax(0,1fr)]">
+        <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
           {/* Heatmap panel */}
-          <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+          <div className="min-w-0 overflow-hidden rounded-lg border border-border/40 bg-secondary/10 p-3">
             {loading ? (
               <HeatmapSkeleton />
             ) : !selectedPump || selectedPump.days.length === 0 ? (
@@ -88,7 +88,7 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
           </div>
 
           {/* Day detail panel */}
-          <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+          <div className="min-w-0 rounded-lg border border-border/40 bg-secondary/10 p-3">
             {loading ? <DayDetailSkeleton /> : <DayDetail day={selectedDay} />}
           </div>
         </div>

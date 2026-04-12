@@ -225,6 +225,7 @@
   --animate-collapsible-down: collapsible-down 0.2s ease-out;
   --animate-collapsible-up: collapsible-up 0.15s ease-in;
   --animate-fade-in-up: fade-in-up 0.3s ease-out both;
+  --animate-bar-rise: bar-rise 0.4s ease-out both;
 
   @keyframes collapsible-down {
     from {
@@ -256,6 +257,17 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  @keyframes bar-rise {
+    from {
+      transform: scaleY(0);
+      opacity: 0;
+    }
+    to {
+      transform: scaleY(1);
+      opacity: 1;
     }
   }
 
@@ -294,5 +306,10 @@
   ::selection {
     background: color-mix(in oklab, var(--color-primary) 30%, white);
     color: var(--color-foreground);
+  }
+
+  .dark ::selection {
+    background: color-mix(in oklab, var(--color-primary) 40%, black);
+    color: #e2e8f0;
   }
 }

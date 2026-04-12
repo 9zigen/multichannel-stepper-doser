@@ -4,6 +4,7 @@ import type { PumpHistoryDay } from '@/lib/api.ts';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils.ts';
 import {
+  getBarIntensityClass,
   getDayVolume,
   getIntensityClass,
   parseHistoryDate,
@@ -83,76 +84,110 @@ const Heatmap = ({ days, selectedDay, onDaySelect }: HeatmapProps): React.ReactE
     [days],
   );
 
+  const recentDays = React.useMemo(() => days.slice(-30), [days]);
+
   return (
     <div className="flex flex-col gap-2">
-      {/* Heatmap grid with horizontal scroll for mobile */}
-      <ScrollArea className="w-full">
-        <div
-          className="grid gap-x-1 gap-y-1"
-          style={{ gridTemplateColumns: `20px repeat(${columns.length}, 14px)` }}
-        >
-          {/* Month labels row */}
-          <div />
-          <div className="grid gap-1" style={{ gridColumn: `2 / span ${columns.length}` }}>
-            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns.length}, 14px)` }}>
-              {monthLabels.map((monthLabel) => (
-                <div
-                  key={monthLabel.key}
-                  className="text-left text-[9px] text-muted-foreground"
-                  style={{ gridColumn: `${monthLabel.startColumn + 1} / span ${monthLabel.span}` }}
-                >
-                  {monthLabel.label}
+      {/* Heatmap + Daily volume bar chart — stacked on mobile, row on sm+ */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        {/* Heatmap grid (fixed width) */}
+        <ScrollArea className="shrink-0">
+          <div
+            className="grid gap-x-1 gap-y-1"
+            style={{ gridTemplateColumns: `20px repeat(${columns.length}, 14px)` }}
+          >
+            {/* Month labels row */}
+            <div />
+            <div className="grid gap-1" style={{ gridColumn: `2 / span ${columns.length}` }}>
+              <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns.length}, 14px)` }}>
+                {monthLabels.map((monthLabel) => (
+                  <div
+                    key={monthLabel.key}
+                    className="text-left text-[9px] text-muted-foreground"
+                    style={{ gridColumn: `${monthLabel.startColumn + 1} / span ${monthLabel.span}` }}
+                  >
+                    {monthLabel.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Weekday labels */}
+            <div className="grid grid-rows-7 gap-1 text-[9px] text-muted-foreground">
+              {WEEKDAY_LABELS.map((label, index) => (
+                <div key={`${label}-${index}`} className="flex h-[14px] items-center justify-end pr-0.5">
+                  {index % 2 === 1 ? label : ''}
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Weekday labels */}
-          <div className="grid grid-rows-7 gap-1 text-[9px] text-muted-foreground">
-            {WEEKDAY_LABELS.map((label, index) => (
-              <div key={`${label}-${index}`} className="flex h-[14px] items-center justify-end pr-0.5">
-                {index % 2 === 1 ? label : ''}
-              </div>
-            ))}
-          </div>
+            {/* Day cells */}
+            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns.length}, 14px)` }}>
+              {columns.map((column, columnIndex) =>
+                column.days.map((day, rowIndex) => {
+                  if (!day) {
+                    return (
+                      <div
+                        key={`empty-${column.startStamp}-${rowIndex}`}
+                        className="size-[14px] rounded-[3px] bg-transparent"
+                        style={{ gridColumn: columnIndex + 1, gridRow: rowIndex + 1 }}
+                      />
+                    );
+                  }
 
-          {/* Day cells */}
-          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns.length}, 14px)` }}>
-            {columns.map((column, columnIndex) =>
-              column.days.map((day, rowIndex) => {
-                if (!day) {
+                  const totalVolume = getDayVolume(day);
+                  const selected = day.day_stamp === selectedDay?.day_stamp;
+
                   return (
-                    <div
-                      key={`empty-${column.startStamp}-${rowIndex}`}
-                      className="size-[14px] rounded-[3px] bg-transparent"
+                    <button
+                      key={day.day_stamp}
+                      type="button"
+                      title={`${day.date} · ${totalVolume} ml`}
+                      className={cn(
+                        'size-[14px] rounded-[3px] border border-black/5 transition hover:scale-110 hover:border-border',
+                        getIntensityClass(totalVolume, maxDayVolume),
+                        selected && 'ring-1.5 ring-primary/80 ring-offset-1 ring-offset-background',
+                      )}
                       style={{ gridColumn: columnIndex + 1, gridRow: rowIndex + 1 }}
+                      onClick={() => onDaySelect(day.day_stamp)}
                     />
                   );
-                }
+                }),
+              )}
+            </div>
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
 
-                const totalVolume = getDayVolume(day);
+        {/* Daily volume bar chart (fills remaining width on sm+, fixed height on mobile) */}
+        {recentDays.length > 0 && (
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Daily volume</span>
+            <div className="flex h-10 items-end gap-px sm:h-auto sm:flex-1">
+              {recentDays.map((day, i) => {
+                const vol = getDayVolume(day);
+                const pct = maxDayVolume > 0 ? Math.max(vol / maxDayVolume, 0.04) : 0.04;
                 const selected = day.day_stamp === selectedDay?.day_stamp;
-
                 return (
                   <button
                     key={day.day_stamp}
                     type="button"
-                    title={`${day.date} · ${totalVolume} ml`}
+                    title={`${day.date} · ${vol} ml`}
                     className={cn(
-                      'size-[14px] rounded-[3px] border border-black/5 transition hover:scale-110 hover:border-border',
-                      getIntensityClass(totalVolume, maxDayVolume),
-                      selected && 'ring-1.5 ring-primary/80 ring-offset-1 ring-offset-background',
+                      'flex-1 origin-bottom rounded-t-sm animate-bar-rise transition-colors hover:opacity-80',
+                      selected
+                        ? getIntensityClass(vol, maxDayVolume)
+                        : getBarIntensityClass(vol, maxDayVolume),
                     )}
-                    style={{ gridColumn: columnIndex + 1, gridRow: rowIndex + 1 }}
+                    style={{ height: `${pct * 100}%`, animationDelay: `${i * 15}ms` }}
                     onClick={() => onDaySelect(day.day_stamp)}
                   />
                 );
-              }),
-            )}
+              })}
+            </div>
           </div>
-        </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
+        )}
+      </div>
 
       {/* Legend */}
       <div className="flex items-center gap-1 text-[9px] text-muted-foreground">

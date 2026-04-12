@@ -69,40 +69,49 @@ export const getIntensityClass = (value: number, maxValue: number) => {
 
 export const getBarIntensityClass = (value: number, maxValue: number) => {
   if (value <= 0 || maxValue <= 0) {
-    return 'bg-muted/80';
+    return 'bg-muted/30';
   }
 
   const ratio = value / maxValue;
 
   if (ratio >= 0.85) {
-    return 'bg-emerald-500';
+    return 'bg-emerald-500/40';
   }
   if (ratio >= 0.55) {
-    return 'bg-emerald-400';
+    return 'bg-emerald-400/35';
   }
   if (ratio >= 0.3) {
-    return 'bg-emerald-300';
+    return 'bg-emerald-300/30';
   }
-  return 'bg-emerald-200';
+  return 'bg-emerald-200/25';
 };
 
 export const renderFlags = (flags: number): string[] => {
   const items: string[] = [];
 
   if (flags & FLAG_SCHEDULED) {
-    items.push('Scheduled');
+    items.push('S');
   }
   if (flags & FLAG_MANUAL) {
-    items.push('Manual');
+    items.push('M');
   }
   if (flags & FLAG_CONTINUOUS) {
-    items.push('Continuous');
+    items.push('C');
   }
   if (flags & FLAG_CALIBRATION) {
-    items.push('Calibration');
+    items.push('K');
   }
 
-  return items.length > 0 ? items : ['Idle'];
+  return items;
+};
+
+export const flagTitle = (flags: number): string => {
+  const names: string[] = [];
+  if (flags & FLAG_SCHEDULED) names.push('Scheduled');
+  if (flags & FLAG_MANUAL) names.push('Manual');
+  if (flags & FLAG_CONTINUOUS) names.push('Continuous');
+  if (flags & FLAG_CALIBRATION) names.push('Calibration');
+  return names.join(', ');
 };
 
 export const getTodayStamp = () => Math.floor(new Date().setHours(0, 0, 0, 0) / 86400000);

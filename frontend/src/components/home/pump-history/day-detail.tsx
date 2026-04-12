@@ -5,6 +5,7 @@ import type { PumpHistoryDay } from '@/lib/api.ts';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
+  flagTitle,
   formatHourLabel,
   formatRuntime,
   formatShortDate,
@@ -70,8 +71,8 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
             <tr className="border-b border-border/50 text-[10px] uppercase tracking-wider text-muted-foreground">
               <th className="whitespace-nowrap py-1.5 pr-3 text-left font-medium">Hour</th>
               <th className="whitespace-nowrap px-2 py-1.5 text-right font-medium">Total</th>
-              <th className="whitespace-nowrap px-2 py-1.5 text-right font-medium">Sched</th>
-              <th className="whitespace-nowrap px-2 py-1.5 text-right font-medium">Manual</th>
+              <th className="hidden whitespace-nowrap px-2 py-1.5 text-right font-medium sm:table-cell">Sched</th>
+              <th className="hidden whitespace-nowrap px-2 py-1.5 text-right font-medium sm:table-cell">Manual</th>
               <th className="whitespace-nowrap pl-2 py-1.5 text-right font-medium">Time</th>
             </tr>
           </thead>
@@ -89,17 +90,17 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
                   <td className="whitespace-nowrap py-1.5 pr-3 font-medium tabular-nums">
                     {formatHourLabel(hour.hour)}
                     {flags.length > 0 && (
-                      <span className="ml-1.5 text-[9px] text-muted-foreground">{flags.join(' ')}</span>
+                      <span className="ml-1 text-[9px] text-muted-foreground" title={flagTitle(hour.flags)}>{flags.join('')}</span>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-2 py-1.5 text-right">
                     <span className="font-semibold tabular-nums">{hourTotal}</span>
                     <span className="text-muted-foreground"> ml</span>
                   </td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums">
+                  <td className="hidden whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums sm:table-cell">
                     {hour.scheduled_volume_ml}
                   </td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums">
+                  <td className="hidden whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums sm:table-cell">
                     {hour.manual_volume_ml}
                   </td>
                   <td className="whitespace-nowrap pl-2 py-1.5 text-right text-muted-foreground tabular-nums">
