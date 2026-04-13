@@ -2,24 +2,13 @@ import React from 'react';
 import { Controller, ControllerRenderProps, SubmitHandler, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Check, Clock3, LoaderCircle, Repeat } from 'lucide-react';
+import { Check, CircleHelp, LoaderCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLegend,
-  FieldLabel,
-  FieldSet,
-  FieldTitle,
-} from '@/components/ui/field';
 import { Input } from '@/components/ui/input.tsx';
+import { Label } from '@/components/ui/label.tsx';
 import { Toggle } from '@/components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
@@ -32,19 +21,6 @@ import {
   formatVolumePerDay,
   scheduleModeMeta,
 } from '@/components/schedule-utils';
-
-const SummaryRow = ({
-  label,
-  value,
-}: {
-  label: React.ReactNode;
-  value: React.ReactNode;
-}): React.ReactElement => (
-  <div className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-xl px-1">
-    <div className="text-sm leading-6 text-muted-foreground">{label}</div>
-    <div className="justify-self-end text-sm font-medium tabular-nums leading-6 text-foreground">{value}</div>
-  </div>
-);
 
 type FormData = {
   id: number;
@@ -87,10 +63,11 @@ type ScheduleFormProps = {
 };
 
 const hours = Array.from(Array(24).keys());
-const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const weekdayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
 const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement => {
   const updatePump = useAppStore((state: AppStoreState) => state.updatePump);
+  const [showHelp, setShowHelp] = React.useState(false);
 
   const {
     control,
@@ -117,7 +94,6 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
   });
 
   const modeActual = watch('schedule.mode');
-  const modeDetails = scheduleModeMeta[modeActual];
   const selectedHours = watch('schedule.work_hours');
   const selectedWeekdays = watch('schedule.weekdays');
   const selectedSpeed = watch('schedule.speed');
@@ -127,14 +103,14 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
     const value = field.value.includes(hour)
       ? field.value.filter((item: number) => item !== hour)
       : [...field.value, hour];
-    field.onChange(value.sort((a, b) => a - b));
+    field.onChange(value.sort((a: number, b: number) => a - b));
   };
 
   const toggleDay = (field: ControllerRenderProps<FormData, 'schedule.weekdays'>, dayIndex: number) => {
     const value = field.value.includes(dayIndex)
       ? field.value.filter((item: number) => item !== dayIndex)
       : [...field.value, dayIndex];
-    field.onChange(value.sort((a, b) => a - b));
+    field.onChange(value.sort((a: number, b: number) => a - b));
   };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
@@ -156,28 +132,22 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
 
   return (
     <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
-      <FieldGroup className="gap-3">
-        <section className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 px-4 py-3">
-          <div className="mb-3 flex flex-col gap-3">
-            <div className="flex items-start gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-background shadow-xs">
-                <modeDetails.icon className="text-primary" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <FieldTitle className="text-base">Schedule mode</FieldTitle>
-                <FieldDescription>{modeDetails.description}</FieldDescription>
-              </div>
-            </div>
-            <div className="grid gap-1.5">
-              <SummaryRow label="Mode" value={<Badge variant={modeDetails.badgeVariant}>{modeDetails.label}</Badge>} />
-              {modeActual === SCHEDULE_MODE.PERIODIC ? (
+      <div className="flex flex-col gap-3">
+        {/* Mode selector */}
+        <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Mode</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {modeActual === SCHEDULE_MODE.PERIODIC && (
                 <>
-                  <SummaryRow label="Daily target" value={formatVolumePerDay(selectedVolume)} />
-                  <SummaryRow label="Speed" value={formatRpm(selectedSpeed)} />
-                  <SummaryRow label="Cadence" value={`${formatDaysCount(selectedWeekdays)} • ${formatHoursCount(selectedHours)}`} />
+                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatVolumePerDay(selectedVolume)}</Badge>
+                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatRpm(selectedSpeed)}</Badge>
+                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatDaysCount(selectedWeekdays)} · {formatHoursCount(selectedHours)}</Badge>
                 </>
-              ) : null}
-              {modeActual === SCHEDULE_MODE.CONTINUOUS ? <SummaryRow label="Speed" value={formatRpm(selectedSpeed)} /> : null}
+              )}
+              {modeActual === SCHEDULE_MODE.CONTINUOUS && (
+                <Badge variant="outline" className="text-[10px] tabular-nums">{formatRpm(selectedSpeed)}</Badge>
+              )}
             </div>
           </div>
 
@@ -185,139 +155,154 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
             name="schedule.mode"
             control={control}
             render={({ field }) => (
-              <div className="rounded-lg border border-border/30 bg-secondary/20 p-1">
-                <ToggleGroup
-                  type="single"
-                  spacing={3}
-                  className="grid w-full grid-cols-1 sm:grid-cols-3"
-                  value={String(field.value)}
-                  onValueChange={(value) => {
-                    if (value !== '') {
-                      field.onChange(Number(value));
-                    }
-                  }}
-                >
-                  {Object.entries(scheduleModeMeta).map(([value, meta], index) => {
-                    const selected = field.value === Number(value);
-
-                    return (
-                      <ToggleGroupItem
-                        key={value}
-                        value={value}
-                        style={{ animationDelay: `${index * 50}ms` }}
-                        className={cn(
-                          'animate-fade-in-up',
-                          'h-9 rounded-md border border-transparent px-3 py-2 text-sm font-medium shadow-none transition-all',
-                          'flex items-center gap-2 hover:bg-secondary/25',
-                          selected
-                            ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_12px_rgba(34,211,238,0.1)]'
-                            : 'text-foreground/80'
-                        )}
-                      >
-                        <meta.icon className="size-3.5 shrink-0" />
-                        <span>{meta.label}</span>
-                      </ToggleGroupItem>
-                    );
-                  })}
-                </ToggleGroup>
-              </div>
+              <ToggleGroup
+                type="single"
+                spacing={3}
+                className="grid w-full grid-cols-3"
+                value={String(field.value)}
+                onValueChange={(value) => {
+                  if (value !== '') {
+                    field.onChange(Number(value));
+                  }
+                }}
+              >
+                {Object.entries(scheduleModeMeta).map(([value, meta]) => {
+                  const selected = field.value === Number(value);
+                  return (
+                    <ToggleGroupItem
+                      key={value}
+                      value={value}
+                      className={cn(
+                        'h-8 rounded-md border border-transparent px-2 text-sm font-medium shadow-none transition-all',
+                        'flex items-center gap-1.5 hover:bg-secondary/25',
+                        selected
+                          ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_12px_rgba(34,211,238,0.1)]'
+                          : 'text-foreground/80',
+                      )}
+                    >
+                      <meta.icon className="size-3.5 shrink-0" />
+                      <span>{meta.label}</span>
+                    </ToggleGroupItem>
+                  );
+                })}
+              </ToggleGroup>
             )}
           />
-        </section>
 
-        {modeActual === SCHEDULE_MODE.OFF ? (
-          <Alert>
-            <Clock3 />
-            <AlertTitle>Automatic dosing is disabled</AlertTitle>
-            <AlertDescription>
-              This pump stays available for manual control, but no schedule windows or continuous output will run until
-              you switch modes.
-            </AlertDescription>
-          </Alert>
-        ) : null}
+          {modeActual === SCHEDULE_MODE.OFF && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Automatic dosing is disabled. Manual control remains available.
+            </p>
+          )}
+        </div>
 
-        {modeActual !== SCHEDULE_MODE.OFF ? (
-          <section className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 px-4 py-3">
-            <FieldSet className="gap-3">
-              <div className="flex flex-col gap-1">
-                <FieldLegend>Output target</FieldLegend>
-                <FieldDescription>
-                  {modeActual === SCHEDULE_MODE.CONTINUOUS
-                    ? 'Only the target speed matters in continuous mode.'
-                    : 'Define the speed and total daily dose before adjusting the timing windows.'}
-                </FieldDescription>
-              </div>
-
-              <FieldGroup className={cn('gap-3', modeActual === SCHEDULE_MODE.PERIODIC ? 'md:grid md:grid-cols-2' : undefined)}>
-                <Field>
-                  <FieldLabel htmlFor={`speed-${pump.id}`}>Speed [rpm]</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      id={`speed-${pump.id}`}
-                      type="number"
-                      placeholder="1"
-                      min="0.1"
-                      step="0.1"
-                      {...register('schedule.speed', { valueAsNumber: true })}
-                      aria-invalid={!!errors.schedule?.speed}
-                    />
-                    <FieldDescription>
-                      {modeActual === SCHEDULE_MODE.CONTINUOUS
-                        ? 'Target motor speed while the pump remains in continuous mode.'
-                        : 'Target speed used during the scheduled dosing windows.'}
-                    </FieldDescription>
-                    <FieldError errors={[errors.schedule?.speed]} />
-                  </FieldContent>
-                </Field>
-
-                {modeActual === SCHEDULE_MODE.PERIODIC ? (
-                  <Field>
-                    <FieldLabel htmlFor={`volume-${pump.id}`}>Daily volume [ml]</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        id={`volume-${pump.id}`}
-                        type="number"
-                        placeholder="10"
-                        min="0.1"
-                        step="0.1"
-                        {...register('schedule.volume', { valueAsNumber: true })}
-                        aria-invalid={!!errors.schedule?.volume}
-                      />
-                      <FieldDescription>Total target volume distributed across the selected schedule.</FieldDescription>
-                      <FieldError errors={[errors.schedule?.volume]} />
-                    </FieldContent>
-                  </Field>
-                ) : null}
-              </FieldGroup>
-            </FieldSet>
-          </section>
-        ) : null}
-
-        {modeActual === SCHEDULE_MODE.PERIODIC ? (
-          <section className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 px-4 py-3">
-            <div className="mb-3 flex items-center gap-2">
-              <Repeat className="size-4 text-primary" />
-              <FieldTitle className="text-base">Timing rules</FieldTitle>
+        {/* Output target */}
+        {modeActual !== SCHEDULE_MODE.OFF && (
+          <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Output target</span>
+              <button
+                type="button"
+                onClick={() => setShowHelp((v) => !v)}
+                className={cn(
+                  'rounded-full p-0.5 transition-colors',
+                  showHelp ? 'text-primary' : 'text-muted-foreground/50 hover:text-muted-foreground',
+                )}
+                aria-label="Toggle field descriptions"
+              >
+                <CircleHelp className="size-3.5" />
+              </button>
             </div>
 
-            <FieldGroup className="gap-3">
-              <FieldSet className="gap-3">
-                <div className="flex flex-col gap-1">
-                  <FieldLegend>Weekdays</FieldLegend>
-                  <FieldDescription>Limit dosing to the weekdays that match your routine.</FieldDescription>
+            <div className={cn('grid gap-3', modeActual === SCHEDULE_MODE.PERIODIC ? 'sm:grid-cols-2' : '')}>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={`speed-${pump.id}`} className="text-xs text-muted-foreground">
+                  Speed [rpm]
+                </Label>
+                <Input
+                  id={`speed-${pump.id}`}
+                  type="number"
+                  placeholder="1"
+                  min="0.1"
+                  step="0.1"
+                  className="h-8 text-sm tabular-nums"
+                  {...register('schedule.speed', { valueAsNumber: true })}
+                  aria-invalid={!!errors.schedule?.speed}
+                />
+                <div
+                  className={cn(
+                    'grid transition-all duration-200',
+                    showHelp ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+                  )}
+                >
+                  <p className="overflow-hidden text-[11px] leading-tight text-muted-foreground">
+                    {modeActual === SCHEDULE_MODE.CONTINUOUS
+                      ? 'Target motor speed while in continuous mode.'
+                      : 'Target speed used during scheduled dosing windows.'}
+                  </p>
                 </div>
+                {errors.schedule?.speed && (
+                  <p className="text-[11px] text-destructive">{errors.schedule.speed.message}</p>
+                )}
+              </div>
+
+              {modeActual === SCHEDULE_MODE.PERIODIC && (
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor={`volume-${pump.id}`} className="text-xs text-muted-foreground">
+                    Daily volume [ml]
+                  </Label>
+                  <Input
+                    id={`volume-${pump.id}`}
+                    type="number"
+                    placeholder="10"
+                    min="0.1"
+                    step="0.1"
+                    className="h-8 text-sm tabular-nums"
+                    {...register('schedule.volume', { valueAsNumber: true })}
+                    aria-invalid={!!errors.schedule?.volume}
+                  />
+                  <div
+                    className={cn(
+                      'grid transition-all duration-200',
+                      showHelp ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+                    )}
+                  >
+                    <p className="overflow-hidden text-[11px] leading-tight text-muted-foreground">
+                      Total target volume distributed across the selected schedule.
+                    </p>
+                  </div>
+                  {errors.schedule?.volume && (
+                    <p className="text-[11px] text-destructive">{errors.schedule.volume.message}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Timing rules — compact */}
+        {modeActual === SCHEDULE_MODE.PERIODIC && (
+          <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+            <span className="mb-2 block text-[10px] uppercase tracking-wider text-muted-foreground">
+              Timing rules
+            </span>
+
+            <div className="flex flex-col gap-3">
+              {/* Weekdays — always single row */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs text-muted-foreground">Weekdays</span>
                 <Controller
                   name="schedule.weekdays"
                   control={control}
                   render={({ field }) => (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-                      {weekdays.map((day, index) => (
+                    <div className="grid grid-cols-7 gap-1">
+                      {weekdayLabels.map((day, index) => (
                         <Toggle
                           key={day}
+                          size="sm"
                           pressed={field.value.includes(index)}
                           onClick={() => toggleDay(field, index)}
-                          className="animate-fade-in-up h-10 rounded-xl text-sm"
-                          style={{ animationDelay: `${index * 50}ms` }}
+                          className="h-8 rounded-md px-0 text-xs"
                         >
                           {day}
                         </Toggle>
@@ -325,25 +310,28 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                     </div>
                   )}
                 />
-              </FieldSet>
+              </div>
 
-              <FieldSet className="gap-3">
-                <div className="flex flex-col gap-1">
-                  <FieldLegend>Hours</FieldLegend>
-                  <FieldDescription>Choose the hours when this pump is allowed to dose.</FieldDescription>
+              {/* Hours — compact grid */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Hours</span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground/60">
+                    {selectedHours.length}/24
+                  </span>
                 </div>
                 <Controller
                   name="schedule.work_hours"
                   control={control}
                   render={({ field }) => (
-                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-8">
-                      {hours.map((hour, index) => (
+                    <div className="grid grid-cols-6 gap-1 sm:grid-cols-8 xl:grid-cols-12">
+                      {hours.map((hour) => (
                         <Toggle
                           key={hour}
+                          size="sm"
                           pressed={field.value.includes(hour)}
                           onClick={() => toggleHour(field, hour)}
-                          className="animate-fade-in-up h-10 rounded-xl text-sm"
-                          style={{ animationDelay: `${index * 20}ms` }}
+                          className="h-7 rounded-md px-0 text-xs tabular-nums"
                         >
                           {String(hour).padStart(2, '0')}
                         </Toggle>
@@ -351,23 +339,26 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                     </div>
                   )}
                 />
-              </FieldSet>
-            </FieldGroup>
-          </section>
-        ) : null}
+              </div>
+            </div>
+          </div>
+        )}
 
-        <Button type="submit" className="w-full md:w-auto md:self-end" size="lg" disabled={!isDirty}>
-          {isSubmitting ? (
-            <>
-              <LoaderCircle className="animate-spin" data-icon="inline-start" /> Saving
-            </>
-          ) : (
-            <>
-              <Check data-icon="inline-start" /> Apply schedule
-            </>
-          )}
-        </Button>
-      </FieldGroup>
+        {/* Submit */}
+        <div className="flex justify-end">
+          <Button type="submit" size="sm" disabled={!isDirty}>
+            {isSubmitting ? (
+              <>
+                <LoaderCircle className="animate-spin" data-icon="inline-start" /> Saving
+              </>
+            ) : (
+              <>
+                <Check data-icon="inline-start" /> Apply
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </form>
   );
 };

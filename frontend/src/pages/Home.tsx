@@ -6,7 +6,6 @@ import DeviceOverviewCard from '@/components/home/device-overview-card.tsx';
 import PumpAgingCard from '@/components/home/pump-aging-card.tsx';
 import PumpControlCard from '@/components/home/pump-control-card.tsx';
 import ConnectivityStabilityCard from '@/components/home/connectivity-stability-card.tsx';
-import MaintenanceActionsCard from '@/components/home/maintenance-actions-card.tsx';
 import SystemCard from '@/components/home/system-card.tsx';
 import PumpHistoryTodayCard from '@/components/home/pump-history-today-card.tsx';
 
@@ -38,11 +37,13 @@ const Home: React.FC = (): React.ReactElement => {
   return (
     <div className="flex flex-col gap-4 py-2 md:py-3">
       <section className="mx-auto grid w-full max-w-screen-2xl gap-3 px-3 xl:grid-cols-12">
-        <div className="xl:col-span-3 xl:row-span-3 xl:h-full">
+        {/* Left: Device Overview (with maintenance actions) */}
+        <div className="min-w-0 xl:col-span-3 xl:row-span-3 xl:h-full">
           <DeviceOverviewCard pumps={pumps} deviceStatus={deviceStatus} />
         </div>
 
-        <div className="xl:col-span-9">
+        {/* Top right: Pump Aging */}
+        <div className="min-w-0 xl:col-span-9">
           <PumpAgingCard
             pumps={pumps}
             resettingPumpId={resettingPumpId}
@@ -51,26 +52,27 @@ const Home: React.FC = (): React.ReactElement => {
             }}
           />
         </div>
-        
-        <div className="xl:col-span-3 xl:h-full">
+
+        {/* Middle right: Today's Dosing */}
+        <div className="min-w-0 xl:col-span-3 xl:h-full">
           <PumpHistoryTodayCard pumps={pumps} />
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:col-span-6 xl:grid-cols-12">
+        {/* Bottom right: Pump Control + Connectivity + System */}
+        <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:col-span-6 xl:grid-cols-12">
+          {/* Pump Control — full width */}
           <div className="md:col-span-2 xl:col-span-12">
             <PumpControlCard pumps={pumps} />
           </div>
 
-          <div className="md:col-span-1 xl:col-span-6 xl:h-full">
-            <SystemCard deviceStatus={deviceStatus} />
-          </div>
-
+          {/* Connectivity on top */}
           <div className="md:col-span-1 xl:col-span-6 xl:h-full">
             <ConnectivityStabilityCard deviceStatus={deviceStatus} />
           </div>
 
-          <div className="md:col-span-2 xl:col-span-12 xl:h-full">
-            <MaintenanceActionsCard />
+          {/* System below */}
+          <div className="md:col-span-1 xl:col-span-6 xl:h-full">
+            <SystemCard deviceStatus={deviceStatus} />
           </div>
         </div>
       </section>

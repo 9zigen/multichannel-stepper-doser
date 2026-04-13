@@ -3,7 +3,7 @@ import { Wifi } from 'lucide-react';
 
 import { StatusState } from '@/lib/api.ts';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type ConnectivityStabilityCardProps = {
   deviceStatus: StatusState;
@@ -14,57 +14,51 @@ const ConnectivityStabilityCard = ({
 }: ConnectivityStabilityCardProps): React.ReactElement => {
   return (
     <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-lg">Connectivity Stability</CardTitle>
-        <CardDescription>
-          Use these counters to spot weak Wi-Fi links or noisy local network conditions.
-        </CardDescription>
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <Wifi className="size-4 text-primary" />
+          <CardTitle className="text-base">Connectivity</CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="grid flex-1 gap-4">
-        <div className="-mx-4 rounded-xl border border-border/30 bg-secondary/10 p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-            <Wifi className="size-4 text-primary" />
-            Wi-Fi health
+      <CardContent className="flex flex-1 flex-col gap-2">
+        <div className="grid gap-2 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Mode</span>
+            <span className="font-medium">{deviceStatus.wifi_mode}</span>
           </div>
-          <div className="grid gap-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Mode</span>
-              <span className="font-medium">{deviceStatus.wifi_mode}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Station SSID</span>
-              <span className="max-w-[180px] truncate font-medium">
-                {deviceStatus.station_ssid || 'Not configured'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Station link</span>
-              <Badge variant={deviceStatus.station_connected ? 'default' : 'outline'}>
-                {deviceStatus.station_connected ? 'Connected' : 'Idle'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Station IP</span>
-              <span className="font-medium">{deviceStatus.station_ip_address || 'Unavailable'}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">AP SSID</span>
-              <span className="max-w-[180px] truncate font-medium">{deviceStatus.ap_ssid || 'Disabled'}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">AP IP</span>
-              <span className="font-medium">{deviceStatus.ap_ip_address || 'Unavailable'}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">AP clients</span>
-              <Badge variant={deviceStatus.ap_clients > 0 ? 'secondary' : 'outline'}>{deviceStatus.ap_clients}</Badge>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Disconnects</span>
-              <Badge variant={deviceStatus.wifi_disconnects > 10 ? 'destructive' : 'secondary'}>
-                {deviceStatus.wifi_disconnects}
-              </Badge>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Station</span>
+            <span className="max-w-[160px] truncate font-medium">
+              {deviceStatus.station_ssid || 'Not configured'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Link</span>
+            <Badge variant={deviceStatus.station_connected ? 'default' : 'outline'} className="text-[10px]">
+              {deviceStatus.station_connected ? 'Connected' : 'Idle'}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Station IP</span>
+            <span className="font-medium tabular-nums">{deviceStatus.station_ip_address || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">AP</span>
+            <span className="max-w-[160px] truncate font-medium">{deviceStatus.ap_ssid || 'Disabled'}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">AP IP</span>
+            <span className="font-medium tabular-nums">{deviceStatus.ap_ip_address || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Clients</span>
+            <span className="font-medium tabular-nums">{deviceStatus.ap_clients}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">Disconnects</span>
+            <Badge variant={deviceStatus.wifi_disconnects > 10 ? 'destructive' : 'outline'} className="text-[10px] tabular-nums">
+              {deviceStatus.wifi_disconnects}
+            </Badge>
           </div>
         </div>
       </CardContent>
