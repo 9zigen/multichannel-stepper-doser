@@ -38,7 +38,7 @@ const Home: React.FC = (): React.ReactElement => {
     <div className="flex flex-col gap-4 py-2 md:py-3">
       <section className="mx-auto grid w-full max-w-screen-2xl gap-3 px-3 xl:grid-cols-12">
         {/* Left: Device Overview (with maintenance actions) */}
-        <div className="min-w-0 xl:col-span-3 xl:row-span-3 xl:h-full">
+        <div className="min-w-0 xl:col-span-3 xl:row-span-3">
           <DeviceOverviewCard pumps={pumps} deviceStatus={deviceStatus} />
         </div>
 

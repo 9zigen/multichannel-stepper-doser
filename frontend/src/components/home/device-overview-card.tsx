@@ -22,7 +22,7 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
   const totalRunningHours = useMemo(() => pumps.reduce((sum, pump) => sum + pump.running_hours, 0), [pumps]);
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
+    <Card className="flex flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <div className="flex items-center gap-2">
@@ -38,7 +38,7 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-3">
+      <CardContent className="flex flex-col gap-3">
         {/* Runtime */}
         <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
           <div className="mb-2 flex items-center gap-2">
@@ -87,9 +87,9 @@ const DeviceOverviewCard = ({ pumps, deviceStatus }: DeviceOverviewCardProps): R
         </div>
 
         {/* Maintenance actions */}
-        <div className="mt-auto rounded-lg border border-border/40 bg-secondary/10 p-3">
+        <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
           <span className="mb-2 block text-[10px] uppercase tracking-wider text-muted-foreground">Maintenance</span>
-          <DeviceMaintenanceActions className="[&_button]:h-8 [&_button]:text-xs [&>div]:flex-col [&>div]:sm:flex-row" />
+          <DeviceMaintenanceActions className="[&_button]:h-8 [&_button]:text-xs [&>div]:flex-col" />
         </div>
       </CardContent>
     </Card>
