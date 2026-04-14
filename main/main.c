@@ -42,6 +42,7 @@
 #include "mqtt.h"
 #include "app_settings_storage.h"
 #include "monitor.h"
+#include "app_time.h"
 #include "i2c_driver.h"
 #include "pump_backend_stepper.h"
 #include "stepper_task.h"
@@ -51,10 +52,37 @@
  *      DEFINES
  *********************/
 #define TAG "MAIN"
+#define APP_SYSTEM_READY_DELAY_MS ((uint32_t)7000)
+#define APP_SYSTEM_READY_NTP_WAIT_MS ((uint32_t)10000)
+#define APP_SHUTDOWN_EVENT_DRAIN_MS ((uint32_t)200)
 static uint8_t ota_requested = 0;
 
 TaskHandle_t pvTask1 = NULL;
 TaskHandle_t pvTask2 = NULL;
+
+static void app_shutdown_handler(void)
+{
+    app_events_dispatch_system(SHUTTING_DOWN, NULL, 0);
+    vTaskDelay(pdMS_TO_TICKS(APP_SHUTDOWN_EVENT_DRAIN_MS));
+}
+
+static void app_system_ready_task(void *pvParameters)
+{
+    (void)pvParameters;
+
+    services_t *services = get_service_config();
+    if (services->enable_ntp) {
+        uint32_t waited_ms = 0;
+        while (!get_ntp_sync_status() && waited_ms < APP_SYSTEM_READY_NTP_WAIT_MS) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+            waited_ms += 500;
+        }
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(APP_SYSTEM_READY_DELAY_MS));
+    app_events_dispatch_system(SYSTEM_READY, NULL, 0);
+    vTaskDelete(NULL);
+}
 
 /**********************
  *   APPLICATION MAIN
@@ -64,6 +92,7 @@ void app_main()
     /* Base */
     init_settings();
     init_events();
+    ESP_ERROR_CHECK(esp_register_shutdown_handler(app_shutdown_handler));
 
     /* Stepper */
     xTaskCreatePinnedToCore(&stepper_task,"Stepper Task",4096, NULL,5, NULL,1);
@@ -124,6 +153,7 @@ void app_main()
 
     /* MQTT Task */
     xTaskCreate(&app_mqtt_task, "mqtt_task", 6144, NULL, 5, NULL);
+    xTaskCreate(&app_system_ready_task, "system_ready_task", 3072, NULL, 4, NULL);
 }
 
 

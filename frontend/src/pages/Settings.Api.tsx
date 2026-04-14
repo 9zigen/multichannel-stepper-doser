@@ -46,7 +46,7 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
         title: 'WebSocket',
         icon: Cable,
         badge: 'Realtime',
-        keywords: 'websocket ws realtime ping pong pump runtime push event connection heartbeat live',
+        keywords: 'websocket ws realtime ping pong pump runtime system_ready shutting_down restart lifecycle push event connection heartbeat live',
         content: (
           <>
             <div className="mb-3">
@@ -56,6 +56,12 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
             <div className="mb-3">
               <div className="mb-1 text-xs font-medium text-muted-foreground">Heartbeat</div>
               <Code>{'{"type":"ping"}'}</Code>
+            </div>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Lifecycle events</div>
+              <Code>
+                {'{"type":"shutting_down","firmware_version":"1.1.0","hostname":"stepper-doser"}\n{"type":"system_ready","firmware_version":"1.1.1","hostname":"stepper-doser"}'}
+              </Code>
             </div>
             <div>
               <div className="mb-1 text-xs font-medium text-muted-foreground">Pump runtime event</div>

@@ -620,6 +620,24 @@ function simulateRestart(reason: StatusState['last_reboot_reason']) {
   state.status.local_time = new Date().toLocaleTimeString('en-GB', { hour12: false });
 }
 
+function emitMockRestartLifecycle() {
+  emitMockRealtimeMessage({
+    type: 'shutting_down',
+    firmware_version: state.status.firmware_version,
+    firmware_date: state.status.firmware_date,
+    hostname: state.services.hostname,
+  });
+
+  window.setTimeout(() => {
+    emitMockRealtimeMessage({
+      type: 'system_ready',
+      firmware_version: state.status.firmware_version,
+      firmware_date: state.status.firmware_date,
+      hostname: state.services.hostname,
+    });
+  }, 2500);
+}
+
 function resolveWifiMode(): StatusState['wifi_mode'] {
   const wifiNetwork = state.networks.find((item) => item.type === 0);
   if (!wifiNetwork) {
@@ -756,6 +774,7 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   if (url === '/api/device/restart' && method === 'post') {
     ensureAuthorized(config, method, url, requestBody);
     simulateRestart('ESP_RST_SW');
+    emitMockRestartLifecycle();
     const mockResponse = response(config, { success: true, message: 'Device restart queued.' });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;
@@ -765,6 +784,7 @@ export const mockAdapter: AxiosAdapter = async (config) => {
     ensureAuthorized(config, method, url, requestBody);
     state = clone(initialState);
     simulateRestart('ESP_RST_SW');
+    emitMockRestartLifecycle();
     const mockResponse = response(config, { success: true, message: 'Factory reset queued.' });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;

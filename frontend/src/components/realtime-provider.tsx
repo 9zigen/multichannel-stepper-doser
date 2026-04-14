@@ -7,9 +7,11 @@ import { emitMockRealtimeMessage, registerMockRealtimePeer, unregisterMockRealti
 import { getStoredAuthToken } from '@/lib/auth-storage.ts';
 
 type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'paused';
+type RealtimeSystemState = 'normal' | 'restarting';
 
 type RealtimeContextValue = {
   status: RealtimeStatus;
+  systemState: RealtimeSystemState;
   attempt: number;
   lastPongAt: number | null;
   reconnectNow: () => void;
@@ -18,6 +20,7 @@ type RealtimeContextValue = {
 
 const RealtimeContext = React.createContext<RealtimeContextValue>({
   status: 'idle',
+  systemState: 'normal',
   attempt: 0,
   lastPongAt: null,
   reconnectNow: () => undefined,
@@ -80,6 +83,7 @@ function createMockSocket(onOpen: () => void, onMessage: (event: MessageEvent<st
 export function RealtimeProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const isAuthenticated = useAppStore((state: AppStoreState) => state.isAuthenticated);
   const [status, setStatus] = React.useState<RealtimeStatus>('idle');
+  const [systemState, setSystemState] = React.useState<RealtimeSystemState>('normal');
   const [attempt, setAttempt] = React.useState(0);
   const [lastPongAt, setLastPongAt] = React.useState<number | null>(null);
   const [lastMessage, setLastMessage] = React.useState<unknown | null>(null);
@@ -154,6 +158,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }): R
         const message = JSON.parse(event.data) as { type?: string };
         if (message.type === 'pong' || message.type === 'welcome') {
           setLastPongAt(Date.now());
+        } else if (message.type === 'shutting_down') {
+          setSystemState('restarting');
+        } else if (message.type === 'system_ready') {
+          setSystemState('normal');
         }
         setLastMessage(message);
       } catch (_error) {
@@ -230,12 +238,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }): R
   const value = React.useMemo(
     () => ({
       status,
+      systemState,
       attempt,
       lastPongAt,
       reconnectNow,
       lastMessage,
     }),
-    [attempt, lastMessage, lastPongAt, reconnectNow, status]
+    [attempt, lastMessage, lastPongAt, reconnectNow, status, systemState]
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;

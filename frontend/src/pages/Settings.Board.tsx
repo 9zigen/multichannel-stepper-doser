@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { BACKEND_SYSTEM_READY_EVENT } from '@/lib/device-events.ts';
 
 const parseNumericInput = (value: string): number => {
   if (value.trim() === '') return 0;
@@ -98,7 +99,17 @@ const BoardPage: React.FC = (): React.ReactElement => {
         setIsLoading(false);
       }
     };
+
+    const handleBackendReady = () => {
+      void loadBoardConfig();
+    };
+
     void loadBoardConfig();
+    window.addEventListener(BACKEND_SYSTEM_READY_EVENT, handleBackendReady);
+
+    return () => {
+      window.removeEventListener(BACKEND_SYSTEM_READY_EVENT, handleBackendReady);
+    };
   }, []);
 
   const validationErrors = useMemo(() => validateBoardConfig(config), [config]);

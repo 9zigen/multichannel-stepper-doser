@@ -17,6 +17,7 @@ import {
   getChannelConfig,
   getChannelMaxRpm,
 } from '@/lib/board-config.ts';
+import { BACKEND_SYSTEM_READY_EVENT } from '@/lib/device-events.ts';
 
 export interface PumpControlState {
   id: number;
@@ -103,7 +104,16 @@ export default function PumpControlCard(props: PumpControlProps) {
       }
     };
 
+    const handleBackendReady = () => {
+      void loadBoardConfig();
+    };
+
     void loadBoardConfig();
+    window.addEventListener(BACKEND_SYSTEM_READY_EVENT, handleBackendReady);
+
+    return () => {
+      window.removeEventListener(BACKEND_SYSTEM_READY_EVENT, handleBackendReady);
+    };
   }, []);
 
   React.useEffect(() => {

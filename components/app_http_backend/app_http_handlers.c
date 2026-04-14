@@ -20,6 +20,7 @@
 #include "driver/gpio.h"
 #include "soc/gpio_num.h"
 
+#include "app_events.h"
 #include "app_settings.h"
 #include "auth.h"
 #include "connect.h"
@@ -177,6 +178,9 @@ static esp_err_t send_success_and_restart(httpd_req_t *req, bool erase_before_re
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, response, (ssize_t)strlen(response));
     free(response);
+
+    app_events_dispatch_system(SHUTTING_DOWN, NULL, 0);
+    vTaskDelay(pdMS_TO_TICKS(150));
 
     if (erase_before_restart) {
         erase_settings();

@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { getPumpsHistory, PumpHistoryPump, PumpHistoryState, PumpState } from '@/lib/api.ts';
+import { BACKEND_SYSTEM_READY_EVENT } from '@/lib/device-events.ts';
 
 type UsePumpHistoryResult = {
   history: PumpHistoryState | null;
@@ -39,10 +40,16 @@ export const usePumpHistory = (pumps: PumpState[]): UsePumpHistoryResult => {
       }
     };
 
+    const handleBackendReady = () => {
+      void loadHistory();
+    };
+
     void loadHistory();
+    window.addEventListener(BACKEND_SYSTEM_READY_EVENT, handleBackendReady);
 
     return () => {
       active = false;
+      window.removeEventListener(BACKEND_SYSTEM_READY_EVENT, handleBackendReady);
     };
   }, []);
 

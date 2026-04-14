@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "cJSON.h"
+#include "esp_app_desc.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 
@@ -28,6 +29,8 @@ typedef struct {
 
 static app_http_ws_client_t ws_clients[APP_HTTP_MAX_WS_CLIENTS];
 static esp_event_handler_instance_t ws_pump_runtime_event_ctx;
+static esp_event_handler_instance_t ws_system_ready_event_ctx;
+static esp_event_handler_instance_t ws_shutting_down_event_ctx;
 
 static int app_http_ws_find_client_slot(int sockfd)
 {
@@ -102,6 +105,39 @@ static void app_http_ws_pump_runtime_event_handler(void* arg, esp_event_base_t e
         free(payload);
     }
     cJSON_Delete(root);
+}
+
+static void app_http_ws_broadcast_lifecycle_event(const char *type)
+{
+    const esp_app_desc_t *app_description = esp_app_get_description();
+    services_t *services = get_service_config();
+    cJSON *root = cJSON_CreateObject();
+    char *payload = NULL;
+
+    cJSON_AddStringToObject(root, "type", type);
+    cJSON_AddStringToObject(root, "firmware_version", app_description->version);
+    cJSON_AddStringToObject(root, "firmware_date", app_description->date);
+    cJSON_AddStringToObject(root, "hostname", services->hostname);
+    payload = cJSON_PrintUnformatted(root);
+    if (payload != NULL) {
+        app_http_ws_broadcast_json(payload);
+        free(payload);
+    }
+    cJSON_Delete(root);
+}
+
+static void app_http_ws_system_event_handler(void *arg, esp_event_base_t event_base,
+                                             int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_base;
+    (void)event_data;
+
+    if (event_id == SYSTEM_READY) {
+        app_http_ws_broadcast_lifecycle_event("system_ready");
+    } else if (event_id == SHUTTING_DOWN) {
+        app_http_ws_broadcast_lifecycle_event("shutting_down");
+    }
 }
 
 extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
@@ -278,6 +314,8 @@ void app_http_ws_init_event_bridge(void)
     }
 
     app_events_register_handler(PUMP_RUNTIME_DATA, NULL, app_http_ws_pump_runtime_event_handler, &ws_pump_runtime_event_ctx);
+    app_events_register_handler(SYSTEM_READY, NULL, app_http_ws_system_event_handler, &ws_system_ready_event_ctx);
+    app_events_register_handler(SHUTTING_DOWN, NULL, app_http_ws_system_event_handler, &ws_shutting_down_event_ctx);
     initialized = true;
 }
 
