@@ -459,6 +459,7 @@ char *get_settings_json(void)
     cJSON_AddItemToObject(services, "mqtt_user", cJSON_CreateString(service_config->mqtt_user));
     cJSON_AddItemToObject(services, "mqtt_password", cJSON_CreateString(service_config->mqtt_password));
     cJSON_AddItemToObject(services, "mqtt_qos", cJSON_CreateNumber(service_config->mqtt_qos));
+    cJSON_AddItemToObject(services, "mqtt_retain", cJSON_CreateBool(service_config->mqtt_retain != 0));
     cJSON_AddItemToObject(services, "mqtt_discovery_topic",
                           cJSON_CreateString(service_config->mqtt_discovery_topic));
     cJSON_AddItemToObject(services, "mqtt_discovery_status_topic",

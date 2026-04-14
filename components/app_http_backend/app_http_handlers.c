@@ -1151,6 +1151,13 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             cJSON *mqtt_qos = cJSON_GetObjectItem(services, "mqtt_qos");
             service_config->mqtt_qos = mqtt_qos->valueint;
 
+            cJSON *mqtt_retain = cJSON_GetObjectItem(services, "mqtt_retain");
+            if (cJSON_IsBool(mqtt_retain)) {
+                service_config->mqtt_retain = cJSON_IsTrue(mqtt_retain) ? 1U : 0U;
+            } else if (cJSON_IsNumber(mqtt_retain)) {
+                service_config->mqtt_retain = mqtt_retain->valueint != 0 ? 1U : 0U;
+            }
+
             cJSON *mqtt_discovery_topic = cJSON_GetObjectItem(services, "mqtt_discovery_topic");
             if (cJSON_IsString(mqtt_discovery_topic) && (mqtt_discovery_topic->valuestring != NULL)) {
                 strlcpy(service_config->mqtt_discovery_topic,
