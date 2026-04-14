@@ -1151,11 +1151,29 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             cJSON *mqtt_qos = cJSON_GetObjectItem(services, "mqtt_qos");
             service_config->mqtt_qos = mqtt_qos->valueint;
 
+            cJSON *mqtt_discovery_topic = cJSON_GetObjectItem(services, "mqtt_discovery_topic");
+            if (cJSON_IsString(mqtt_discovery_topic) && (mqtt_discovery_topic->valuestring != NULL)) {
+                strlcpy(service_config->mqtt_discovery_topic,
+                        mqtt_discovery_topic->valuestring,
+                        sizeof(service_config->mqtt_discovery_topic));
+            }
+
+            cJSON *mqtt_discovery_status_topic = cJSON_GetObjectItem(services, "mqtt_discovery_status_topic");
+            if (cJSON_IsString(mqtt_discovery_status_topic) &&
+                (mqtt_discovery_status_topic->valuestring != NULL)) {
+                strlcpy(service_config->mqtt_discovery_status_topic,
+                        mqtt_discovery_status_topic->valuestring,
+                        sizeof(service_config->mqtt_discovery_status_topic));
+            }
+
             cJSON *enable_ntp = cJSON_GetObjectItem(services, "enable_ntp");
             service_config->enable_ntp = cJSON_IsTrue(enable_ntp);
 
             cJSON *enable_mqtt = cJSON_GetObjectItem(services, "enable_mqtt");
             service_config->enable_mqtt = cJSON_IsTrue(enable_mqtt);
+
+            cJSON *enable_mqtt_discovery = cJSON_GetObjectItem(services, "enable_mqtt_discovery");
+            service_config->enable_mqtt_discovery = cJSON_IsTrue(enable_mqtt_discovery);
 
             save_service();
         }

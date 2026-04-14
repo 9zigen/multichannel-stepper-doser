@@ -73,6 +73,7 @@ static void publish_discovery_payload(esp_mqtt_client_handle_t client, const cha
                                       const char *object_id, cJSON *payload, int qos, int retain)
 {
     char topic[192];
+    int msg_id = -1;
     char *message = cJSON_PrintUnformatted(payload);
     if (message == NULL) {
         cJSON_Delete(payload);
@@ -80,8 +81,12 @@ static void publish_discovery_payload(esp_mqtt_client_handle_t client, const cha
     }
 
     snprintf(topic, sizeof(topic), "%s/%s/%s/config", cfg->hass_prefix, component, object_id);
-    esp_mqtt_client_publish(client, topic, message, 0, qos, retain);
-    ESP_LOGD(TAG, "published discovery topic=%s", topic);
+    msg_id = esp_mqtt_client_publish(client, topic, message, 0, qos, retain);
+    if (msg_id < 0) {
+        ESP_LOGW(TAG, "failed to publish discovery topic=%s", topic);
+    } else {
+        ESP_LOGI(TAG, "published discovery topic=%s msg_id=%d", topic, msg_id);
+    }
 
     free(message);
     cJSON_Delete(payload);

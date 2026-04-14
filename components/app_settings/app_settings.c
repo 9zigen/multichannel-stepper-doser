@@ -90,6 +90,57 @@ static void app_settings_init_network_defaults(network_t *cfg, uint8_t id, netwo
     app_settings_reset_ip(cfg->dns, 0, 0, 0, 0);
 }
 
+static bool normalize_service_config(void)
+{
+    bool changed = false;
+    const bool missing_discovery_config =
+        service.mqtt_discovery_topic[0] == '\0' && service.mqtt_discovery_status_topic[0] == '\0';
+
+    if (service.hostname[0] == '\0') {
+        strlcpy(service.hostname, "stepper-doser", sizeof(service.hostname));
+        changed = true;
+    }
+
+    if (service.ota_url[0] == '\0') {
+        strlcpy(service.ota_url, CONFIG_OTA_URL, sizeof(service.ota_url));
+        changed = true;
+    }
+
+    if (service.ntp_server[0] == '\0') {
+        strlcpy(service.ntp_server, "pool.ntp.org", sizeof(service.ntp_server));
+        changed = true;
+    }
+
+    if (service.time_zone[0] == '\0') {
+        strlcpy(service.time_zone, "UTC", sizeof(service.time_zone));
+        changed = true;
+    }
+
+    if (service.mqtt_port == 0) {
+        service.mqtt_port = 1883;
+        changed = true;
+    }
+
+    if (service.mqtt_discovery_topic[0] == '\0') {
+        strlcpy(service.mqtt_discovery_topic, "homeassistant", sizeof(service.mqtt_discovery_topic));
+        changed = true;
+    }
+
+    if (service.mqtt_discovery_status_topic[0] == '\0') {
+        strlcpy(service.mqtt_discovery_status_topic,
+                "homeassistant/status",
+                sizeof(service.mqtt_discovery_status_topic));
+        changed = true;
+    }
+
+    if (missing_discovery_config) {
+        service.enable_mqtt_discovery = true;
+        changed = true;
+    }
+
+    return changed;
+}
+
 static void app_settings_make_pump_cfg_key(uint8_t pump_id, char *key, size_t key_size)
 {
     snprintf(key, key_size, APP_SETTINGS_PUMP_CFG_KEY_FMT, (unsigned)(pump_id + 1));
@@ -435,6 +486,8 @@ void init_settings()
     } else if (ret == ESP_ERR_NVS_NOT_FOUND || ret == ESP_ERR_NVS_INVALID_LENGTH) {
         ESP_LOGI(TAG, "defauld service config used.");
         set_default_service();
+    } else if (normalize_service_config()) {
+        save_service();
     }
 
     /* Read Pump Config */
@@ -537,6 +590,11 @@ void set_default_service()
     service.enable_mqtt = false;
     service.mqtt_qos = 0;
     service.mqtt_retain = 0;
+    strlcpy(service.mqtt_discovery_topic, "homeassistant", sizeof(service.mqtt_discovery_topic));
+    strlcpy(service.mqtt_discovery_status_topic,
+            "homeassistant/status",
+            sizeof(service.mqtt_discovery_status_topic));
+    service.enable_mqtt_discovery = true;
     save_service();
 }
 

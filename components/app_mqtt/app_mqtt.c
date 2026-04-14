@@ -23,8 +23,6 @@
 #include "app_mqtt.h"
 
 static const char *TAG = "APP_MQTT";
-static const char *MQTT_DISCOVERY_PREFIX = "homeassistant";
-
 typedef struct {
     uint8_t pump_id;
     bool active;
@@ -49,6 +47,9 @@ typedef struct {
     uint8_t mqtt_qos;
     uint8_t mqtt_retain;
     char hostname[sizeof(((services_t *)0)->hostname)];
+    char discovery_topic[sizeof(((services_t *)0)->mqtt_discovery_topic)];
+    char discovery_status_topic[sizeof(((services_t *)0)->mqtt_discovery_status_topic)];
+    bool discovery_enabled;
 } mqtt_runtime_config_t;
 
 typedef enum {
@@ -151,6 +152,11 @@ static void mqtt_runtime_config_from_services(const services_t *services, mqtt_r
     config->mqtt_qos = services->mqtt_qos;
     config->mqtt_retain = services->mqtt_retain;
     strlcpy(config->hostname, services->hostname, sizeof(config->hostname));
+    strlcpy(config->discovery_topic, services->mqtt_discovery_topic, sizeof(config->discovery_topic));
+    strlcpy(config->discovery_status_topic,
+            services->mqtt_discovery_status_topic,
+            sizeof(config->discovery_status_topic));
+    config->discovery_enabled = services->enable_mqtt_discovery;
 }
 
 static bool mqtt_runtime_config_equal(const mqtt_runtime_config_t *left, const mqtt_runtime_config_t *right)
@@ -166,7 +172,10 @@ static bool mqtt_runtime_config_equal(const mqtt_runtime_config_t *left, const m
            memcmp(left->mqtt_ip_address, right->mqtt_ip_address, sizeof(left->mqtt_ip_address)) == 0 &&
            strcmp(left->mqtt_user, right->mqtt_user) == 0 &&
            strcmp(left->mqtt_password, right->mqtt_password) == 0 &&
-           strcmp(left->hostname, right->hostname) == 0;
+           strcmp(left->hostname, right->hostname) == 0 &&
+           strcmp(left->discovery_topic, right->discovery_topic) == 0 &&
+           strcmp(left->discovery_status_topic, right->discovery_status_topic) == 0 &&
+           left->discovery_enabled == right->discovery_enabled;
 }
 
 static void publish_string_topic(const char *topic, const char *payload, int qos, int retain)
@@ -358,6 +367,16 @@ static void publish_discovery_if_needed(void)
         return;
     }
 
+    if (!s_runtime_config.discovery_enabled) {
+        ESP_LOGI(TAG, "MQTT discovery is disabled");
+        return;
+    }
+
+    if (s_runtime_config.discovery_topic[0] == '\0') {
+        ESP_LOGW(TAG, "MQTT discovery topic is empty");
+        return;
+    }
+
     const esp_app_desc_t *app_description = esp_app_get_description();
     services_t *services = get_service_config();
     char topic_base[48];
@@ -368,7 +387,7 @@ static void publish_discovery_if_needed(void)
         .device_manufacturer = HARDWARE_MANUFACTURER,
         .device_sw_version = app_description->version,
         .device_hw_version = HARDWARE_VERSION,
-        .hass_prefix = MQTT_DISCOVERY_PREFIX,
+        .hass_prefix = s_runtime_config.discovery_topic,
         .topic_base = NULL,
     };
 
@@ -376,9 +395,10 @@ static void publish_discovery_if_needed(void)
     discovery.topic_base = topic_base;
 
     if (hass_mqtt_discovery_init(&discovery) == ESP_OK) {
-        hass_mqtt_discovery_configure_device(s_client, services->mqtt_qos, services->mqtt_retain);
+        hass_mqtt_discovery_configure_device(s_client, services->mqtt_qos, 1);
         hass_mqtt_discovery_deinit();
         s_discovery_published = true;
+        ESP_LOGI(TAG, "Published Home Assistant discovery under prefix '%s'", s_runtime_config.discovery_topic);
     }
 }
 
@@ -537,6 +557,17 @@ static void handle_incoming_message(esp_mqtt_event_handle_t event)
 
     ESP_LOGI(TAG, "MQTT message received: topic=%s, data=%s", topic, data);
 
+    if (s_runtime_config.discovery_enabled &&
+        s_runtime_config.discovery_status_topic[0] != '\0' &&
+        strcmp(topic, s_runtime_config.discovery_status_topic) == 0) {
+        ESP_LOGI(TAG, "Received Home Assistant status topic update: %s", data);
+        if (strcmp(data, "online") == 0 || strcmp(data, "1") == 0 || strcmp(data, "true") == 0) {
+            s_discovery_published = false;
+            publish_discovery_if_needed();
+        }
+        return;
+    }
+
     snprintf(expected, sizeof(expected), "%s/command/restart", topic_base);
     if (strcmp(topic, expected) == 0) {
         if (strcmp(data, "restart") == 0 || strcmp(data, "1") == 0 || strcmp(data, "true") == 0) {
@@ -604,6 +635,10 @@ static void subscribe_topics(void)
 
     snprintf(topic, sizeof(topic), "%s/pumps/+/calibration/+", topic_base);
     esp_mqtt_client_subscribe(s_client, topic, services->mqtt_qos);
+
+    if (s_runtime_config.discovery_enabled && s_runtime_config.discovery_status_topic[0] != '\0') {
+        esp_mqtt_client_subscribe(s_client, s_runtime_config.discovery_status_topic, services->mqtt_qos);
+    }
 }
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)

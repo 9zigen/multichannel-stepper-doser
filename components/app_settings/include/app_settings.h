@@ -94,8 +94,11 @@ typedef struct {
     char mqtt_password[MAX_NETWORK_STR_LEN];
     uint8_t mqtt_qos;                     // MQTT QoS
     uint8_t mqtt_retain;                  // MQTT Retain
+    char mqtt_discovery_topic[MAX_NETWORK_STR_LEN];
+    char mqtt_discovery_status_topic[MAX_NETWORK_STR_LEN];
     bool enable_ntp;                      // Enable NTP Service
     bool enable_mqtt;                     // Enable MQTT Service
+    bool enable_mqtt_discovery;           // Enable Home Assistant discovery
 } services_t;
 
 typedef struct {
