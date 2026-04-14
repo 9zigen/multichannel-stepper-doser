@@ -528,6 +528,8 @@ void run_pump_with_timeout(uint8_t pump_id, uint32_t timeout_ms, uint8_t speed)
         return;
     }
 
+    ESP_LOGI(TAG, "run_pump_with_timeout: pump_id=%u, timeout_ms=%u, speed=%u", pump_id, timeout_ms, speed);
+
     pump_t *pump_config = get_pump_config(pump_id);
     double flow_ml_per_min = pump_flow_ml_per_min(pump_config, (float)speed);
     if (flow_ml_per_min <= 0.0) {
@@ -556,6 +558,8 @@ void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm)
     if (pump_id >= MAX_PUMP) {
         return;
     }
+
+    ESP_LOGI(TAG, "run_pump_on_volume: pump_id=%u, volume_ml=%.2f, rpm=%.2f", pump_id, volume_ml, rpm);
 
     pump_t *pump_config = get_pump_config(pump_id);
     double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
@@ -597,6 +601,8 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
         return ESP_ERR_INVALID_ARG;
     }
 
+    ESP_LOGI(TAG, "run_pump_manual: pump_id=%u, rpm=%.2f, direction=%d, time_minutes=%d", pump_id, rpm, direction, time_minutes);
+
     if (time_minutes <= 0) {
         stop_pump(pump_id);
         pumps[pump_id].state = PUMP_OFF;
@@ -635,6 +641,8 @@ void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direct
     if (pump_id >= MAX_PUMP) {
         return;
     }
+
+    ESP_LOGI(TAG, "run_pump_calibration: pump_id=%u, is_start=%d, rpm=%.2f, direction=%d", pump_id, is_start, rpm, direction);
 
     if (is_start) {
         pumps[pump_id].state = PUMP_CAL;

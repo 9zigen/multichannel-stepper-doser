@@ -489,6 +489,39 @@ static void handle_pump_calibration_command(uint8_t pump_id, bool start, const c
     run_pump_calibration(pump_id, start, rpm, direction);
 }
 
+static bool mqtt_match_pump_topic(const char *topic,
+                                  const char *topic_base,
+                                  const char *suffix,
+                                  uint8_t *pump_id_out)
+{
+    char prefix[64];
+    const char *cursor = NULL;
+    char *endptr = NULL;
+    unsigned long parsed_id = 0;
+
+    if (topic == NULL || topic_base == NULL || suffix == NULL || pump_id_out == NULL) {
+        return false;
+    }
+
+    snprintf(prefix, sizeof(prefix), "%s/pumps/", topic_base);
+    if (strncmp(topic, prefix, strlen(prefix)) != 0) {
+        return false;
+    }
+
+    cursor = topic + strlen(prefix);
+    parsed_id = strtoul(cursor, &endptr, 10);
+    if (endptr == cursor || parsed_id >= MAX_PUMP) {
+        return false;
+    }
+
+    if (strcmp(endptr, suffix) != 0) {
+        return false;
+    }
+
+    *pump_id_out = (uint8_t)parsed_id;
+    return true;
+}
+
 static void handle_incoming_message(esp_mqtt_event_handle_t event)
 {
     char topic[192];
@@ -496,15 +529,18 @@ static void handle_incoming_message(esp_mqtt_event_handle_t event)
     services_t *services = get_service_config();
     char topic_base[48];
     char expected[192];
-    unsigned int pump_id = 0;
+    uint8_t pump_id = 0;
 
     snprintf(topic, sizeof(topic), "%.*s", event->topic_len, event->topic);
     snprintf(data, sizeof(data), "%.*s", event->data_len, event->data);
     build_topic_base(topic_base, sizeof(topic_base));
 
+    ESP_LOGI(TAG, "MQTT message received: topic=%s, data=%s", topic, data);
+
     snprintf(expected, sizeof(expected), "%s/command/restart", topic_base);
     if (strcmp(topic, expected) == 0) {
         if (strcmp(data, "restart") == 0 || strcmp(data, "1") == 0 || strcmp(data, "true") == 0) {
+            ESP_LOGI(TAG, "Received restart command, initiating restart");
             handle_restart_command();
         }
         return;
@@ -513,33 +549,39 @@ static void handle_incoming_message(esp_mqtt_event_handle_t event)
     snprintf(expected, sizeof(expected), "%s/command/history_backup", topic_base);
     if (strcmp(topic, expected) == 0) {
         if (strcmp(data, "backup") == 0 || strcmp(data, "1") == 0 || strcmp(data, "true") == 0) {
+            ESP_LOGI(TAG, "Received history backup command, initiating backup");
             handle_history_backup_command();
         }
         return;
     }
 
-    snprintf(expected, sizeof(expected), "%s/pumps/%%u/run", topic_base);
-    if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
-        handle_pump_run_command((uint8_t)pump_id, data);
+    if (mqtt_match_pump_topic(topic, topic_base, "/run", &pump_id)) {
+        ESP_LOGI(TAG, "Received pump run command for pump %u with data: %s", pump_id, data);
+        handle_pump_run_command(pump_id, data);
         return;
     }
 
-    snprintf(expected, sizeof(expected), "%s/pumps/%%u/stop", topic_base);
-    if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
-        pump_t *pump_config = get_pump_config((uint8_t)pump_id);
-        run_pump_manual((uint8_t)pump_id, 1.0f, pump_config->direction, 0);
+    if (mqtt_match_pump_topic(topic, topic_base, "/stop", &pump_id)) {
+        pump_t *pump_config = get_pump_config(pump_id);
+        ESP_LOGI(TAG, "Received pump stop command for pump %u", pump_id);
+        run_pump_manual(pump_id, 1.0f, pump_config->direction, 0);
         return;
     }
 
-    snprintf(expected, sizeof(expected), "%s/pumps/%%u/calibration/start", topic_base);
-    if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
-        handle_pump_calibration_command((uint8_t)pump_id, true, data);
+    if (mqtt_match_pump_topic(topic, topic_base, "/calibration/start", &pump_id)) {
+        ESP_LOGI(TAG, "Received pump calibration start command for pump %u with data: %s", pump_id, data);
+        handle_pump_calibration_command(pump_id, true, data);
         return;
     }
 
-    snprintf(expected, sizeof(expected), "%s/pumps/%%u/calibration/stop", topic_base);
-    if (sscanf(topic, expected, &pump_id) == 1 && pump_id < MAX_PUMP) {
-        handle_pump_calibration_command((uint8_t)pump_id, false, data);
+    if (mqtt_match_pump_topic(topic, topic_base, "/calibration/stop", &pump_id)) {
+        ESP_LOGI(TAG, "Received pump calibration stop command for pump %u with data: %s", pump_id, data);
+        handle_pump_calibration_command(pump_id, false, data);
+        return;
+    }
+
+    if (mqtt_match_pump_topic(topic, topic_base, "/state", &pump_id)) {
+        ESP_LOGD(TAG, "Ignoring echoed pump state topic for pump %u", pump_id);
         return;
     }
 
