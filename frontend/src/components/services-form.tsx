@@ -2,7 +2,7 @@ import React from 'react';
 import { Controller, SubmitHandler, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Clock3, Globe, RadioTower, RefreshCcw } from 'lucide-react';
+import { Clock3, Globe, HomeIcon, RadioTower, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button.tsx';
@@ -30,8 +30,11 @@ type FormData = {
   mqtt_user: string;
   mqtt_password: string;
   mqtt_qos: number;
+  mqtt_discovery_topic: string;
+  mqtt_discovery_status_topic: string;
   enable_ntp: boolean;
   enable_mqtt: boolean;
+  enable_mqtt_discovery: boolean;
   ota_url: string;
 };
 
@@ -52,8 +55,15 @@ const FormSchema = z.object({
   mqtt_user: z.string().max(64, 'User must be 64 characters or fewer.'),
   mqtt_password: z.string().max(64, 'Password must be 64 characters or fewer.'),
   mqtt_qos: z.number().min(0, 'QoS must be 0, 1, or 2.').max(2, 'QoS must be 0, 1, or 2.'),
+  mqtt_discovery_topic: z
+    .string()
+    .max(64, 'Discovery prefix must be 64 characters or fewer.'),
+  mqtt_discovery_status_topic: z
+    .string()
+    .max(64, 'Status topic must be 64 characters or fewer.'),
   enable_ntp: z.boolean(),
   enable_mqtt: z.boolean(),
+  enable_mqtt_discovery: z.boolean(),
   ota_url: z.string().max(256, 'OTA URL must be 256 characters or fewer.'),
 });
 
@@ -81,14 +91,20 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
       mqtt_user: services.mqtt_user,
       mqtt_password: services.mqtt_password,
       mqtt_qos: services.mqtt_qos,
+      mqtt_discovery_topic: services.mqtt_discovery_topic || 'homeassistant',
+      mqtt_discovery_status_topic:
+        services.mqtt_discovery_status_topic || 'homeassistant/status',
       enable_ntp: services.enable_ntp,
       enable_mqtt: services.enable_mqtt,
+      enable_mqtt_discovery: services.enable_mqtt_discovery,
       ota_url: services.ota_url,
     },
   });
 
   const enableNtp = useWatch({ control, name: 'enable_ntp' });
   const enableMqtt = useWatch({ control, name: 'enable_mqtt' });
+  const enableDiscovery = useWatch({ control, name: 'enable_mqtt_discovery' });
+  const discoveryActive = enableMqtt && enableDiscovery;
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     if (await updateServices(data)) {
@@ -253,6 +269,82 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
                 {...register('mqtt_password')}
                 disabled={!enableMqtt}
               />
+            </div>
+          </div>
+
+          {/* Home Assistant Discovery */}
+          <div className="rounded-md border border-border/40 bg-background/40 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <HomeIcon className="size-3" />
+                Home Assistant Discovery
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="enable-mqtt-discovery" className="text-xs text-muted-foreground">
+                  Publish
+                </Label>
+                <Controller
+                  name="enable_mqtt_discovery"
+                  control={control}
+                  render={({ field }) => (
+                    <Switch
+                      id="enable-mqtt-discovery"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={!enableMqtt}
+                    />
+                  )}
+                />
+              </div>
+            </div>
+            <p className="mb-3 text-[11px] leading-tight text-muted-foreground">
+              Publishes MQTT discovery messages so Home Assistant can auto-add pumps as devices.
+            </p>
+            <div
+              className={cn(
+                'grid gap-3 sm:grid-cols-2',
+                !discoveryActive && 'pointer-events-none opacity-40',
+              )}
+            >
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="mqtt_discovery_topic" className="text-xs text-muted-foreground">
+                  Discovery Prefix
+                </Label>
+                <Input
+                  id="mqtt_discovery_topic"
+                  type="text"
+                  placeholder="homeassistant"
+                  className="h-8 text-sm"
+                  {...register('mqtt_discovery_topic')}
+                  disabled={!discoveryActive}
+                  aria-invalid={!!errors.mqtt_discovery_topic}
+                />
+                {errors.mqtt_discovery_topic && (
+                  <p className="text-xs text-destructive">{errors.mqtt_discovery_topic.message}</p>
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label
+                  htmlFor="mqtt_discovery_status_topic"
+                  className="text-xs text-muted-foreground"
+                >
+                  Status Topic
+                </Label>
+                <Input
+                  id="mqtt_discovery_status_topic"
+                  type="text"
+                  placeholder="homeassistant/status"
+                  className="h-8 text-sm"
+                  {...register('mqtt_discovery_status_topic')}
+                  disabled={!discoveryActive}
+                  aria-invalid={!!errors.mqtt_discovery_status_topic}
+                />
+                {errors.mqtt_discovery_status_topic && (
+                  <p className="text-xs text-destructive">
+                    {errors.mqtt_discovery_status_topic.message}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>

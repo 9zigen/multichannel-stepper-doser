@@ -133,8 +133,11 @@ export type ServiceState = {
   mqtt_user: string;
   mqtt_password: string;
   mqtt_qos: number;
+  mqtt_discovery_topic: string;
+  mqtt_discovery_status_topic: string;
   enable_ntp: boolean;
   enable_mqtt: boolean;
+  enable_mqtt_discovery: boolean;
   ota_url: string;
 };
 
