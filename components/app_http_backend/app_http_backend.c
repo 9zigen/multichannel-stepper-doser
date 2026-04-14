@@ -55,6 +55,22 @@ static const char *app_http_ws_pump_state_to_string(pump_state_t state)
     }
 }
 
+static bool app_http_is_spa_route(const char *uri)
+{
+    if (uri == NULL || uri[0] != '/') {
+        return false;
+    }
+
+    if (strncmp(uri, "/api/", 5) == 0 ||
+        strcmp(uri, "/api") == 0 ||
+        strncmp(uri, "/ws", 3) == 0 ||
+        strncmp(uri, "/upload", 7) == 0) {
+        return false;
+    }
+
+    return strchr(uri + 1, '.') == NULL;
+}
+
 static void app_http_ws_pump_runtime_event_handler(void* arg, esp_event_base_t event_base,
                                                    int32_t event_id, void* event_data)
 {
@@ -307,6 +323,26 @@ static esp_err_t index_head_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t spa_fallback_get_handler(httpd_req_t *req)
+{
+    if (!app_http_is_spa_route(req->uri)) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Resource not found");
+        return ESP_OK;
+    }
+
+    return index_get_handler(req);
+}
+
+static esp_err_t spa_fallback_head_handler(httpd_req_t *req)
+{
+    if (!app_http_is_spa_route(req->uri)) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Resource not found");
+        return ESP_OK;
+    }
+
+    return index_head_handler(req);
+}
+
 static esp_err_t captive_probe_handler(httpd_req_t *req)
 {
     httpd_resp_set_status(req, "302 Found");
@@ -401,41 +437,6 @@ httpd_handle_t start_webserver(void)
             .uri = "/app.css",
             .method = HTTP_GET,
             .handler = css_handler,
-            .user_ctx = NULL,
-        };
-
-        httpd_uri_t get_settings_page = {
-            .uri = "/settings/network",
-            .method = HTTP_GET,
-            .handler = index_get_handler,
-            .user_ctx = NULL,
-        };
-
-        httpd_uri_t get_login_page = {
-            .uri = "/login",
-            .method = HTTP_GET,
-            .handler = index_get_handler,
-            .user_ctx = NULL,
-        };
-
-        httpd_uri_t get_schedule_page = {
-            .uri = "/schedule",
-            .method = HTTP_GET,
-            .handler = index_get_handler,
-            .user_ctx = NULL,
-        };
-
-        httpd_uri_t get_wifi_page = {
-            .uri = "/wifi",
-            .method = HTTP_GET,
-            .handler = index_get_handler,
-            .user_ctx = NULL,
-        };
-
-        httpd_uri_t get_about_page = {
-            .uri = "/about",
-            .method = HTTP_GET,
-            .handler = index_get_handler,
             .user_ctx = NULL,
         };
 
@@ -630,14 +631,23 @@ httpd_handle_t start_webserver(void)
             .user_ctx = NULL,
         };
 
+        httpd_uri_t get_spa_fallback = {
+            .uri = "/*",
+            .method = HTTP_GET,
+            .handler = spa_fallback_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t head_spa_fallback = {
+            .uri = "/*",
+            .method = HTTP_HEAD,
+            .handler = spa_fallback_head_handler,
+            .user_ctx = NULL,
+        };
+
         httpd_register_uri_handler(server, &global_options);
         httpd_register_uri_handler(server, &get_home_page);
         httpd_register_uri_handler(server, &head_home_page);
-        httpd_register_uri_handler(server, &get_settings_page);
-        httpd_register_uri_handler(server, &get_login_page);
-        httpd_register_uri_handler(server, &get_schedule_page);
-        httpd_register_uri_handler(server, &get_wifi_page);
-        httpd_register_uri_handler(server, &get_about_page);
         httpd_register_uri_handler(server, &get_favicon);
         httpd_register_uri_handler(server, &get_icon_svg);
         httpd_register_uri_handler(server, &get_apple_touch_icon);
@@ -667,6 +677,8 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &post_device_restart);
         httpd_register_uri_handler(server, &post_device_factory_reset);
         httpd_register_uri_handler(server, &update_post);
+        httpd_register_uri_handler(server, &get_spa_fallback);
+        httpd_register_uri_handler(server, &head_spa_fallback);
 
         return server;
     }
