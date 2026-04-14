@@ -8,7 +8,6 @@ set(WEB_FILES
         "../../frontend/dist/favicon.ico"
         "../../frontend/dist/app.css.gz"
         "../../frontend/dist/app.js.gz"
-        "../../frontend/dist/app.woff2"
         "../../frontend/dist/icon.svg.gz"
         "../../frontend/dist/apple-touch-icon.png"
         "../../frontend/dist/index.html.gz")

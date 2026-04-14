@@ -98,8 +98,6 @@ extern const uint8_t app_css_start[] asm("_binary_app_css_gz_start");
 extern const uint8_t app_css_end[] asm("_binary_app_css_gz_end");
 extern const uint8_t app_js_start[] asm("_binary_app_js_gz_start");
 extern const uint8_t app_js_end[] asm("_binary_app_js_gz_end");
-extern const uint8_t app_woff2_start[] asm("_binary_app_woff2_start");
-extern const uint8_t app_woff2_end[] asm("_binary_app_woff2_end");
 extern const uint8_t index_html_start[] asm("_binary_index_html_gz_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_gz_end");
 
@@ -335,14 +333,6 @@ esp_err_t css_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-esp_err_t woff2_handler(httpd_req_t *req)
-{
-    const size_t size = (app_woff2_end - app_woff2_start);
-    httpd_resp_set_type(req, "font/woff2");
-    httpd_resp_send(req, (const char *)app_woff2_start, (ssize_t)size);
-    return ESP_OK;
-}
-
 esp_err_t options_handler(httpd_req_t *req)
 {
     app_http_set_cors_headers(req);
@@ -411,13 +401,6 @@ httpd_handle_t start_webserver(void)
             .uri = "/app.css",
             .method = HTTP_GET,
             .handler = css_handler,
-            .user_ctx = NULL,
-        };
-
-        httpd_uri_t get_woff2 = {
-            .uri = "/app.woff2",
-            .method = HTTP_GET,
-            .handler = woff2_handler,
             .user_ctx = NULL,
         };
 
@@ -665,7 +648,6 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &captive_connecttest);
         httpd_register_uri_handler(server, &get_js);
         httpd_register_uri_handler(server, &get_css);
-        httpd_register_uri_handler(server, &get_woff2);
         httpd_register_uri_handler(server, &get_status);
         httpd_register_uri_handler(server, &get_pumps_runtime);
         httpd_register_uri_handler(server, &get_pumps_history);
