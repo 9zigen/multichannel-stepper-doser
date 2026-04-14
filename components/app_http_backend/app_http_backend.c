@@ -43,6 +43,17 @@ static int app_http_ws_find_client_slot(int sockfd)
     return -1;
 }
 
+bool app_http_ws_has_capacity(void)
+{
+    for (uint32_t i = 0; i < APP_HTTP_MAX_WS_CLIENTS; ++i) {
+        if (ws_clients[i].sockfd <= 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static const char *app_http_ws_pump_state_to_string(pump_state_t state)
 {
     switch (state) {
@@ -418,12 +429,19 @@ httpd_handle_t start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 36;
+    config.max_open_sockets = APP_HTTP_MAX_OPEN_SOCKETS;
     config.lru_purge_enable = true;
+    config.backlog_conn = APP_HTTP_MAX_OPEN_SOCKETS;
     config.recv_wait_timeout = 30;
     config.send_wait_timeout = 60;
+    config.keep_alive_enable = true;
+    config.keep_alive_idle = 30;
+    config.keep_alive_interval = 5;
+    config.keep_alive_count = 3;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
-    ESP_LOGI(TAG, "Starting web server on port: '%d'", config.server_port);
+    ESP_LOGI(TAG, "Starting web server on port: '%d' (max_open_sockets=%u, max_ws_clients=%u)",
+             config.server_port, (unsigned)config.max_open_sockets, (unsigned)APP_HTTP_MAX_WS_CLIENTS);
 
     if (server != NULL) {
         stop_webserver();

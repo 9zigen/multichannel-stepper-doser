@@ -150,6 +150,12 @@ static esp_err_t board_config_validate(const stepper_board_config_t *config, cha
 esp_err_t websocket_pre_handshake_cb(httpd_req_t *req)
 {
     if (app_http_validate_ws_request(req) == ESP_OK) {
+        if (!app_http_ws_has_capacity()) {
+            app_http_set_cors_headers(req);
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_send(req, "WebSocket client limit reached", HTTPD_RESP_USE_STRLEN);
+            return ESP_FAIL;
+        }
         return ESP_OK;
     }
 

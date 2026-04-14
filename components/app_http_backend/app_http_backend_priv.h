@@ -8,7 +8,8 @@
 
 #define TOKEN_SIZE ((uint32_t)32)
 #define SCRATCH_BUFSIZE ((uint32_t)2048)
-#define APP_HTTP_MAX_WS_CLIENTS ((uint32_t)8)
+#define APP_HTTP_MAX_WS_CLIENTS ((uint32_t)6)
+#define APP_HTTP_MAX_OPEN_SOCKETS ((uint16_t)8)
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
 extern char app_http_auth_token[65];
@@ -16,6 +17,7 @@ extern char app_http_auth_token[65];
 char *app_http_success_response_json(bool success);
 esp_err_t app_http_validate_request(httpd_req_t *req);
 esp_err_t app_http_validate_ws_request(httpd_req_t *req);
+bool app_http_ws_has_capacity(void);
 void app_http_set_cors_headers(httpd_req_t *req);
 void app_http_ws_register_client(int sockfd);
 void app_http_ws_unregister_client(int sockfd);
