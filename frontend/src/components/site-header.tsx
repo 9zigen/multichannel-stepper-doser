@@ -11,17 +11,19 @@ import {
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '@/components/theme-provider';
 import { Button } from '@/components/ui/button.tsx';
-import { AlertTriangle, Moon, Sun } from 'lucide-react';
+import {AlertTriangle, Moon, Sun} from 'lucide-react';
 import { BackendConnectionIndicator } from '@/components/backend-connection-indicator.tsx';
 import { CalibrationStatusIndicator } from '@/components/calibration-status-indicator.tsx';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { Badge } from '@/components/ui/badge';
+import {useRealtimeConnection} from "@/components/realtime-provider.tsx";
 
 export function SiteHeader(): React.ReactElement {
   const location = useLocation();
   const pathNames = location.pathname.split('/').filter((x) => x);
   const { theme, setTheme } = useTheme();
   const status = useAppStore((state: AppStoreState) => state.status);
+  const { systemState } = useRealtimeConnection();
 
   const routes = [
     { path: '/', name: 'Home' },
@@ -82,6 +84,19 @@ export function SiteHeader(): React.ReactElement {
             </div>
             <Badge variant="outline" className="border-border bg-background/70 text-foreground">
               Periodic paused
+            </Badge>
+          </div>
+        </div>
+      )}
+      {systemState === 'restarting' && (
+        <div className="border-b border-border/80 bg-secondary/60">
+          <div className="flex items-center justify-between gap-3 px-5 py-2 text-sm md:px-6">
+            <div className="flex items-center gap-2 text-foreground animate-pulse">
+              <AlertTriangle className="size-4" />
+              <span className="font-medium">Controller restarting</span>
+            </div>
+            <Badge variant="outline" className="border-border bg-background/70 text-foreground">
+              The device is shutting down and reconnecting. Data will refresh automatically when it is ready
             </Badge>
           </div>
         </div>

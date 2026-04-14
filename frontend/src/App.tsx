@@ -21,9 +21,7 @@ function DeviceLifecycleBridge(): React.ReactElement | null {
     if (
       !isAuthenticated ||
       !lastMessage ||
-      typeof lastMessage !== 'object' ||
-      lastMessage === null ||
-      !('type' in lastMessage) ||
+      typeof lastMessage !== 'object' || !('type' in lastMessage) ||
       (lastMessage as { type?: string }).type !== 'system_ready'
     ) {
       return;
