@@ -30,6 +30,7 @@ type FormData = {
   mqtt_user: string;
   mqtt_password: string;
   mqtt_qos: number;
+  mqtt_retain: boolean;
   mqtt_discovery_topic: string;
   mqtt_discovery_status_topic: string;
   enable_ntp: boolean;
@@ -55,6 +56,7 @@ const FormSchema = z.object({
   mqtt_user: z.string().max(64, 'User must be 64 characters or fewer.'),
   mqtt_password: z.string().max(64, 'Password must be 64 characters or fewer.'),
   mqtt_qos: z.number().min(0, 'QoS must be 0, 1, or 2.').max(2, 'QoS must be 0, 1, or 2.'),
+  mqtt_retain: z.boolean(),
   mqtt_discovery_topic: z
     .string()
     .max(64, 'Discovery prefix must be 64 characters or fewer.'),
@@ -91,6 +93,7 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
       mqtt_user: services.mqtt_user,
       mqtt_password: services.mqtt_password,
       mqtt_qos: services.mqtt_qos,
+      mqtt_retain: services.mqtt_retain,
       mqtt_discovery_topic: services.mqtt_discovery_topic || 'homeassistant',
       mqtt_discovery_status_topic:
         services.mqtt_discovery_status_topic || 'homeassistant/status',
@@ -206,7 +209,7 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
           </div>
         </div>
         <div className={cn('flex flex-col gap-3', !enableMqtt && 'opacity-40 pointer-events-none')}>
-          <div className="grid gap-3 sm:grid-cols-[1fr_100px_80px]">
+          <div className="grid gap-3 sm:grid-cols-[1fr_100px_72px_auto]">
             <div className="flex flex-col gap-1">
               <Label htmlFor="mqtt_ip_address" className="text-xs text-muted-foreground">Broker Host</Label>
               <Input
@@ -245,6 +248,23 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
                 disabled={!enableMqtt}
               />
               {errors.mqtt_qos && <p className="text-xs text-destructive">{errors.mqtt_qos.message}</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mqtt_retain" className="text-xs text-muted-foreground">Retain</Label>
+              <div className="flex h-8 items-center">
+                <Controller
+                  name="mqtt_retain"
+                  control={control}
+                  render={({ field }) => (
+                    <Switch
+                      id="mqtt_retain"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={!enableMqtt}
+                    />
+                  )}
+                />
+              </div>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

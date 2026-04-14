@@ -164,6 +164,21 @@ When the firmware gains a new settings field (e.g. a new MQTT/service option), f
 
 For **nested feature toggles** (e.g. Home Assistant Discovery inside MQTT), compose the dependency: `const discoveryActive = enableMqtt && enableDiscovery;` and dim when `!discoveryActive`. Nest the sub-panel visually inside its parent panel using a lighter inner wrapper (`rounded-md border border-border/40 bg-background/40 p-3`) rather than a sibling flat panel.
 
+For **inline boolean flags placed on a field row** (e.g. MQTT Retain sitting alongside QoS), render a labelled `<Switch>` cell so it lines up with the adjacent Inputs:
+
+```tsx
+<div className="flex flex-col gap-1">
+  <Label htmlFor="mqtt_retain" className="text-xs text-muted-foreground">Retain</Label>
+  <div className="flex h-8 items-center">
+    <Controller name="mqtt_retain" control={control} render={({ field }) => (
+      <Switch id="mqtt_retain" checked={field.value} onCheckedChange={field.onChange} disabled={!enableMqtt} />
+    )} />
+  </div>
+</div>
+```
+
+The `flex h-8 items-center` wrapper ensures the switch vertically aligns with `h-8` inputs in the same grid row.
+
 ### 3.8 How forms dim disabled dependent fields
 
 The established pattern for a boolean toggle controlling a group of inputs:
@@ -429,4 +444,4 @@ Always confirm with the user before committing. Never push, force-push, or amend
 
 ---
 
-*Last updated: Home Assistant discovery fields added to Services page; corepack/pnpm workaround documented; end-to-end settings-field propagation playbook added (sections 3.7, 3.8, 5.10, 5.11).*
+*Last updated: Added `mqtt_retain` boolean to Services page (inline Switch beside QoS); documented the inline-switch-in-field-row pattern in section 3.7.*

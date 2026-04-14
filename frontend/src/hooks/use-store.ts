@@ -113,6 +113,7 @@ const defaultSettings: SettingsState = {
     mqtt_user: '',
     mqtt_password: '',
     mqtt_qos: 0,
+    mqtt_retain: false,
     mqtt_discovery_topic: 'homeassistant',
     mqtt_discovery_status_topic: 'homeassistant/status',
     enable_ntp: false,
