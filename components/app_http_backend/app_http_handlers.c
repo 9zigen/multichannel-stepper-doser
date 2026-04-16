@@ -993,292 +993,292 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         save_pump_aging_state(get_pump_aging_day_stamp());
         save_schedule();
         backup_eeprom_tank_status();
+    }
 
-        cJSON *networks = cJSON_GetObjectItem(root, "networks");
-        if (cJSON_IsArray(networks)) {
-            for (uint8_t i = 0; i < MAX_NETWORKS; i++) {
-                network_t *network_config = get_networks_config(i);
-                memset(network_config, 0, sizeof(*network_config));
-                network_config->id = i;
-                network_config->type = i;
-                network_config->keep_ap_active = (i == NETWORK_TYPE_WIFI);
-                network_config->dhcp = true;
-                network_config->vlan_tag = 0;
-                network_config->channel = 13;
-                network_config->force_dataset = true;
-            }
-
-            cJSON *network_item;
-            uint8_t network_id = 0;
-            cJSON_ArrayForEach(network_item, networks) {
-                if (network_id >= MAX_NETWORKS) {
-                    break;
-                }
-
-                network_t *network_config = get_networks_config(network_id);
-                cJSON *type = cJSON_GetObjectItem(network_item, "type");
-                cJSON *is_dirty = cJSON_GetObjectItem(network_item, "is_dirty");
-                cJSON *id = cJSON_GetObjectItem(network_item, "id");
-
-                network_config->id = cJSON_IsNumber(id) ? id->valueint : network_id;
-                network_config->type = cJSON_IsNumber(type) ? type->valueint : NETWORK_TYPE_WIFI;
-                network_config->is_dirty = cJSON_IsTrue(is_dirty);
-
-                cJSON *ssid = cJSON_GetObjectItem(network_item, "ssid");
-                if (cJSON_IsString(ssid) && (ssid->valuestring != NULL)) {
-                    strlcpy(network_config->ssid, ssid->valuestring, sizeof(network_config->ssid));
-                }
-
-                cJSON *password = cJSON_GetObjectItem(network_item, "password");
-                if (cJSON_IsString(password) && (password->valuestring != NULL)) {
-                    strlcpy(network_config->password, password->valuestring, sizeof(network_config->password));
-                }
-
-                cJSON *keep_ap_active = cJSON_GetObjectItem(network_item, "keep_ap_active");
-                network_config->keep_ap_active = cJSON_IsTrue(keep_ap_active);
-
-                cJSON *ip_address = cJSON_GetObjectItem(network_item, "ip_address");
-                if (cJSON_IsString(ip_address) && (ip_address->valuestring != NULL)) {
-                    string_to_ip(ip_address->valuestring, network_config->ip_address);
-                }
-
-                cJSON *mask = cJSON_GetObjectItem(network_item, "mask");
-                if (cJSON_IsString(mask) && (mask->valuestring != NULL)) {
-                    string_to_ip(mask->valuestring, network_config->mask);
-                }
-
-                cJSON *gateway = cJSON_GetObjectItem(network_item, "gateway");
-                if (cJSON_IsString(gateway) && (gateway->valuestring != NULL)) {
-                    string_to_ip(gateway->valuestring, network_config->gateway);
-                }
-
-                cJSON *dns = cJSON_GetObjectItem(network_item, "dns");
-                if (cJSON_IsString(dns) && (dns->valuestring != NULL)) {
-                    string_to_ip(dns->valuestring, network_config->dns);
-                }
-
-                cJSON *dhcp = cJSON_GetObjectItem(network_item, "dhcp");
-                network_config->dhcp = cJSON_IsTrue(dhcp);
-
-                cJSON *vlan_tag = cJSON_GetObjectItem(network_item, "vlan_tag");
-                if (cJSON_IsNumber(vlan_tag)) {
-                    network_config->vlan_tag = vlan_tag->valueint;
-                }
-
-                cJSON *channel = cJSON_GetObjectItem(network_item, "channel");
-                if (cJSON_IsNumber(channel)) {
-                    network_config->channel = channel->valueint;
-                }
-
-                cJSON *network_name = cJSON_GetObjectItem(network_item, "network_name");
-                if (cJSON_IsString(network_name) && (network_name->valuestring != NULL)) {
-                    strlcpy(network_config->network_name, network_name->valuestring, sizeof(network_config->network_name));
-                }
-
-                cJSON *network_key = cJSON_GetObjectItem(network_item, "network_key");
-                if (cJSON_IsString(network_key) && (network_key->valuestring != NULL)) {
-                    strlcpy(network_config->network_key, network_key->valuestring, sizeof(network_config->network_key));
-                }
-
-                cJSON *pan_id = cJSON_GetObjectItem(network_item, "pan_id");
-                if (cJSON_IsString(pan_id) && (pan_id->valuestring != NULL)) {
-                    strlcpy(network_config->pan_id, pan_id->valuestring, sizeof(network_config->pan_id));
-                }
-
-                cJSON *ext_pan_id = cJSON_GetObjectItem(network_item, "ext_pan_id");
-                if (cJSON_IsString(ext_pan_id) && (ext_pan_id->valuestring != NULL)) {
-                    strlcpy(network_config->ext_pan_id, ext_pan_id->valuestring, sizeof(network_config->ext_pan_id));
-                }
-
-                cJSON *pskc = cJSON_GetObjectItem(network_item, "pskc");
-                if (cJSON_IsString(pskc) && (pskc->valuestring != NULL)) {
-                    strlcpy(network_config->pskc, pskc->valuestring, sizeof(network_config->pskc));
-                }
-
-                cJSON *mesh_local_prefix = cJSON_GetObjectItem(network_item, "mesh_local_prefix");
-                if (cJSON_IsString(mesh_local_prefix) && (mesh_local_prefix->valuestring != NULL)) {
-                    strlcpy(network_config->mesh_local_prefix, mesh_local_prefix->valuestring,
-                            sizeof(network_config->mesh_local_prefix));
-                }
-
-                cJSON *force_dataset = cJSON_GetObjectItem(network_item, "force_dataset");
-                network_config->force_dataset = cJSON_IsTrue(force_dataset);
-                network_config->active = true;
-                network_id++;
-            }
-
-            save_network();
-            connect_on_network_settings_updated();
+    cJSON *networks = cJSON_GetObjectItem(root, "networks");
+    if (cJSON_IsArray(networks)) {
+        for (uint8_t i = 0; i < MAX_NETWORKS; i++) {
+            network_t *network_config = get_networks_config(i);
+            memset(network_config, 0, sizeof(*network_config));
+            network_config->id = i;
+            network_config->type = i;
+            network_config->keep_ap_active = (i == NETWORK_TYPE_WIFI);
+            network_config->dhcp = true;
+            network_config->vlan_tag = 0;
+            network_config->channel = 13;
+            network_config->force_dataset = true;
         }
 
-        cJSON *services = cJSON_GetObjectItem(root, "services");
-        if (cJSON_IsObject(services)) {
-            services_t *service_config = get_service_config();
-
-            cJSON *hostname = cJSON_GetObjectItem(services, "hostname");
-            if (cJSON_IsString(hostname) && (hostname->valuestring != NULL)) {
-                strlcpy(service_config->hostname, hostname->valuestring, 20);
+        cJSON *network_item;
+        uint8_t network_id = 0;
+        cJSON_ArrayForEach(network_item, networks) {
+            if (network_id >= MAX_NETWORKS) {
+                break;
             }
 
-            cJSON *ota_url = cJSON_GetObjectItem(services, "ota_url");
-            if (cJSON_IsString(ota_url) && (ota_url->valuestring != NULL)) {
-                strlcpy(service_config->ota_url, ota_url->valuestring, sizeof(service_config->ota_url));
+            network_t *network_config = get_networks_config(network_id);
+            cJSON *type = cJSON_GetObjectItem(network_item, "type");
+            cJSON *is_dirty = cJSON_GetObjectItem(network_item, "is_dirty");
+            cJSON *id = cJSON_GetObjectItem(network_item, "id");
+
+            network_config->id = cJSON_IsNumber(id) ? id->valueint : network_id;
+            network_config->type = cJSON_IsNumber(type) ? type->valueint : NETWORK_TYPE_WIFI;
+            network_config->is_dirty = cJSON_IsTrue(is_dirty);
+
+            cJSON *ssid = cJSON_GetObjectItem(network_item, "ssid");
+            if (cJSON_IsString(ssid) && (ssid->valuestring != NULL)) {
+                strlcpy(network_config->ssid, ssid->valuestring, sizeof(network_config->ssid));
             }
 
-            cJSON *ntp_server = cJSON_GetObjectItem(services, "ntp_server");
-            if (cJSON_IsString(ntp_server) && (ntp_server->valuestring != NULL)) {
-                strlcpy(service_config->ntp_server, ntp_server->valuestring, sizeof(service_config->ntp_server));
+            cJSON *password = cJSON_GetObjectItem(network_item, "password");
+            if (cJSON_IsString(password) && (password->valuestring != NULL)) {
+                strlcpy(network_config->password, password->valuestring, sizeof(network_config->password));
             }
 
-            cJSON *time_zone = cJSON_GetObjectItem(services, "time_zone");
-            if (cJSON_IsString(time_zone) && (time_zone->valuestring != NULL)) {
-                strlcpy(service_config->time_zone, time_zone->valuestring, sizeof(service_config->time_zone));
-            } else {
-                /* Backward compatibility for older clients still posting a plain UTC offset. */
-                cJSON *utc_offset = cJSON_GetObjectItem(services, "utc_offset");
-                if (cJSON_IsNumber(utc_offset)) {
-                    int offset = utc_offset->valueint;
-                    snprintf(service_config->time_zone, sizeof(service_config->time_zone), "Etc/GMT%+d", -offset);
-                }
+            cJSON *keep_ap_active = cJSON_GetObjectItem(network_item, "keep_ap_active");
+            network_config->keep_ap_active = cJSON_IsTrue(keep_ap_active);
+
+            cJSON *ip_address = cJSON_GetObjectItem(network_item, "ip_address");
+            if (cJSON_IsString(ip_address) && (ip_address->valuestring != NULL)) {
+                string_to_ip(ip_address->valuestring, network_config->ip_address);
             }
 
-            cJSON *mqtt_ip_address = cJSON_GetObjectItem(services, "mqtt_ip_address");
-            if (cJSON_IsString(mqtt_ip_address) && (mqtt_ip_address->valuestring != NULL)) {
-                string_to_ip(mqtt_ip_address->valuestring, service_config->mqtt_ip_address);
+            cJSON *mask = cJSON_GetObjectItem(network_item, "mask");
+            if (cJSON_IsString(mask) && (mask->valuestring != NULL)) {
+                string_to_ip(mask->valuestring, network_config->mask);
             }
 
-            cJSON *mqtt_port = cJSON_GetObjectItem(services, "mqtt_port");
-            if (cJSON_IsNumber(mqtt_port)) {
-                service_config->mqtt_port = mqtt_port->valueint;
-            } else if (cJSON_IsString(mqtt_port) && mqtt_port->valuestring != NULL) {
-                service_config->mqtt_port = (uint16_t)atoi(mqtt_port->valuestring);
+            cJSON *gateway = cJSON_GetObjectItem(network_item, "gateway");
+            if (cJSON_IsString(gateway) && (gateway->valuestring != NULL)) {
+                string_to_ip(gateway->valuestring, network_config->gateway);
             }
 
-            cJSON *mqtt_user = cJSON_GetObjectItem(services, "mqtt_user");
-            if (cJSON_IsString(mqtt_user) && (mqtt_user->valuestring != NULL)) {
-                strlcpy(service_config->mqtt_user, mqtt_user->valuestring, sizeof(service_config->mqtt_user));
+            cJSON *dns = cJSON_GetObjectItem(network_item, "dns");
+            if (cJSON_IsString(dns) && (dns->valuestring != NULL)) {
+                string_to_ip(dns->valuestring, network_config->dns);
             }
 
-            cJSON *mqtt_password = cJSON_GetObjectItem(services, "mqtt_password");
-            if (cJSON_IsString(mqtt_password) && (mqtt_password->valuestring != NULL)) {
-                strlcpy(service_config->mqtt_password, mqtt_password->valuestring, sizeof(service_config->mqtt_password));
+            cJSON *dhcp = cJSON_GetObjectItem(network_item, "dhcp");
+            network_config->dhcp = cJSON_IsTrue(dhcp);
+
+            cJSON *vlan_tag = cJSON_GetObjectItem(network_item, "vlan_tag");
+            if (cJSON_IsNumber(vlan_tag)) {
+                network_config->vlan_tag = vlan_tag->valueint;
             }
 
-            cJSON *mqtt_qos = cJSON_GetObjectItem(services, "mqtt_qos");
-            service_config->mqtt_qos = mqtt_qos->valueint;
-
-            cJSON *mqtt_retain = cJSON_GetObjectItem(services, "mqtt_retain");
-            if (cJSON_IsBool(mqtt_retain)) {
-                service_config->mqtt_retain = cJSON_IsTrue(mqtt_retain) ? 1U : 0U;
-            } else if (cJSON_IsNumber(mqtt_retain)) {
-                service_config->mqtt_retain = mqtt_retain->valueint != 0 ? 1U : 0U;
+            cJSON *channel = cJSON_GetObjectItem(network_item, "channel");
+            if (cJSON_IsNumber(channel)) {
+                network_config->channel = channel->valueint;
             }
 
-            cJSON *mqtt_discovery_topic = cJSON_GetObjectItem(services, "mqtt_discovery_topic");
-            if (cJSON_IsString(mqtt_discovery_topic) && (mqtt_discovery_topic->valuestring != NULL)) {
-                strlcpy(service_config->mqtt_discovery_topic,
-                        mqtt_discovery_topic->valuestring,
-                        sizeof(service_config->mqtt_discovery_topic));
+            cJSON *network_name = cJSON_GetObjectItem(network_item, "network_name");
+            if (cJSON_IsString(network_name) && (network_name->valuestring != NULL)) {
+                strlcpy(network_config->network_name, network_name->valuestring, sizeof(network_config->network_name));
             }
 
-            cJSON *mqtt_discovery_status_topic = cJSON_GetObjectItem(services, "mqtt_discovery_status_topic");
-            if (cJSON_IsString(mqtt_discovery_status_topic) &&
-                (mqtt_discovery_status_topic->valuestring != NULL)) {
-                strlcpy(service_config->mqtt_discovery_status_topic,
-                        mqtt_discovery_status_topic->valuestring,
-                        sizeof(service_config->mqtt_discovery_status_topic));
+            cJSON *network_key = cJSON_GetObjectItem(network_item, "network_key");
+            if (cJSON_IsString(network_key) && (network_key->valuestring != NULL)) {
+                strlcpy(network_config->network_key, network_key->valuestring, sizeof(network_config->network_key));
             }
 
-            cJSON *enable_ntp = cJSON_GetObjectItem(services, "enable_ntp");
-            service_config->enable_ntp = cJSON_IsTrue(enable_ntp);
+            cJSON *pan_id = cJSON_GetObjectItem(network_item, "pan_id");
+            if (cJSON_IsString(pan_id) && (pan_id->valuestring != NULL)) {
+                strlcpy(network_config->pan_id, pan_id->valuestring, sizeof(network_config->pan_id));
+            }
 
-            cJSON *enable_mqtt = cJSON_GetObjectItem(services, "enable_mqtt");
-            service_config->enable_mqtt = cJSON_IsTrue(enable_mqtt);
+            cJSON *ext_pan_id = cJSON_GetObjectItem(network_item, "ext_pan_id");
+            if (cJSON_IsString(ext_pan_id) && (ext_pan_id->valuestring != NULL)) {
+                strlcpy(network_config->ext_pan_id, ext_pan_id->valuestring, sizeof(network_config->ext_pan_id));
+            }
 
-            cJSON *enable_mqtt_discovery = cJSON_GetObjectItem(services, "enable_mqtt_discovery");
-            service_config->enable_mqtt_discovery = cJSON_IsTrue(enable_mqtt_discovery);
+            cJSON *pskc = cJSON_GetObjectItem(network_item, "pskc");
+            if (cJSON_IsString(pskc) && (pskc->valuestring != NULL)) {
+                strlcpy(network_config->pskc, pskc->valuestring, sizeof(network_config->pskc));
+            }
 
+            cJSON *mesh_local_prefix = cJSON_GetObjectItem(network_item, "mesh_local_prefix");
+            if (cJSON_IsString(mesh_local_prefix) && (mesh_local_prefix->valuestring != NULL)) {
+                strlcpy(network_config->mesh_local_prefix, mesh_local_prefix->valuestring,
+                        sizeof(network_config->mesh_local_prefix));
+            }
+
+            cJSON *force_dataset = cJSON_GetObjectItem(network_item, "force_dataset");
+            network_config->force_dataset = cJSON_IsTrue(force_dataset);
+            network_config->active = true;
+            network_id++;
+        }
+
+        save_network();
+        connect_on_network_settings_updated();
+    }
+
+    cJSON *services = cJSON_GetObjectItem(root, "services");
+    if (cJSON_IsObject(services)) {
+        services_t *service_config = get_service_config();
+
+        cJSON *hostname = cJSON_GetObjectItem(services, "hostname");
+        if (cJSON_IsString(hostname) && (hostname->valuestring != NULL)) {
+            strlcpy(service_config->hostname, hostname->valuestring, 20);
+        }
+
+        cJSON *ota_url = cJSON_GetObjectItem(services, "ota_url");
+        if (cJSON_IsString(ota_url) && (ota_url->valuestring != NULL)) {
+            strlcpy(service_config->ota_url, ota_url->valuestring, sizeof(service_config->ota_url));
+        }
+
+        cJSON *ntp_server = cJSON_GetObjectItem(services, "ntp_server");
+        if (cJSON_IsString(ntp_server) && (ntp_server->valuestring != NULL)) {
+            strlcpy(service_config->ntp_server, ntp_server->valuestring, sizeof(service_config->ntp_server));
+        }
+
+        cJSON *time_zone = cJSON_GetObjectItem(services, "time_zone");
+        if (cJSON_IsString(time_zone) && (time_zone->valuestring != NULL)) {
+            strlcpy(service_config->time_zone, time_zone->valuestring, sizeof(service_config->time_zone));
+        } else {
+            /* Backward compatibility for older clients still posting a plain UTC offset. */
+            cJSON *utc_offset = cJSON_GetObjectItem(services, "utc_offset");
+            if (cJSON_IsNumber(utc_offset)) {
+                int offset = utc_offset->valueint;
+                snprintf(service_config->time_zone, sizeof(service_config->time_zone), "Etc/GMT%+d", -offset);
+            }
+        }
+
+        cJSON *mqtt_ip_address = cJSON_GetObjectItem(services, "mqtt_ip_address");
+        if (cJSON_IsString(mqtt_ip_address) && (mqtt_ip_address->valuestring != NULL)) {
+            string_to_ip(mqtt_ip_address->valuestring, service_config->mqtt_ip_address);
+        }
+
+        cJSON *mqtt_port = cJSON_GetObjectItem(services, "mqtt_port");
+        if (cJSON_IsNumber(mqtt_port)) {
+            service_config->mqtt_port = mqtt_port->valueint;
+        } else if (cJSON_IsString(mqtt_port) && mqtt_port->valuestring != NULL) {
+            service_config->mqtt_port = (uint16_t)atoi(mqtt_port->valuestring);
+        }
+
+        cJSON *mqtt_user = cJSON_GetObjectItem(services, "mqtt_user");
+        if (cJSON_IsString(mqtt_user) && (mqtt_user->valuestring != NULL)) {
+            strlcpy(service_config->mqtt_user, mqtt_user->valuestring, sizeof(service_config->mqtt_user));
+        }
+
+        cJSON *mqtt_password = cJSON_GetObjectItem(services, "mqtt_password");
+        if (cJSON_IsString(mqtt_password) && (mqtt_password->valuestring != NULL)) {
+            strlcpy(service_config->mqtt_password, mqtt_password->valuestring, sizeof(service_config->mqtt_password));
+        }
+
+        cJSON *mqtt_qos = cJSON_GetObjectItem(services, "mqtt_qos");
+        service_config->mqtt_qos = mqtt_qos->valueint;
+
+        cJSON *mqtt_retain = cJSON_GetObjectItem(services, "mqtt_retain");
+        if (cJSON_IsBool(mqtt_retain)) {
+            service_config->mqtt_retain = cJSON_IsTrue(mqtt_retain) ? 1U : 0U;
+        } else if (cJSON_IsNumber(mqtt_retain)) {
+            service_config->mqtt_retain = mqtt_retain->valueint != 0 ? 1U : 0U;
+        }
+
+        cJSON *mqtt_discovery_topic = cJSON_GetObjectItem(services, "mqtt_discovery_topic");
+        if (cJSON_IsString(mqtt_discovery_topic) && (mqtt_discovery_topic->valuestring != NULL)) {
+            strlcpy(service_config->mqtt_discovery_topic,
+                    mqtt_discovery_topic->valuestring,
+                    sizeof(service_config->mqtt_discovery_topic));
+        }
+
+        cJSON *mqtt_discovery_status_topic = cJSON_GetObjectItem(services, "mqtt_discovery_status_topic");
+        if (cJSON_IsString(mqtt_discovery_status_topic) &&
+            (mqtt_discovery_status_topic->valuestring != NULL)) {
+            strlcpy(service_config->mqtt_discovery_status_topic,
+                    mqtt_discovery_status_topic->valuestring,
+                    sizeof(service_config->mqtt_discovery_status_topic));
+        }
+
+        cJSON *enable_ntp = cJSON_GetObjectItem(services, "enable_ntp");
+        service_config->enable_ntp = cJSON_IsTrue(enable_ntp);
+
+        cJSON *enable_mqtt = cJSON_GetObjectItem(services, "enable_mqtt");
+        service_config->enable_mqtt = cJSON_IsTrue(enable_mqtt);
+
+        cJSON *enable_mqtt_discovery = cJSON_GetObjectItem(services, "enable_mqtt_discovery");
+        service_config->enable_mqtt_discovery = cJSON_IsTrue(enable_mqtt_discovery);
+
+        save_service();
+    }
+
+    cJSON *time = cJSON_GetObjectItem(root, "time");
+    if (cJSON_IsObject(time)) {
+        datetime_t datetime = {0};
+        cJSON *date = cJSON_GetObjectItem(time, "date");
+        cJSON *clock = cJSON_GetObjectItem(time, "time");
+        cJSON *time_zone = cJSON_GetObjectItem(time, "time_zone");
+
+        if (cJSON_IsString(date) && date->valuestring != NULL) {
+            int year = 2000;
+            int month = 1;
+            int day = 1;
+            if (sscanf(date->valuestring, "%d-%d-%d", &year, &month, &day) == 3) {
+                datetime.year = (uint8_t)(year - 2000);
+                datetime.month = (uint8_t)month;
+                datetime.day = (uint8_t)day;
+            }
+        }
+        if (cJSON_IsString(clock) && clock->valuestring != NULL) {
+            int hour = 0;
+            int minute = 0;
+            int second = 0;
+            if (sscanf(clock->valuestring, "%d:%d:%d", &hour, &minute, &second) == 3) {
+                datetime.hour = (uint8_t)hour;
+                datetime.min = (uint8_t)minute;
+                datetime.sec = (uint8_t)second;
+            }
+        }
+        if (cJSON_IsString(time_zone) && time_zone->valuestring != NULL) {
+            strlcpy(get_service_config()->time_zone, time_zone->valuestring,
+                    sizeof(get_service_config()->time_zone));
             save_service();
         }
 
-        cJSON *time = cJSON_GetObjectItem(root, "time");
-        if (cJSON_IsObject(time)) {
-            datetime_t datetime = {0};
-            cJSON *date = cJSON_GetObjectItem(time, "date");
-            cJSON *clock = cJSON_GetObjectItem(time, "time");
-            cJSON *time_zone = cJSON_GetObjectItem(time, "time_zone");
-
-            if (cJSON_IsString(date) && date->valuestring != NULL) {
-                int year = 2000;
-                int month = 1;
-                int day = 1;
-                if (sscanf(date->valuestring, "%d-%d-%d", &year, &month, &day) == 3) {
-                    datetime.year = (uint8_t)(year - 2000);
-                    datetime.month = (uint8_t)month;
-                    datetime.day = (uint8_t)day;
-                }
-            }
-            if (cJSON_IsString(clock) && clock->valuestring != NULL) {
-                int hour = 0;
-                int minute = 0;
-                int second = 0;
-                if (sscanf(clock->valuestring, "%d:%d:%d", &hour, &minute, &second) == 3) {
-                    datetime.hour = (uint8_t)hour;
-                    datetime.min = (uint8_t)minute;
-                    datetime.sec = (uint8_t)second;
-                }
-            }
-            if (cJSON_IsString(time_zone) && time_zone->valuestring != NULL) {
-                strlcpy(get_service_config()->time_zone, time_zone->valuestring,
-                        sizeof(get_service_config()->time_zone));
-                save_service();
-            }
-
 #if defined(USE_MCP7940)
-            mcp7940_set_datetime(&datetime);
+        mcp7940_set_datetime(&datetime);
 #endif
-            char *debug_string = cJSON_Print(time);
-            if (debug_string == NULL) {
-                fprintf(stderr, "Failed to print time.\n");
-            } else {
-                ESP_LOGI(TAG, "JSON parse time: %s", debug_string);
-            }
-            free(debug_string);
+        char *debug_string = cJSON_Print(time);
+        if (debug_string == NULL) {
+            fprintf(stderr, "Failed to print time.\n");
+        } else {
+            ESP_LOGI(TAG, "JSON parse time: %s", debug_string);
         }
-
-        cJSON *user_json = cJSON_GetObjectItem(root, "auth");
-        if (cJSON_IsObject(user_json)) {
-            auth_t *auth = get_auth_config();
-
-            cJSON *user = cJSON_GetObjectItem(user_json, "username");
-            if (cJSON_IsString(user) && (user->valuestring != NULL)) {
-                strlcpy(auth->username, user->valuestring, 32);
-            }
-
-            cJSON *password = cJSON_GetObjectItem(user_json, "password");
-            if (cJSON_IsString(password) && (password->valuestring != NULL)) {
-                strlcpy(auth->password, password->valuestring, 32);
-            }
-
-            save_auth();
-        }
-
-        cJSON *app_json = cJSON_GetObjectItem(root, "app");
-        if (cJSON_IsObject(app_json)) {
-            app_state_t *app_state = get_app_state_config();
-            cJSON *onboarding_completed = cJSON_GetObjectItem(app_json, "onboarding_completed");
-            if (cJSON_IsBool(onboarding_completed)) {
-                app_state->onboarding_completed = cJSON_IsTrue(onboarding_completed);
-                save_app_state();
-            }
-        }
-
-        cJSON_Delete(root);
-
-        char *response = app_http_success_response_json(true);
-        httpd_resp_send(req, response, (ssize_t)strlen(response));
-        free(response);
+        free(debug_string);
     }
+
+    cJSON *user_json = cJSON_GetObjectItem(root, "auth");
+    if (cJSON_IsObject(user_json)) {
+        auth_t *auth = get_auth_config();
+
+        cJSON *user = cJSON_GetObjectItem(user_json, "username");
+        if (cJSON_IsString(user) && (user->valuestring != NULL)) {
+            strlcpy(auth->username, user->valuestring, 32);
+        }
+
+        cJSON *password = cJSON_GetObjectItem(user_json, "password");
+        if (cJSON_IsString(password) && (password->valuestring != NULL)) {
+            strlcpy(auth->password, password->valuestring, 32);
+        }
+
+        save_auth();
+    }
+
+    cJSON *app_json = cJSON_GetObjectItem(root, "app");
+    if (cJSON_IsObject(app_json)) {
+        app_state_t *app_state = get_app_state_config();
+        cJSON *onboarding_completed = cJSON_GetObjectItem(app_json, "onboarding_completed");
+        if (cJSON_IsBool(onboarding_completed)) {
+            app_state->onboarding_completed = cJSON_IsTrue(onboarding_completed);
+            save_app_state();
+        }
+    }
+
+    cJSON_Delete(root);
+
+    char *response = app_http_success_response_json(true);
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
 
     free(buf);
     return ESP_OK;
