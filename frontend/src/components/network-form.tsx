@@ -43,7 +43,8 @@ const FormSchema = z
     mask: z.ipv4().or(z.literal('')),
     gateway: z.ipv4().or(z.literal('')),
     dns: z.ipv4().or(z.literal('')),
-    type: z.number().lte(5),
+    type: z.enum(NetworkType),
+    vlan_tag: z.number().int().min(0).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.type === NetworkType.WiFi && data.ssid.trim().length === 0) {
@@ -51,6 +52,14 @@ const FormSchema = z
         code: z.ZodIssueCode.custom,
         path: ['ssid'],
         message: 'This field is required.',
+      });
+    }
+
+    if (data.type === NetworkType.Ethernet && data.vlan_tag === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['vlan_tag'],
+        message: 'VLAN tag is required.',
       });
     }
   });
@@ -99,6 +108,7 @@ const NetworkForm = (props: NetworkFormProps): React.ReactElement => {
       setValue('gateway', network.gateway);
       setValue('dns', network.dns);
       setValue('dhcp', network.dhcp);
+      setValue('vlan_tag', network.type === NetworkType.Ethernet ? network.vlan_tag ?? 0 : 0);
     }
 
     setValue('type', network.type);
@@ -144,9 +154,42 @@ const NetworkForm = (props: NetworkFormProps): React.ReactElement => {
 
     try {
       if (network?.id !== undefined) {
-        data.id = network?.id;
+        if (network.type !== NetworkType.WiFi && network.type !== NetworkType.Ethernet) {
+          return toast.error('Unsupported network type.');
+        }
+
         const shouldPromptRestart = Boolean(network.is_dirty);
-        const success = await updateNetwork(data as NetworkState);
+        let nextNetwork: NetworkState;
+
+        if (network.type === NetworkType.WiFi) {
+          nextNetwork = {
+            ...network,
+            id: network.id,
+            ssid: data.ssid,
+            password: data.password,
+            keep_ap_active: data.keep_ap_active,
+            dhcp: data.dhcp,
+            ip_address: data.ip_address,
+            mask: data.mask,
+            gateway: data.gateway,
+            dns: data.dns,
+            is_dirty: network.is_dirty,
+          };
+        } else {
+          nextNetwork = {
+            ...network,
+            id: network.id,
+            dhcp: data.dhcp,
+            ip_address: data.ip_address,
+            mask: data.mask,
+            gateway: data.gateway,
+            dns: data.dns,
+            vlan_tag: data.vlan_tag,
+            is_dirty: network.is_dirty,
+          };
+        }
+
+        const success = await updateNetwork(nextNetwork);
 
         if (!success) {
           return toast.error('Network settings not saved.');

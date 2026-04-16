@@ -53,6 +53,7 @@ export interface NetworkStateBaseEthernet extends NetworkStateBase {
 }
 
 export interface NetworkStateEthernet extends NetworkStateBaseEthernet {
+  vlan_tag?: number;
   type: NetworkType.Ethernet;
 }
 

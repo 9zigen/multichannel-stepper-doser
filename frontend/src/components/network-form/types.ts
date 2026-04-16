@@ -10,6 +10,6 @@ export type FormData = {
   gateway: string;
   dns: string;
   dhcp: boolean;
-  vlan_tag: string;
+  vlan_tag?: number;
   type: NetworkType;
 };

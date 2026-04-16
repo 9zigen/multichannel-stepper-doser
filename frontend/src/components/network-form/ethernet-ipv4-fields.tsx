@@ -32,7 +32,13 @@ const EthernetIPv4Fields = (props: Ipv4Props): React.ReactElement => {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <Label htmlFor="vlan" className="text-xs text-muted-foreground">VLAN Tag</Label>
-              <Input id="vlan_tag" type="number" placeholder="no VLAN" className="h-8 text-sm" {...register('vlan_tag')} />
+              <Input
+                id="vlan_tag"
+                type="number"
+                placeholder="no VLAN"
+                className="h-8 text-sm"
+                {...register('vlan_tag', { valueAsNumber: true })}
+              />
               {errors.vlan_tag && <p className="text-xs text-destructive" role="alert">{errors.vlan_tag.message}</p>}
             </div>
           </div>

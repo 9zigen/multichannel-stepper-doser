@@ -18,6 +18,7 @@ export const defaultsEthernet: Partial<NetworkStateEthernet> = {
   gateway: '0.0.0.0',
   dns: '0.0.0.0',
   dhcp: true,
+  vlan_tag: 0,
   type: NetworkType.Ethernet,
 };
 
