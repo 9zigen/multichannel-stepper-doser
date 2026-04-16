@@ -17,7 +17,7 @@ import {
   defaultsWifi,
 } from '@/components/network-form/defaults.ts';
 import { toast } from 'sonner';
-import IPv4Fields from '@/components/network-form/ipv4-fields.tsx';
+import WifiIpv4Fields from '@/components/network-form/wifi-ipv4-fields.tsx';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { FormData } from './network-form/types.ts';
+import EthernetIpv4Fields from "@/components/network-form/ethernet-ipv4-fields.tsx";
 
 const FormSchema = z
   .object({
@@ -170,7 +171,7 @@ const NetworkForm = (props: NetworkFormProps): React.ReactElement => {
     switch (typeSelected) {
       case NetworkType.WiFi:
         return (
-          <IPv4Fields
+          <WifiIpv4Fields
             register={register}
             watch={watch}
             formState={formState}
@@ -185,14 +186,13 @@ const NetworkForm = (props: NetworkFormProps): React.ReactElement => {
 
       case NetworkType.Ethernet: {
         return (
-          <IPv4Fields
+          <EthernetIpv4Fields
             register={register}
             watch={watch}
             formState={formState}
             control={control}
             setValue={setValue}
             networkType={typeSelected}
-            wifiNetworks={[]}
             isScanning={false}
             onScanWifi={() => undefined}
           />

@@ -418,6 +418,7 @@ char *get_settings_json(void)
                 ip_to_string(network_config->dns, net_buff);
                 cJSON_AddItemToObject(network_item, "dns", cJSON_CreateString(net_buff));
                 cJSON_AddItemToObject(network_item, "dhcp", cJSON_CreateBool(network_config->dhcp));
+                cJSON_AddItemToObject(network_item, "vlan_tag", cJSON_CreateNumber(network_config->vlan_tag));
                 break;
             case NETWORK_TYPE_THREAD:
                 cJSON_AddItemToObject(network_item, "channel", cJSON_CreateNumber(network_config->channel));

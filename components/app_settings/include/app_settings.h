@@ -71,6 +71,7 @@ typedef struct {
     uint8_t gateway[4];                   // Gateway
     uint8_t dns[4];                       // DNS
     bool dhcp;                            // Enable DHCP Client
+    uint16_t vlan_tag;                    // VLAN Tag 12 Bits
     uint16_t channel;                     // Thread channel
     char network_name[MAX_NETWORK_STR_LEN];
     char network_key[MAX_NETWORK_STR_LEN];

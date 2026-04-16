@@ -876,123 +876,123 @@ esp_err_t settings_post_handler(httpd_req_t *req)
         send_unauthorized(req);
         free(buf);
         return ESP_OK;
-    } else {
-        app_http_set_cors_headers(req);
-        int cur_len = 0;
-        while (cur_len < total_len) {
-            int received = httpd_req_recv(req, buf + cur_len, total_len);
-            if (received <= 0) {
-                free(buf);
-                return ESP_FAIL;
-            }
-            cur_len += received;
+    }
+
+    app_http_set_cors_headers(req);
+    int cur_len = 0;
+    while (cur_len < total_len) {
+        int received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            free(buf);
+            return ESP_FAIL;
         }
-        buf[total_len] = '\0';
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
 
-        cJSON *root = cJSON_Parse(buf);
+    cJSON *root = cJSON_Parse(buf);
 
-        cJSON *pump_channels = cJSON_GetObjectItem(root, "pumps");
-        if (cJSON_IsArray(pump_channels)) {
-            cJSON *pump_item;
-            cJSON_ArrayForEach(pump_item, pump_channels) {
-                cJSON *id = cJSON_GetObjectItem(pump_item, "id");
-                cJSON *enabled = cJSON_GetObjectItem(pump_item, "state");
-                cJSON *name = cJSON_GetObjectItem(pump_item, "name");
-                cJSON *direction = cJSON_GetObjectItem(pump_item, "direction");
-                cJSON *running_hours = cJSON_GetObjectItem(pump_item, "running_hours");
-                cJSON *tank_full_volume = cJSON_GetObjectItem(pump_item, "tank_full_vol");
-                cJSON *tank_concentration_total = cJSON_GetObjectItem(pump_item, "tank_concentration_total");
-                cJSON *tank_concentration_active = cJSON_GetObjectItem(pump_item, "tank_concentration_active");
-                cJSON *tank_current_volume = cJSON_GetObjectItem(pump_item, "tank_current_vol");
-                cJSON *calibration = cJSON_GetObjectItem(pump_item, "calibration");
-                cJSON *schedule = cJSON_GetObjectItem(pump_item, "schedule");
-                cJSON *aging = cJSON_GetObjectItem(pump_item, "aging");
+    cJSON *pump_channels = cJSON_GetObjectItem(root, "pumps");
+    if (cJSON_IsArray(pump_channels)) {
+        cJSON *pump_item;
+        cJSON_ArrayForEach(pump_item, pump_channels) {
+            cJSON *id = cJSON_GetObjectItem(pump_item, "id");
+            cJSON *enabled = cJSON_GetObjectItem(pump_item, "state");
+            cJSON *name = cJSON_GetObjectItem(pump_item, "name");
+            cJSON *direction = cJSON_GetObjectItem(pump_item, "direction");
+            cJSON *running_hours = cJSON_GetObjectItem(pump_item, "running_hours");
+            cJSON *tank_full_volume = cJSON_GetObjectItem(pump_item, "tank_full_vol");
+            cJSON *tank_concentration_total = cJSON_GetObjectItem(pump_item, "tank_concentration_total");
+            cJSON *tank_concentration_active = cJSON_GetObjectItem(pump_item, "tank_concentration_active");
+            cJSON *tank_current_volume = cJSON_GetObjectItem(pump_item, "tank_current_vol");
+            cJSON *calibration = cJSON_GetObjectItem(pump_item, "calibration");
+            cJSON *schedule = cJSON_GetObjectItem(pump_item, "schedule");
+            cJSON *aging = cJSON_GetObjectItem(pump_item, "aging");
 
-                pump_t *pump_config = get_pump_config(id->valueint);
-                schedule_t *schedule_config = get_schedule_config(id->valueint);
+            pump_t *pump_config = get_pump_config(id->valueint);
+            schedule_t *schedule_config = get_schedule_config(id->valueint);
 
-                if (cJSON_IsString(name) && (name->valuestring != NULL)) {
-                    strlcpy(pump_config->name, name->valuestring, 32);
+            if (cJSON_IsString(name) && (name->valuestring != NULL)) {
+                strlcpy(pump_config->name, name->valuestring, 32);
+            }
+
+            pump_config->direction = cJSON_IsTrue(direction);
+            pump_config->running_hours = cJSON_IsNumber(running_hours) ? running_hours->valuedouble : 0;
+            pump_config->tank_full_vol = tank_full_volume->valueint;
+            pump_config->tank_concentration_total = tank_concentration_total->valueint;
+            pump_config->tank_concentration_active = tank_concentration_active->valueint;
+            pump_config->tank_current_vol = tank_current_volume->valuedouble;
+            pump_config->state = cJSON_IsTrue(enabled);
+
+            if (cJSON_IsObject(aging)) {
+                cJSON *warning_hours = cJSON_GetObjectItem(aging, "warning_hours");
+                cJSON *replace_hours = cJSON_GetObjectItem(aging, "replace_hours");
+                if (cJSON_IsNumber(warning_hours) && warning_hours->valueint >= 0) {
+                    pump_config->aging.warning_hours = (uint16_t)warning_hours->valueint;
                 }
-
-                pump_config->direction = cJSON_IsTrue(direction);
-                pump_config->running_hours = cJSON_IsNumber(running_hours) ? running_hours->valuedouble : 0;
-                pump_config->tank_full_vol = tank_full_volume->valueint;
-                pump_config->tank_concentration_total = tank_concentration_total->valueint;
-                pump_config->tank_concentration_active = tank_concentration_active->valueint;
-                pump_config->tank_current_vol = tank_current_volume->valuedouble;
-                pump_config->state = cJSON_IsTrue(enabled);
-
-                if (cJSON_IsObject(aging)) {
-                    cJSON *warning_hours = cJSON_GetObjectItem(aging, "warning_hours");
-                    cJSON *replace_hours = cJSON_GetObjectItem(aging, "replace_hours");
-                    if (cJSON_IsNumber(warning_hours) && warning_hours->valueint >= 0) {
-                        pump_config->aging.warning_hours = (uint16_t)warning_hours->valueint;
-                    }
-                    if (cJSON_IsNumber(replace_hours) && replace_hours->valueint >= 0) {
-                        pump_config->aging.replace_hours = (uint16_t)replace_hours->valueint;
-                    }
-                }
-
-                pump_config->calibration_count = 0;
-                if (cJSON_IsArray(calibration)) {
-                    cJSON *point;
-                    cJSON_ArrayForEach(point, calibration) {
-                        if (pump_config->calibration_count >= MAX_PUMP_CALIBRATION_POINTS) {
-                            break;
-                        }
-
-                        cJSON *speed = cJSON_GetObjectItem(point, "speed");
-                        cJSON *flow = cJSON_GetObjectItem(point, "flow");
-                        if (cJSON_IsNumber(speed) && cJSON_IsNumber(flow)) {
-                            uint8_t point_id = pump_config->calibration_count++;
-                            pump_config->calibration[point_id].speed = speed->valuedouble;
-                            pump_config->calibration[point_id].flow = flow->valuedouble;
-                        }
-                    }
-                }
-                pump_config->calibration_100ml_units = calibration_to_100ml_units(pump_config);
-
-                if (cJSON_IsObject(schedule)) {
-                    cJSON *mode = cJSON_GetObjectItem(schedule, "mode");
-                    cJSON *work_hours = cJSON_GetObjectItem(schedule, "work_hours");
-                    cJSON *weekdays = cJSON_GetObjectItem(schedule, "weekdays");
-                    cJSON *speed = cJSON_GetObjectItem(schedule, "speed");
-                    cJSON *time = cJSON_GetObjectItem(schedule, "time");
-                    cJSON *volume = cJSON_GetObjectItem(schedule, "volume");
-
-                    schedule_config->pump_id = pump_config->id;
-                    schedule_config->mode = cJSON_IsNumber(mode) ? mode->valueint : SCHEDULE_MODE_OFF;
-                    schedule_config->work_hours = 0;
-                    schedule_config->week_days = 0;
-
-                    if (cJSON_IsArray(work_hours)) {
-                        cJSON *hour_item;
-                        cJSON_ArrayForEach(hour_item, work_hours) {
-                            schedule_config->work_hours |= 1 << (uint8_t)hour_item->valueint;
-                        }
-                    }
-
-                    if (cJSON_IsArray(weekdays)) {
-                        cJSON *weekday_item;
-                        cJSON_ArrayForEach(weekday_item, weekdays) {
-                            schedule_config->week_days |= 1 << (uint8_t)weekday_item->valueint;
-                        }
-                    }
-
-                    schedule_config->speed = cJSON_IsNumber(speed) ? speed->valuedouble : 0;
-                    schedule_config->time = cJSON_IsNumber(time) ? time->valueint : 0;
-                    schedule_config->day_volume = cJSON_IsNumber(volume) ? volume->valueint : 0;
-                    schedule_config->active = schedule_config->mode != SCHEDULE_MODE_OFF;
+                if (cJSON_IsNumber(replace_hours) && replace_hours->valueint >= 0) {
+                    pump_config->aging.replace_hours = (uint16_t)replace_hours->valueint;
                 }
             }
 
-            save_pump();
-            save_pump_aging_config();
-            save_pump_aging_state(get_pump_aging_day_stamp());
-            save_schedule();
-            backup_eeprom_tank_status();
+            pump_config->calibration_count = 0;
+            if (cJSON_IsArray(calibration)) {
+                cJSON *point;
+                cJSON_ArrayForEach(point, calibration) {
+                    if (pump_config->calibration_count >= MAX_PUMP_CALIBRATION_POINTS) {
+                        break;
+                    }
+
+                    cJSON *speed = cJSON_GetObjectItem(point, "speed");
+                    cJSON *flow = cJSON_GetObjectItem(point, "flow");
+                    if (cJSON_IsNumber(speed) && cJSON_IsNumber(flow)) {
+                        uint8_t point_id = pump_config->calibration_count++;
+                        pump_config->calibration[point_id].speed = speed->valuedouble;
+                        pump_config->calibration[point_id].flow = flow->valuedouble;
+                    }
+                }
+            }
+            pump_config->calibration_100ml_units = calibration_to_100ml_units(pump_config);
+
+            if (cJSON_IsObject(schedule)) {
+                cJSON *mode = cJSON_GetObjectItem(schedule, "mode");
+                cJSON *work_hours = cJSON_GetObjectItem(schedule, "work_hours");
+                cJSON *weekdays = cJSON_GetObjectItem(schedule, "weekdays");
+                cJSON *speed = cJSON_GetObjectItem(schedule, "speed");
+                cJSON *time = cJSON_GetObjectItem(schedule, "time");
+                cJSON *volume = cJSON_GetObjectItem(schedule, "volume");
+
+                schedule_config->pump_id = pump_config->id;
+                schedule_config->mode = cJSON_IsNumber(mode) ? mode->valueint : SCHEDULE_MODE_OFF;
+                schedule_config->work_hours = 0;
+                schedule_config->week_days = 0;
+
+                if (cJSON_IsArray(work_hours)) {
+                    cJSON *hour_item;
+                    cJSON_ArrayForEach(hour_item, work_hours) {
+                        schedule_config->work_hours |= 1 << (uint8_t)hour_item->valueint;
+                    }
+                }
+
+                if (cJSON_IsArray(weekdays)) {
+                    cJSON *weekday_item;
+                    cJSON_ArrayForEach(weekday_item, weekdays) {
+                        schedule_config->week_days |= 1 << (uint8_t)weekday_item->valueint;
+                    }
+                }
+
+                schedule_config->speed = cJSON_IsNumber(speed) ? speed->valuedouble : 0;
+                schedule_config->time = cJSON_IsNumber(time) ? time->valueint : 0;
+                schedule_config->day_volume = cJSON_IsNumber(volume) ? volume->valueint : 0;
+                schedule_config->active = schedule_config->mode != SCHEDULE_MODE_OFF;
+            }
         }
+
+        save_pump();
+        save_pump_aging_config();
+        save_pump_aging_state(get_pump_aging_day_stamp());
+        save_schedule();
+        backup_eeprom_tank_status();
 
         cJSON *networks = cJSON_GetObjectItem(root, "networks");
         if (cJSON_IsArray(networks)) {
@@ -1003,6 +1003,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
                 network_config->type = i;
                 network_config->keep_ap_active = (i == NETWORK_TYPE_WIFI);
                 network_config->dhcp = true;
+                network_config->vlan_tag = 0;
                 network_config->channel = 13;
                 network_config->force_dataset = true;
             }
@@ -1058,6 +1059,11 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
                 cJSON *dhcp = cJSON_GetObjectItem(network_item, "dhcp");
                 network_config->dhcp = cJSON_IsTrue(dhcp);
+
+                cJSON *vlan_tag = cJSON_GetObjectItem(network_item, "vlan_tag");
+                if (cJSON_IsNumber(vlan_tag)) {
+                    network_config->vlan_tag = vlan_tag->valueint;
+                }
 
                 cJSON *channel = cJSON_GetObjectItem(network_item, "channel");
                 if (cJSON_IsNumber(channel)) {
