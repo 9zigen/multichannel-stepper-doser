@@ -1275,6 +1275,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     }
 
     cJSON_Delete(root);
+    app_http_ws_broadcast_settings_snapshot();
+    monitor_refresh_and_publish();
 
     char *response = app_http_success_response_json(true);
     httpd_resp_send(req, response, (ssize_t)strlen(response));

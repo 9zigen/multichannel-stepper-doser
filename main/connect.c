@@ -94,6 +94,7 @@ bool connect_ap_fallback_is_active(void)
 void connect_on_network_settings_updated(void)
 {
     wifi_collect_profiles();
+    monitor_refresh_and_publish();
 
     if (!wifi_manager_ready) {
         return;
@@ -394,6 +395,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         station_connected = false;
+        monitor_refresh_and_publish();
         if (wifi_has_profiles()) {
             esp_wifi_connect();
         }
@@ -403,6 +405,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         station_connected = false;
         monitor_increment_wifi_disconnects();
+        monitor_refresh_and_publish();
 
         if (!wifi_has_profiles()) {
             ESP_LOGI(TAG, "Station disconnected but no station profile is configured");
@@ -436,6 +439,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         tested_profiles_in_cycle = 1;
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         set_led_mode(LED_INDICATE_OK, LED_SLOW_BLINK, 255);
+        monitor_refresh_and_publish();
 
         if (esp_wifi_get_mode(&mode) != ESP_OK) {
             mode = WIFI_MODE_NULL;
@@ -458,6 +462,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "AP client " MACSTR " joined, AID=%d, clients=%u",
                  MAC2STR(event->mac), event->aid, (unsigned)ap_client_count);
         wifi_arm_ap_timeout_if_needed();
+        monitor_refresh_and_publish();
         return;
     }
 
@@ -469,6 +474,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "AP client " MACSTR " left, AID=%d, clients=%u",
                  MAC2STR(event->mac), event->aid, (unsigned)ap_client_count);
         wifi_arm_ap_timeout_if_needed();
+        monitor_refresh_and_publish();
         if (ap_client_count == 0 && !ap_fallback_active && !booted_without_networks) {
             network_t *profile = wifi_get_active_profile();
             if (wifi_has_profiles() && (profile == NULL || !profile->keep_ap_active)) {

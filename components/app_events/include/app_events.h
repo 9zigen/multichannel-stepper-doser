@@ -19,7 +19,8 @@ typedef enum {
     TEMPERATURE_CHANGE_EVENT,
     LIGHT_CHANGE_EVENT,
     SERVICES_UPDATED,
-    PUMP_RUNTIME_DATA
+    PUMP_RUNTIME_DATA,
+    STATUS_CHANGED
 } app_event_t;
 
 typedef void (*app_event_handler_t)(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);

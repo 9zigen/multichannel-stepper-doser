@@ -12,6 +12,7 @@
 
 #include "auth.h"
 #include "app_events.h"
+#include "app_monitor.h"
 #include "app_settings.h"
 #include "web_server.h"
 #include "app_pumps.h"
@@ -31,6 +32,7 @@ static app_http_ws_client_t ws_clients[APP_HTTP_MAX_WS_CLIENTS];
 static esp_event_handler_instance_t ws_pump_runtime_event_ctx;
 static esp_event_handler_instance_t ws_system_ready_event_ctx;
 static esp_event_handler_instance_t ws_shutting_down_event_ctx;
+static esp_event_handler_instance_t ws_status_changed_event_ctx;
 
 static int app_http_ws_find_client_slot(int sockfd)
 {
@@ -129,6 +131,96 @@ static void app_http_ws_broadcast_lifecycle_event(const char *type)
     cJSON_AddStringToObject(root, "firmware_version", app_description->version);
     cJSON_AddStringToObject(root, "firmware_date", app_description->date);
     cJSON_AddStringToObject(root, "hostname", services->hostname);
+    payload = cJSON_PrintUnformatted(root);
+    if (payload != NULL) {
+        app_http_ws_broadcast_json(payload);
+        free(payload);
+    }
+    cJSON_Delete(root);
+}
+
+static void app_http_ws_status_changed_event_handler(void *arg, esp_event_base_t event_base,
+                                                     int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_base;
+
+    if (event_id != STATUS_CHANGED || event_data == NULL) {
+        return;
+    }
+
+    const app_status_event_t *status_event = (const app_status_event_t *)event_data;
+    cJSON *root = cJSON_CreateObject();
+    cJSON *status = cJSON_CreateObject();
+    char *payload = NULL;
+
+    cJSON_AddStringToObject(root, "type", "status_patch");
+
+    if (status_event->changed_mask & APP_STATUS_CHANGED_UP_TIME) {
+        cJSON_AddStringToObject(status, "up_time", status_event->up_time);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_LOCAL_TIME) {
+        cJSON_AddStringToObject(status, "local_time", status_event->local_time);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_LOCAL_DATE) {
+        cJSON_AddStringToObject(status, "local_date", status_event->local_date);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_FREE_HEAP) {
+        cJSON_AddNumberToObject(status, "free_heap", (double)status_event->free_heap);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_VCC) {
+        cJSON_AddNumberToObject(status, "vcc", (double)status_event->vcc);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_WIFI_MODE) {
+        cJSON_AddStringToObject(status, "wifi_mode", status_event->wifi_mode);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_IP_ADDRESS) {
+        cJSON_AddStringToObject(status, "ip_address", status_event->ip_address);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_STATION_CONNECTED) {
+        cJSON_AddBoolToObject(status, "station_connected", status_event->station_connected);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_STATION_SSID) {
+        cJSON_AddStringToObject(status, "station_ssid", status_event->station_ssid);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_STATION_IP) {
+        cJSON_AddStringToObject(status, "station_ip_address", status_event->station_ip_address);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_AP_SSID) {
+        cJSON_AddStringToObject(status, "ap_ssid", status_event->ap_ssid);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_AP_IP) {
+        cJSON_AddStringToObject(status, "ap_ip_address", status_event->ap_ip_address);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_AP_CLIENTS) {
+        cJSON_AddNumberToObject(status, "ap_clients", status_event->ap_clients);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_BOARD_TEMPERATURE) {
+        cJSON_AddNumberToObject(status, "board_temperature", status_event->board_temperature);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_WIFI_DISCONNECTS) {
+        cJSON_AddNumberToObject(status, "wifi_disconnects", (double)status_event->wifi_disconnects);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_TIME_VALID) {
+        cJSON_AddBoolToObject(status, "time_valid", status_event->time_valid);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_TIME_WARNING) {
+        cJSON_AddStringToObject(status, "time_warning", status_event->time_warning);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_MQTT_SERVICE) {
+        cJSON *mqtt_status = cJSON_CreateObject();
+        cJSON_AddBoolToObject(mqtt_status, "enabled", status_event->mqtt_enabled);
+        cJSON_AddBoolToObject(mqtt_status, "connected", status_event->mqtt_connected);
+        cJSON_AddItemToObject(status, "mqtt_service", mqtt_status);
+    }
+    if (status_event->changed_mask & APP_STATUS_CHANGED_NTP_SERVICE) {
+        cJSON *ntp_status = cJSON_CreateObject();
+        cJSON_AddBoolToObject(ntp_status, "enabled", status_event->ntp_enabled);
+        cJSON_AddBoolToObject(ntp_status, "sync", status_event->ntp_sync);
+        cJSON_AddItemToObject(status, "ntp_service", ntp_status);
+    }
+
+    cJSON_AddItemToObject(root, "status", status);
     payload = cJSON_PrintUnformatted(root);
     if (payload != NULL) {
         app_http_ws_broadcast_json(payload);
@@ -327,6 +419,7 @@ void app_http_ws_init_event_bridge(void)
     app_events_register_handler(PUMP_RUNTIME_DATA, NULL, app_http_ws_pump_runtime_event_handler, &ws_pump_runtime_event_ctx);
     app_events_register_handler(SYSTEM_READY, NULL, app_http_ws_system_event_handler, &ws_system_ready_event_ctx);
     app_events_register_handler(SHUTTING_DOWN, NULL, app_http_ws_system_event_handler, &ws_shutting_down_event_ctx);
+    app_events_register_handler(STATUS_CHANGED, NULL, app_http_ws_status_changed_event_handler, &ws_status_changed_event_ctx);
     initialized = true;
 }
 

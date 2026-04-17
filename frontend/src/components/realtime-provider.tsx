@@ -82,6 +82,10 @@ function createMockSocket(onOpen: () => void, onMessage: (event: MessageEvent<st
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const isAuthenticated = useAppStore((state: AppStoreState) => state.isAuthenticated);
+  const loadStatus = useAppStore((state: AppStoreState) => state.loadStatus);
+  const loadSettings = useAppStore((state: AppStoreState) => state.loadSettings);
+  const applyRealtimeStatus = useAppStore((state: AppStoreState) => state.applyRealtimeStatus);
+  const applyRealtimeSettings = useAppStore((state: AppStoreState) => state.applyRealtimeSettings);
   const [status, setStatus] = React.useState<RealtimeStatus>('idle');
   const [systemState, setSystemState] = React.useState<RealtimeSystemState>('normal');
   const [attempt, setAttempt] = React.useState(0);
@@ -155,13 +159,23 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }): R
 
     const handleMessage = (event: MessageEvent<string>) => {
       try {
-        const message = JSON.parse(event.data) as { type?: string };
+        const message = JSON.parse(event.data) as { type?: string; status?: unknown };
         if (message.type === 'pong' || message.type === 'welcome') {
           setLastPongAt(Date.now());
+          if (message.type === 'welcome') {
+            void loadStatus();
+            void loadSettings();
+          }
         } else if (message.type === 'shutting_down') {
           setSystemState('restarting');
         } else if (message.type === 'system_ready') {
           setSystemState('normal');
+          void loadStatus();
+          void loadSettings();
+        } else if ((message.type === 'status_patch' || message.type === 'status_update') && message.status) {
+          applyRealtimeStatus(message.status as Parameters<AppStoreState['applyRealtimeStatus']>[0]);
+        } else if (message.type === 'settings_update') {
+          applyRealtimeSettings(message as Parameters<AppStoreState['applyRealtimeSettings']>[0]);
         }
         setLastMessage(message);
       } catch (_error) {
@@ -219,7 +233,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }): R
       socket.close();
     });
     socketRef.current = socket;
-  }, [clearTimers, disconnect, isAuthenticated]);
+  }, [applyRealtimeSettings, applyRealtimeStatus, clearTimers, disconnect, isAuthenticated, loadSettings, loadStatus]);
 
   React.useEffect(() => {
     connect();

@@ -46,7 +46,8 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
         title: 'WebSocket',
         icon: Cable,
         badge: 'Realtime',
-        keywords: 'websocket ws realtime ping pong pump runtime system_ready shutting_down restart lifecycle push event connection heartbeat live',
+        keywords:
+          'websocket ws realtime ping pong pump runtime system_ready shutting_down restart lifecycle push event connection heartbeat live status patch delta connectivity mqtt ntp',
         content: (
           <>
             <div className="mb-3">
@@ -62,6 +63,21 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
               <Code>
                 {'{"type":"shutting_down","firmware_version":"1.1.0","hostname":"stepper-doser"}\n{"type":"system_ready","firmware_version":"1.1.1","hostname":"stepper-doser"}'}
               </Code>
+            </div>
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Status patch event</div>
+              <Code>
+                {
+                  '{"type":"status_patch","status":{"wifi_mode":"AP+STA","ip_address":"10.0.20.70","station_connected":true,"station_ssid":"Home","station_ip_address":"10.0.20.70","ap_clients":0,"wifi_disconnects":48,"mqtt_service":{"enabled":true,"connected":true},"ntp_service":{"enabled":true,"sync":true}}}'
+                }
+              </Code>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Status updates are sent as partial patches. Only changed keys are included, not the full
+                {' '}
+                <span className="font-mono text-foreground">/api/status</span>
+                {' '}
+                payload.
+              </p>
             </div>
             <div>
               <div className="mb-1 text-xs font-medium text-muted-foreground">Pump runtime event</div>

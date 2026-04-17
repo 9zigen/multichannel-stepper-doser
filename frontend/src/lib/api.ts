@@ -190,6 +190,31 @@ export type StatusState = {
   rtc_backend: string;
 };
 
+export type StatusPatch = Partial<
+  Pick<
+    StatusState,
+    | 'up_time'
+    | 'local_time'
+    | 'local_date'
+    | 'free_heap'
+    | 'vcc'
+    | 'wifi_mode'
+    | 'ip_address'
+    | 'station_connected'
+    | 'station_ssid'
+    | 'station_ip_address'
+    | 'ap_ssid'
+    | 'ap_ip_address'
+    | 'ap_clients'
+    | 'board_temperature'
+    | 'wifi_disconnects'
+    | 'time_valid'
+    | 'time_warning'
+    | 'mqtt_service'
+    | 'ntp_service'
+  >
+>;
+
 export type WifiScanNetwork = {
   ssid: string;
   rssi: number;

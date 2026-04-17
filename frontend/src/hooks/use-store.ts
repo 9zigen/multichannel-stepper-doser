@@ -14,6 +14,7 @@ import {
   setSettings,
   SettingsSaveResponse,
   SettingsState,
+  StatusPatch,
   StatusState,
   UserCredentials,
 } from '@/lib/api.ts';
@@ -49,6 +50,8 @@ export type AppStoreState = {
   logout: () => void;
   loadStatus: () => Promise<StatusState | null>;
   loadSettings: () => Promise<SettingsState | null>;
+  applyRealtimeStatus: (status: StatusPatch) => void;
+  applyRealtimeSettings: (settings: SettingsState) => void;
   saveSettings: (entity: string | string[] | null, data: Partial<SettingsState>) => Promise<boolean>;
   restartDevice: () => Promise<boolean>;
   factoryResetDevice: () => Promise<boolean>;
@@ -216,6 +219,31 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       set({ error: 'Failed to load Settings' });
       return null;
     }
+  },
+
+  applyRealtimeStatus: (status: StatusPatch) => {
+    set((state) => ({
+      status: {
+        ...state.status,
+        ...cloneSettings(status),
+      },
+      error: null,
+    }));
+  },
+
+  applyRealtimeSettings: (settings: SettingsState) => {
+    const normalizedPumps = normalizePumps(settings.pumps);
+    set(() => ({
+      settings: {
+        auth: cloneSettings(settings.auth),
+        app: cloneSettings(settings.app),
+        services: cloneSettings(settings.services),
+        networks: cloneSettings(settings.networks),
+        pumps: normalizedPumps,
+        time: cloneSettings(settings.time),
+      },
+      error: null,
+    }));
   },
 
   saveSettings: async (entity: string | string[] | null, data: Partial<SettingsState>) => {

@@ -153,7 +153,45 @@ Forms: **React Hook Form + Zod** (`@hookform/resolvers/zod`). Define a `FormSche
 
 `src/lib/api.ts` holds fetch helpers and types. Async actions return `{ success: boolean }` style results. Wrap calls in try/catch and surface outcomes via `sonner` toasts (`toast.success`, `toast.error`).
 
-### 3.7 Adding a new settings field end-to-end
+### 3.7 Realtime Status Design
+
+The device serves two different realtime patterns over WebSocket and they should stay distinct:
+
+- **Event payloads** for pump activity, e.g. `pump_runtime`
+- **Field patches** for device status, e.g. `status_patch`
+
+Do **not** push the full `GET /api/status` response over websocket on every monitor tick. It is too large for the ESP32 and most fields are unchanged. Instead:
+
+- Produce a small tracked snapshot in firmware
+- Detect which fields changed
+- Emit a websocket message with only those changed keys under `status`
+- Merge the patch into Zustand on the frontend instead of replacing the whole `status` object
+
+Current tracked minimum set for `status_patch`:
+
+- `up_time`
+- `local_time`
+- `local_date`
+- `free_heap`
+- `vcc`
+- `wifi_mode`
+- `ip_address`
+- `station_connected`
+- `station_ssid`
+- `station_ip_address`
+- `ap_ssid`
+- `ap_ip_address`
+- `ap_clients`
+- `board_temperature`
+- `wifi_disconnects`
+- `time_valid`
+- `time_warning`
+- `mqtt_service`
+- `ntp_service`
+
+Use `components/app_events` as the bridge between producers and websocket broadcasting. For immediate connection UX, Wi-Fi/IP/AP client transitions should publish right inside `main/connect.c` instead of waiting for the periodic monitor timer.
+
+### 3.8 Adding a new settings field end-to-end
 
 When the firmware gains a new settings field (e.g. a new MQTT/service option), four frontend files need to change in lockstep — missing any one will fail `tsc -b`:
 
@@ -179,7 +217,7 @@ For **inline boolean flags placed on a field row** (e.g. MQTT Retain sitting alo
 
 The `flex h-8 items-center` wrapper ensures the switch vertically aligns with `h-8` inputs in the same grid row.
 
-### 3.8 How forms dim disabled dependent fields
+### 3.9 How forms dim disabled dependent fields
 
 The established pattern for a boolean toggle controlling a group of inputs:
 
