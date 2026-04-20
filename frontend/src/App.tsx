@@ -3,6 +3,7 @@ import routes from '@/routes';
 import React, { useEffect } from 'react';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { ThemeProvider } from '@/components/theme-provider';
+import { FontScaleProvider } from '@/components/font-scale-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { RealtimeProvider, useRealtimeConnection } from '@/components/realtime-provider.tsx';
 import { PumpRuntimeProvider, usePumpRuntime } from '@/components/pump-runtime-provider.tsx';
@@ -80,16 +81,18 @@ const App = (): React.ReactElement => {
   }, []);
 
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-      <TooltipProvider>
-        <RealtimeProvider>
-          <PumpRuntimeProvider>
-            <DeviceLifecycleBridge />
-            <Layout>{routes}</Layout>
-          </PumpRuntimeProvider>
-        </RealtimeProvider>
-      </TooltipProvider>
-    </ThemeProvider>
+    <FontScaleProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+        <TooltipProvider>
+          <RealtimeProvider>
+            <PumpRuntimeProvider>
+              <DeviceLifecycleBridge />
+              <Layout>{routes}</Layout>
+            </PumpRuntimeProvider>
+          </RealtimeProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </FontScaleProvider>
   );
 };
 

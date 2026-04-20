@@ -30,6 +30,7 @@
   }
   html {
     @apply font-sans;
+    &[data-font-scale='large'] { font-size: 19px; }
   }
 }
 

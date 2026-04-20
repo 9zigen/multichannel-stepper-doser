@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/breadcrumb.tsx';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '@/components/theme-provider';
+import { useFontScale } from '@/components/font-scale-provider';
 import { Button } from '@/components/ui/button.tsx';
-import {AlertTriangle, Moon, Sun} from 'lucide-react';
+import { AlertTriangle, Moon, Sun } from 'lucide-react';
 import { BackendConnectionIndicator } from '@/components/backend-connection-indicator.tsx';
 import { CalibrationStatusIndicator } from '@/components/calibration-status-indicator.tsx';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
@@ -22,6 +23,7 @@ export function SiteHeader(): React.ReactElement {
   const location = useLocation();
   const pathNames = location.pathname.split('/').filter((x) => x);
   const { theme, setTheme } = useTheme();
+  const { fontScale, setFontScale } = useFontScale();
   const status = useAppStore((state: AppStoreState) => state.status);
   const { systemState } = useRealtimeConnection();
 
@@ -73,6 +75,22 @@ export function SiteHeader(): React.ReactElement {
     );
   };
 
+  const ButtonFontScale = () => {
+    const isLarge = fontScale === 'large';
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="px-2 font-medium text-muted-foreground hover:text-foreground"
+        title={isLarge ? 'Switch to default text size' : 'Switch to large text size'}
+        onClick={() => setFontScale(isLarge ? 'default' : 'large')}
+      >
+        <span style={{ fontSize: '11px' }} className={isLarge ? 'text-muted-foreground' : 'text-foreground'}>a</span>
+        <span style={{ fontSize: '16px' }} className={isLarge ? 'text-foreground' : 'text-muted-foreground'}>A</span>
+      </Button>
+    );
+  };
+
   return (
     <header className="sticky top-0 z-10 shrink-0 border-b border-border/70 bg-background/70 backdrop-blur-xl">
       {!status.time_valid && (
@@ -109,6 +127,7 @@ export function SiteHeader(): React.ReactElement {
           <div className="flex items-center gap-2">
             <CalibrationStatusIndicator />
             <BackendConnectionIndicator />
+            <ButtonFontScale />
             <ButtonTheme />
           </div>
         </div>

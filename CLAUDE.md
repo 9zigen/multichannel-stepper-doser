@@ -217,7 +217,27 @@ For **inline boolean flags placed on a field row** (e.g. MQTT Retain sitting alo
 
 The `flex h-8 items-center` wrapper ensures the switch vertically aligns with `h-8` inputs in the same grid row.
 
-### 3.9 How forms dim disabled dependent fields
+### 3.9 Font scale preference
+
+Two-size system: **Default** (16 px root) and **Large** (19 px root). Stored as `"ui-font-scale"` in `localStorage`, applied as `data-font-scale="default|large"` on `document.documentElement`.
+
+CSS hook in `src/index.css` inside `@layer base`:
+```css
+html {
+  @apply font-sans;
+  &[data-font-scale='large'] { font-size: 19px; }
+}
+```
+
+Because Tailwind v4 spacing and typography utilities use `rem`, setting `html { font-size }` scales the **entire UI proportionally** — no per-component changes needed. The `aA` toggle button in the site header uses fixed `px` arbitrary values (`text-[11px]` / `text-[16px]`) so the button itself never changes size regardless of the active scale.
+
+Key files: `src/components/font-scale-provider.tsx`, `src/components/site-header.tsx` (`ButtonFontScale` component).
+
+### 3.10 Language / i18n
+
+**Not yet implemented.** UI strings are hardcoded English. A locale switcher is planned — build it from scratch when the time comes. Do not add any i18n library or translation infrastructure until that work is explicitly started.
+
+### 3.11 How forms dim disabled dependent fields
 
 The established pattern for a boolean toggle controlling a group of inputs:
 
@@ -471,15 +491,19 @@ Always confirm with the user before committing. Never push, force-push, or amend
 | `frontend/design/DESIGN_SYSTEM.md`                | Full design system reference              |
 | `frontend/components.json`                        | shadcn/ui config                          |
 | `frontend/src/lib/api.ts`                         | API client + shared types                 |
+| `frontend/src/lib/board-config.ts`                | Board config helpers, `createEmptyBoardConfig`, RPM math |
 | `frontend/src/hooks/use-store.ts`                 | Zustand global store                      |
 | `frontend/src/lib/utils.ts`                       | `cn()` utility                            |
 | `frontend/src/components/home/pump-history/utils.ts` | Heatmap intensity + flag helpers      |
 | `frontend/src/components/schedule-form.tsx`       | Compact form patterns reference           |
 | `frontend/src/components/services-form.tsx`       | Nested feature-toggle panel reference (HA Discovery inside MQTT) |
+| `frontend/src/components/font-scale-provider.tsx` | Font scale preference (Default/Large), `localStorage` `ui-font-scale` |
+| `frontend/src/components/realtime-provider.tsx`   | WebSocket lifecycle + realtime state (`status_patch`, `settings_update`, `shutting_down`, `system_ready`) |
 | `.claude/launch.json`                             | Dev server launch config (corepack workaround) |
 | `frontend/src/pages/Home.tsx`                     | Complex grid layout reference             |
 | `frontend/src/pages/History.tsx`                  | Single-card layout reference              |
+| `frontend/src/pages/Settings.Board.tsx`           | Board config page — `validateBoardConfig` as `useCallback`, no-form pattern |
 
 ---
 
-*Last updated: Added `mqtt_retain` boolean to Services page (inline Switch beside QoS); documented the inline-switch-in-field-row pattern in section 3.7.*
+*Last updated: Font scale selector (Default/Large) in header toolbar; Board Configuration presets planned (Fysetc E4 v1.0 + extended peripheral fields: RTC/EEPROM I2C addr, CAN GPIO); language/i18n deferred — will be built from scratch when started.*
