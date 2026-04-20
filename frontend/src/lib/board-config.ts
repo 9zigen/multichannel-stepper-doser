@@ -4,19 +4,25 @@ export const MICROSTEP_OPTIONS = [1, 2, 4, 8, 16, 32, 64, 128, 256] as const;
 export const MAX_BOARD_CHANNELS = 4;
 export const BASE_MAX_RPM_AT_256 = 30;
 
+// Fysetc E4 v1.0 — verified from firmware app_settings.c defaults
+const FYSETC_E4_CHANNELS: BoardConfigChannel[] = [
+  { id: 0, dir_pin: 12, en_pin: 25, step_pin: 14, micro_steps: 256 },
+  { id: 1, dir_pin: 26, en_pin: 25, step_pin: 27, micro_steps: 256 },
+  { id: 2, dir_pin: 17, en_pin: 25, step_pin: 16, micro_steps: 256 },
+  { id: 3, dir_pin: 32, en_pin: 25, step_pin: 33, micro_steps: 256 },
+];
+
 export function createEmptyBoardConfig(): BoardConfigState {
   return {
     uart: 2,
     tx_pin: 22,
     rx_pin: 21,
     motors_num: 4,
-    channels: Array.from({ length: MAX_BOARD_CHANNELS }, (_, id) => ({
-      id,
-      dir_pin: 0,
-      en_pin: 0,
-      step_pin: 0,
-      micro_steps: 256,
-    })),
+    channels: FYSETC_E4_CHANNELS.map((ch) => ({ ...ch })),
+    rtc_i2c_addr: 0x6f,    // MCP7940
+    eeprom_i2c_addr: 0x50, // 24LC series
+    can_tx_pin: -1,
+    can_rx_pin: -1,
   };
 }
 
@@ -45,4 +51,20 @@ export function formatRemainingDuration(totalSeconds: number): string {
   const minutesPart = Math.floor(seconds / 60);
   const secondsPart = seconds % 60;
   return `${String(minutesPart).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`;
+}
+
+/** Parses a hex (0x6F) or decimal (111) string to a number. Returns 0 on failure. */
+export function parseI2cInput(value: string): number {
+  const trimmed = value.trim();
+  if (trimmed === '') return 0;
+  const parsed = trimmed.toLowerCase().startsWith('0x')
+    ? parseInt(trimmed, 16)
+    : parseInt(trimmed, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Formats a number as uppercase hex string with 0x prefix, e.g. 0x6F */
+export function formatI2cAddr(value: number): string {
+  if (value <= 0) return '0x00';
+  return `0x${value.toString(16).toUpperCase().padStart(2, '0')}`;
 }

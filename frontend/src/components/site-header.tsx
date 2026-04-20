@@ -37,6 +37,7 @@ export function SiteHeader(): React.ReactElement {
     { path: '/settings/services', name: 'Services' },
     { path: '/settings/pumps', name: 'Pumps' },
     { path: '/settings/api', name: 'API' },
+    { path: '/settings/backup', name: 'Backup' },
     { path: '/onboarding', name: 'Onboarding' },
   ];
 

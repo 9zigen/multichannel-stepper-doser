@@ -13,6 +13,7 @@ import NotFound from './pages/NotFound';
 import Schedule from '@/pages/Schedule.tsx';
 import ApiDocsPage from '@/pages/Settings.Api.tsx';
 import HistoryPage from '@/pages/History.tsx';
+import BackupPage from '@/pages/Settings.Backup.tsx';
 
 export default (
   <Routes>
@@ -28,6 +29,7 @@ export default (
     <Route path="/settings/services" element={<Services />} />
     <Route path="/settings/pumps" element={<Pumps />} />
     <Route path="/settings/api" element={<ApiDocsPage />} />
+    <Route path="/settings/backup" element={<BackupPage />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );

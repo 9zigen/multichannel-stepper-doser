@@ -94,6 +94,10 @@ const initialState: MockState = {
       { id: 2, dir_pin: 17, en_pin: 25, step_pin: 16, micro_steps: 256 },
       { id: 3, dir_pin: 32, en_pin: 25, step_pin: 33, micro_steps: 256 },
     ],
+    rtc_i2c_addr: 0x6f,
+    eeprom_i2c_addr: 0x50,
+    can_tx_pin: -1,
+    can_rx_pin: -1,
   },
   networks: [
     {

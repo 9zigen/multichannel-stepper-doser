@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { Home, Network, CalendarClock, LogOut, Cpu, Play, Disc, BookText, CircuitBoard, TimerReset, Activity } from 'lucide-react';
+import { Home, Network, CalendarClock, LogOut, Cpu, Play, Disc, BookText, CircuitBoard, TimerReset, Activity, HardDriveDownload } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -66,6 +66,11 @@ const navigation = {
       name: 'API',
       url: '/settings/api',
       icon: BookText,
+    },
+    {
+      name: 'Backup',
+      url: '/settings/backup',
+      icon: HardDriveDownload,
     },
   ],
   // navSettings: [

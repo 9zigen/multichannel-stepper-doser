@@ -28,7 +28,7 @@ const ConnectivityStabilityCard = ({
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">Station</span>
-            <span className="max-w-[160px] truncate font-medium">
+            <span className="max-w-40 truncate font-medium">
               {deviceStatus.station_ssid || 'Not configured'}
             </span>
           </div>
@@ -44,7 +44,7 @@ const ConnectivityStabilityCard = ({
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">AP</span>
-            <span className="max-w-[160px] truncate font-medium">{deviceStatus.ap_ssid || 'Disabled'}</span>
+            <span className="max-w-40 truncate font-medium">{deviceStatus.ap_ssid || 'Disabled'}</span>
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">AP IP</span>

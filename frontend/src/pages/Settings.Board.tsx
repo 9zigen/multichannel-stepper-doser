@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Cable, CircuitBoard, Network, RotateCw, Save } from 'lucide-react';
+import { AlertTriangle, Cable, Check, ChevronDown, CircuitBoard, LayoutTemplate, Network, RotateCw, Save } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -7,17 +7,21 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BoardConfigChannel, BoardConfigState, getBoardConfig, setBoardConfig } from '@/lib/api.ts';
 import {
   createEmptyBoardConfig,
+  formatI2cAddr,
   getChannelMaxRpm,
   getMaxRpmForMicrosteps,
   MAX_BOARD_CHANNELS,
   MICROSTEP_OPTIONS,
+  parseI2cInput,
 } from '@/lib/board-config.ts';
+import { BOARD_PRESETS, BoardPreset } from '@/lib/board-presets.ts';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { BACKEND_SYSTEM_READY_EVENT } from '@/lib/device-events.ts';
@@ -43,16 +47,36 @@ const validateBoardConfig = (config: BoardConfigState): string[] => {
     errors.push('TX and RX pins must be different.');
   }
 
+  if (config.rtc_i2c_addr < 0 || config.rtc_i2c_addr > 0x7f) {
+    errors.push('RTC I2C address must be in range 0x00–0x7F.');
+  }
+
+  if (config.eeprom_i2c_addr < 0 || config.eeprom_i2c_addr > 0x7f) {
+    errors.push('EEPROM I2C address must be in range 0x00–0x7F.');
+  }
+
+  if (config.can_tx_pin !== -1 && config.can_rx_pin === -1) {
+    errors.push('CAN TX pin is set but CAN RX pin is missing.');
+  }
+
+  if (config.can_rx_pin !== -1 && config.can_tx_pin === -1) {
+    errors.push('CAN RX pin is set but CAN TX pin is missing.');
+  }
+
   const allPins = new Map<number, string[]>();
   const activeChannels = config.channels.slice(0, config.motors_num);
 
   const addPinUse = (pin: number, label: string) => {
+    if (pin < 0) return;
     if (!allPins.has(pin)) allPins.set(pin, []);
     allPins.get(pin)?.push(label);
   };
 
   addPinUse(config.tx_pin, 'UART TX');
   addPinUse(config.rx_pin, 'UART RX');
+
+  if (config.can_tx_pin >= 0) addPinUse(config.can_tx_pin, 'CAN TX');
+  if (config.can_rx_pin >= 0) addPinUse(config.can_rx_pin, 'CAN RX');
 
   activeChannels.forEach((channel) => {
     if (!MICROSTEP_OPTIONS.includes(channel.micro_steps as (typeof MICROSTEP_OPTIONS)[number])) {
@@ -86,6 +110,8 @@ const BoardPage: React.FC = (): React.ReactElement => {
   const [initialConfig, setInitialConfig] = useState<BoardConfigState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [presetOpen, setPresetOpen] = useState(false);
+  const [pendingPreset, setPendingPreset] = useState<BoardPreset | null>(null);
 
   useEffect(() => {
     const loadBoardConfig = async () => {
@@ -116,6 +142,24 @@ const BoardPage: React.FC = (): React.ReactElement => {
   const isDirty = useMemo(() => JSON.stringify(config) !== JSON.stringify(initialConfig), [config, initialConfig]);
   const guidedMode = searchParams.get('guided') === '1';
 
+  const applyPreset = (preset: BoardPreset) => {
+    if (isDirty) {
+      setPendingPreset(preset);
+    } else {
+      setConfig(preset.config);
+      setPresetOpen(false);
+      toast.success(`Preset "${preset.name}" applied.`);
+    }
+  };
+
+  const confirmApplyPreset = () => {
+    if (!pendingPreset) return;
+    setConfig(pendingPreset.config);
+    setPendingPreset(null);
+    setPresetOpen(false);
+    toast.success(`Preset "${pendingPreset.name}" applied.`);
+  };
+
   const updateSharedField = (field: keyof Omit<BoardConfigState, 'channels'>, value: number) => {
     setConfig((current) => ({ ...current, [field]: value }));
   };
@@ -131,6 +175,7 @@ const BoardPage: React.FC = (): React.ReactElement => {
 
   const resetDraft = () => {
     if (initialConfig) setConfig(initialConfig);
+    setPendingPreset(null);
   };
 
   const handleSave = async () => {
@@ -199,6 +244,62 @@ const BoardPage: React.FC = (): React.ReactElement => {
                   <Badge variant="secondary" className="tabular-nums">
                     TX {config.tx_pin} / RX {config.rx_pin}
                   </Badge>
+
+                  {/* Preset picker */}
+                  <Popover open={presetOpen} onOpenChange={(open) => { setPresetOpen(open); if (!open) setPendingPreset(null); }}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs">
+                        <LayoutTemplate className="size-3.5" />
+                        Presets
+                        <ChevronDown className="size-3 opacity-60" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-80 p-2">
+                      {pendingPreset ? (
+                        <div className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+                          <div className="flex items-start gap-2 text-sm">
+                            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                            <span className="text-foreground">
+                              You have unsaved changes. Applying <span className="font-medium">{pendingPreset.name}</span> will discard them.
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="h-7 flex-1 text-xs" onClick={confirmApplyPreset}>
+                              Apply anyway
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 flex-1 text-xs" onClick={() => setPendingPreset(null)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="px-2 pb-1 pt-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Hardware presets
+                          </div>
+                          {BOARD_PRESETS.map((preset) => {
+                            const isActive = JSON.stringify(config) === JSON.stringify(preset.config);
+                            return (
+                              <button
+                                key={preset.id}
+                                onClick={() => applyPreset(preset)}
+                                className={cn(
+                                  'flex w-full flex-col gap-0.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-secondary/60',
+                                  isActive && 'bg-primary/10 text-primary',
+                                )}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-medium">{preset.name}</span>
+                                  {isActive && <Check className="size-3.5 shrink-0" />}
+                                </div>
+                                <span className="text-xs text-muted-foreground">{preset.description}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </CardHeader>
@@ -350,6 +451,67 @@ const BoardPage: React.FC = (): React.ReactElement => {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Peripherals */}
+              <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Peripherals
+                </div>
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="rtc_i2c_addr" className="text-xs text-muted-foreground">RTC I2C Addr</Label>
+                    <Input
+                      id="rtc_i2c_addr"
+                      type="text"
+                      inputMode="text"
+                      className="h-8 text-sm tabular-nums font-mono"
+                      value={formatI2cAddr(config.rtc_i2c_addr)}
+                      onChange={(e) => updateSharedField('rtc_i2c_addr', parseI2cInput(e.target.value))}
+                      placeholder="0x6F"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="eeprom_i2c_addr" className="text-xs text-muted-foreground">EEPROM I2C Addr</Label>
+                    <Input
+                      id="eeprom_i2c_addr"
+                      type="text"
+                      inputMode="text"
+                      className="h-8 text-sm tabular-nums font-mono"
+                      value={formatI2cAddr(config.eeprom_i2c_addr)}
+                      onChange={(e) => updateSharedField('eeprom_i2c_addr', parseI2cInput(e.target.value))}
+                      placeholder="0x50"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="can_tx_pin" className="text-xs text-muted-foreground">CAN TX Pin</Label>
+                    <Input
+                      id="can_tx_pin"
+                      type="number"
+                      className="h-8 text-sm tabular-nums"
+                      value={config.can_tx_pin < 0 ? '' : config.can_tx_pin}
+                      placeholder="-1 (disabled)"
+                      onChange={(e) => {
+                        const v = parseNumericInput(e.target.value);
+                        updateSharedField('can_tx_pin', v || -1);
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="can_rx_pin" className="text-xs text-muted-foreground">CAN RX Pin</Label>
+                    <Input
+                      id="can_rx_pin"
+                      type="number"
+                      className="h-8 text-sm tabular-nums"
+                      value={config.can_rx_pin < 0 ? '' : config.can_rx_pin}
+                      placeholder="-1 (disabled)"
+                      onChange={(e) => {
+                        const v = parseNumericInput(e.target.value);
+                        updateSharedField('can_rx_pin', v || -1);
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Validation error */}

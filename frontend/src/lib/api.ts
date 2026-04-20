@@ -286,6 +286,10 @@ export type BoardConfigState = {
   rx_pin: number;
   motors_num: number;
   channels: BoardConfigChannel[];
+  rtc_i2c_addr: number;    // 7-bit I2C address; 0 = not present
+  eeprom_i2c_addr: number; // 7-bit I2C address; 0 = not present
+  can_tx_pin: number;      // -1 = disabled
+  can_rx_pin: number;      // -1 = disabled
 };
 
 export type CalibrationResponse = {
