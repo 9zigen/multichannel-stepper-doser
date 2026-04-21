@@ -1,3 +1,4 @@
+import { GpioPull } from '@/lib/api.ts';
 import type { BoardConfigState } from '@/lib/api.ts';
 
 export type BoardPreset = {
@@ -19,8 +20,24 @@ const FYSETC_E4_BASE: Omit<BoardConfigState, 'motors_num'> = {
   ],
   rtc_i2c_addr: 0x6f,
   eeprom_i2c_addr: 0x50,
+  i2c_sda_pin: 21,
+  i2c_scl_pin: 22,
   can_tx_pin: -1,
   can_rx_pin: -1,
+  adc_channels: [
+    { id: 0, pin: 36, enabled: false },
+    { id: 1, pin: 39, enabled: false },
+  ],
+  gpio_inputs: [
+    { id: 0, pin: 34, enabled: false, pull: GpioPull.None, active_level: 1 },
+    { id: 1, pin: 35, enabled: false, pull: GpioPull.None, active_level: 1 },
+    { id: 2, pin: 32, enabled: false, pull: GpioPull.None, active_level: 1 },
+  ],
+  gpio_outputs: [
+    { id: 0, pin: 13, enabled: false, active_level: 1 },
+    { id: 1, pin: 2,  enabled: false, active_level: 1 },
+    { id: 2, pin: 4,  enabled: false, active_level: 1 },
+  ],
 };
 
 export const BOARD_PRESETS: BoardPreset[] = [

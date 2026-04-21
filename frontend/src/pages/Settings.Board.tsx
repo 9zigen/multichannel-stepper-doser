@@ -1,10 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Cable, Check, ChevronDown, CircuitBoard, LayoutTemplate, Network, RotateCw, Save } from 'lucide-react';
+import { AlertTriangle, Cable, Check, ChevronDown, CircuitBoard, LayoutTemplate, Network, RotateCw, Save, Zap } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { BoardConfigChannel, BoardConfigSaveResponse, BoardConfigState, getBoardConfig, setBoardConfig } from '@/lib/api.ts';
+import {
+  AdcChannelConfig,
+  BoardConfigChannel,
+  BoardConfigSaveResponse,
+  BoardConfigState,
+  getBoardConfig,
+  GpioInputConfig,
+  GpioOutputConfig,
+  GpioPull,
+  setBoardConfig,
+} from '@/lib/api.ts';
 import {
   createEmptyBoardConfig,
   formatI2cAddr,
@@ -23,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { BACKEND_SYSTEM_READY_EVENT } from '@/lib/device-events.ts';
 
@@ -160,8 +171,32 @@ const BoardPage: React.FC = (): React.ReactElement => {
     toast.success(`Preset "${pendingPreset.name}" applied.`);
   };
 
-  const updateSharedField = (field: keyof Omit<BoardConfigState, 'channels'>, value: number) => {
+  const updateSharedField = (
+    field: keyof Omit<BoardConfigState, 'channels' | 'adc_channels' | 'gpio_inputs' | 'gpio_outputs'>,
+    value: number,
+  ) => {
     setConfig((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateAdcChannel = (id: number, field: keyof AdcChannelConfig, value: number | boolean) => {
+    setConfig((current) => ({
+      ...current,
+      adc_channels: current.adc_channels.map((ch) => ch.id === id ? { ...ch, [field]: value } : ch),
+    }));
+  };
+
+  const updateGpioInput = (id: number, field: keyof GpioInputConfig, value: number | boolean) => {
+    setConfig((current) => ({
+      ...current,
+      gpio_inputs: current.gpio_inputs.map((inp) => inp.id === id ? { ...inp, [field]: value } : inp),
+    }));
+  };
+
+  const updateGpioOutput = (id: number, field: keyof GpioOutputConfig, value: number | boolean) => {
+    setConfig((current) => ({
+      ...current,
+      gpio_outputs: current.gpio_outputs.map((out) => out.id === id ? { ...out, [field]: value } : out),
+    }));
   };
 
   const updateChannelField = (channelId: number, field: keyof BoardConfigChannel, value: number) => {
@@ -454,63 +489,204 @@ const BoardPage: React.FC = (): React.ReactElement => {
                 })}
               </div>
 
-              {/* Peripherals */}
+              {/* I2C Bus */}
               <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Peripherals
-                </div>
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">I2C Bus</div>
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <div className="flex flex-col gap-1">
-                    <Label htmlFor="rtc_i2c_addr" className="text-xs text-muted-foreground">RTC I2C Addr</Label>
-                    <Input
-                      id="rtc_i2c_addr"
-                      type="text"
-                      inputMode="text"
-                      className="h-8 text-sm tabular-nums font-mono"
-                      value={formatI2cAddr(config.rtc_i2c_addr)}
-                      onChange={(e) => updateSharedField('rtc_i2c_addr', parseI2cInput(e.target.value))}
-                      placeholder="0x6F"
-                    />
+                    <Label htmlFor="i2c_sda_pin" className="text-xs text-muted-foreground">SDA Pin</Label>
+                    <Input id="i2c_sda_pin" type="number" className="h-8 text-sm tabular-nums"
+                      value={config.i2c_sda_pin}
+                      onChange={(e) => updateSharedField('i2c_sda_pin', parseNumericInput(e.target.value))} />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label htmlFor="eeprom_i2c_addr" className="text-xs text-muted-foreground">EEPROM I2C Addr</Label>
-                    <Input
-                      id="eeprom_i2c_addr"
-                      type="text"
-                      inputMode="text"
-                      className="h-8 text-sm tabular-nums font-mono"
-                      value={formatI2cAddr(config.eeprom_i2c_addr)}
-                      onChange={(e) => updateSharedField('eeprom_i2c_addr', parseI2cInput(e.target.value))}
-                      placeholder="0x50"
-                    />
+                    <Label htmlFor="i2c_scl_pin" className="text-xs text-muted-foreground">SCL Pin</Label>
+                    <Input id="i2c_scl_pin" type="number" className="h-8 text-sm tabular-nums"
+                      value={config.i2c_scl_pin}
+                      onChange={(e) => updateSharedField('i2c_scl_pin', parseNumericInput(e.target.value))} />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label htmlFor="can_tx_pin" className="text-xs text-muted-foreground">CAN TX Pin</Label>
-                    <Input
-                      id="can_tx_pin"
-                      type="number"
-                      className="h-8 text-sm tabular-nums"
+                    <Label htmlFor="rtc_i2c_addr" className="text-xs text-muted-foreground">RTC Addr</Label>
+                    <Input id="rtc_i2c_addr" type="text" inputMode="text"
+                      className="h-8 text-sm tabular-nums font-mono"
+                      value={formatI2cAddr(config.rtc_i2c_addr)} placeholder="0x6F"
+                      onChange={(e) => updateSharedField('rtc_i2c_addr', parseI2cInput(e.target.value))} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="eeprom_i2c_addr" className="text-xs text-muted-foreground">EEPROM Addr</Label>
+                    <Input id="eeprom_i2c_addr" type="text" inputMode="text"
+                      className="h-8 text-sm tabular-nums font-mono"
+                      value={formatI2cAddr(config.eeprom_i2c_addr)} placeholder="0x50"
+                      onChange={(e) => updateSharedField('eeprom_i2c_addr', parseI2cInput(e.target.value))} />
+                  </div>
+                </div>
+              </div>
+
+              {/* ADC Channels */}
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground px-1">ADC Channels</div>
+                {config.adc_channels.map((ch) => (
+                  <div key={ch.id} className={cn(
+                    'rounded-lg border border-border/40 bg-secondary/10 p-3 transition-opacity',
+                    !ch.enabled && 'opacity-60',
+                  )}>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-6 items-center justify-center rounded bg-secondary/50">
+                          <Zap className="size-3 text-muted-foreground" />
+                        </div>
+                        <span className="text-sm font-medium">ADC {ch.id + 1}</span>
+                        <Badge variant={ch.enabled ? 'default' : 'outline'} className="text-xs">
+                          {ch.enabled ? 'Active' : 'Idle'}
+                        </Badge>
+                      </div>
+                      <div className="ml-auto flex flex-wrap items-center gap-3">
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`adc_pin_${ch.id}`} className="text-xs text-muted-foreground">Pin</Label>
+                          <Input id={`adc_pin_${ch.id}`} type="number" className="h-8 w-24 text-sm tabular-nums"
+                            value={ch.pin}
+                            onChange={(e) => updateAdcChannel(ch.id, 'pin', parseNumericInput(e.target.value))} />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs text-muted-foreground">Enabled</Label>
+                          <div className="flex h-8 items-center">
+                            <Switch checked={ch.enabled} onCheckedChange={(v) => updateAdcChannel(ch.id, 'enabled', v)} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Digital Inputs */}
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground px-1">Digital Inputs</div>
+                {config.gpio_inputs.map((inp) => (
+                  <div key={inp.id} className={cn(
+                    'rounded-lg border border-border/40 bg-secondary/10 p-3 transition-opacity',
+                    !inp.enabled && 'opacity-60',
+                  )}>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-6 items-center justify-center rounded bg-secondary/50">
+                          <Zap className="size-3 text-muted-foreground" />
+                        </div>
+                        <span className="text-sm font-medium">IN {inp.id + 1}</span>
+                        <Badge variant={inp.enabled ? 'default' : 'outline'} className="text-xs">
+                          {inp.enabled ? 'Active' : 'Idle'}
+                        </Badge>
+                      </div>
+                      <div className="ml-auto flex flex-wrap items-center gap-3">
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`in_pin_${inp.id}`} className="text-xs text-muted-foreground">Pin</Label>
+                          <Input id={`in_pin_${inp.id}`} type="number" className="h-8 w-24 text-sm tabular-nums"
+                            value={inp.pin}
+                            onChange={(e) => updateGpioInput(inp.id, 'pin', parseNumericInput(e.target.value))} />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`in_pull_${inp.id}`} className="text-xs text-muted-foreground">Pull</Label>
+                          <Select value={String(inp.pull)} onValueChange={(v) => updateGpioInput(inp.id, 'pull', Number(v))}>
+                            <SelectTrigger id={`in_pull_${inp.id}`} className="h-8 w-32 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={String(GpioPull.None)}>None</SelectItem>
+                              <SelectItem value={String(GpioPull.Up)}>Pull-up</SelectItem>
+                              <SelectItem value={String(GpioPull.Down)}>Pull-down</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`in_active_${inp.id}`} className="text-xs text-muted-foreground">Active</Label>
+                          <Select value={String(inp.active_level)} onValueChange={(v) => updateGpioInput(inp.id, 'active_level', Number(v))}>
+                            <SelectTrigger id={`in_active_${inp.id}`} className="h-8 w-28 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">High (1)</SelectItem>
+                              <SelectItem value="0">Low (0)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs text-muted-foreground">Enabled</Label>
+                          <div className="flex h-8 items-center">
+                            <Switch checked={inp.enabled} onCheckedChange={(v) => updateGpioInput(inp.id, 'enabled', v)} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Digital Outputs */}
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground px-1">Digital Outputs</div>
+                {config.gpio_outputs.map((out) => (
+                  <div key={out.id} className={cn(
+                    'rounded-lg border border-border/40 bg-secondary/10 p-3 transition-opacity',
+                    !out.enabled && 'opacity-60',
+                  )}>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-6 items-center justify-center rounded bg-secondary/50">
+                          <Zap className="size-3 text-muted-foreground" />
+                        </div>
+                        <span className="text-sm font-medium">OUT {out.id + 1}</span>
+                        <Badge variant={out.enabled ? 'default' : 'outline'} className="text-xs">
+                          {out.enabled ? 'Active' : 'Idle'}
+                        </Badge>
+                      </div>
+                      <div className="ml-auto flex flex-wrap items-center gap-3">
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`out_pin_${out.id}`} className="text-xs text-muted-foreground">Pin</Label>
+                          <Input id={`out_pin_${out.id}`} type="number" className="h-8 w-24 text-sm tabular-nums"
+                            value={out.pin}
+                            onChange={(e) => updateGpioOutput(out.id, 'pin', parseNumericInput(e.target.value))} />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`out_active_${out.id}`} className="text-xs text-muted-foreground">Active</Label>
+                          <Select value={String(out.active_level)} onValueChange={(v) => updateGpioOutput(out.id, 'active_level', Number(v))}>
+                            <SelectTrigger id={`out_active_${out.id}`} className="h-8 w-28 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">High (1)</SelectItem>
+                              <SelectItem value="0">Low (0)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs text-muted-foreground">Enabled</Label>
+                          <div className="flex h-8 items-center">
+                            <Switch checked={out.enabled} onCheckedChange={(v) => updateGpioOutput(out.id, 'enabled', v)} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* CAN Bus */}
+              <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">CAN Bus</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="can_tx_pin" className="text-xs text-muted-foreground">TX Pin</Label>
+                    <Input id="can_tx_pin" type="number" className="h-8 text-sm tabular-nums"
                       value={config.can_tx_pin < 0 ? '' : config.can_tx_pin}
                       placeholder="-1 (disabled)"
-                      onChange={(e) => {
-                        const v = parseNumericInput(e.target.value);
-                        updateSharedField('can_tx_pin', v || -1);
-                      }}
-                    />
+                      onChange={(e) => { const v = parseNumericInput(e.target.value); updateSharedField('can_tx_pin', v || -1); }} />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label htmlFor="can_rx_pin" className="text-xs text-muted-foreground">CAN RX Pin</Label>
-                    <Input
-                      id="can_rx_pin"
-                      type="number"
-                      className="h-8 text-sm tabular-nums"
+                    <Label htmlFor="can_rx_pin" className="text-xs text-muted-foreground">RX Pin</Label>
+                    <Input id="can_rx_pin" type="number" className="h-8 text-sm tabular-nums"
                       value={config.can_rx_pin < 0 ? '' : config.can_rx_pin}
                       placeholder="-1 (disabled)"
-                      onChange={(e) => {
-                        const v = parseNumericInput(e.target.value);
-                        updateSharedField('can_rx_pin', v || -1);
-                      }}
-                    />
+                      onChange={(e) => { const v = parseNumericInput(e.target.value); updateSharedField('can_rx_pin', v || -1); }} />
                   </div>
                 </div>
               </div>

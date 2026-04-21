@@ -255,10 +255,44 @@ const applyPreset = (preset: BoardPreset) => {
 ```
 
 **When `BoardConfigState` gains a new field** — update four places in lockstep:
-1. `src/lib/api.ts` — add the field to `BoardConfigState`
+1. `src/lib/api.ts` — add the field to `BoardConfigState` (and any new sub-types)
 2. `src/lib/board-config.ts` — add default in `createEmptyBoardConfig()`
 3. `src/lib/board-presets.ts` — add the value to `FYSETC_E4_BASE` (and any other preset bases)
 4. `src/lib/mock-backend.ts` — add default to `initialState.boardConfig`
+
+Also update the Zod schema in `src/lib/config-export.ts` if the field should be included in exports.
+
+**Current `BoardConfigState` scalar fields** (all `number`):
+`uart`, `tx_pin`, `rx_pin`, `motors_num`, `rtc_i2c_addr`, `eeprom_i2c_addr`, `i2c_sda_pin`, `i2c_scl_pin`, `can_tx_pin` (`-1` = disabled), `can_rx_pin` (`-1` = disabled)
+
+**Current `BoardConfigState` array fields**:
+- `channels: BoardConfigChannel[]` — stepper driver wiring (DIR/EN/STEP/μstep per channel)
+- `adc_channels: AdcChannelConfig[]` — `{ id, pin, enabled }` — ADC1_CH0 (GPIO36) and ADC1_CH3 (GPIO39) on Fysetc E4
+- `gpio_inputs: GpioInputConfig[]` — `{ id, pin, enabled, pull: GpioPull, active_level }` — IO34, IO35, IO32 on Fysetc E4
+- `gpio_outputs: GpioOutputConfig[]` — `{ id, pin, enabled, active_level }` — IO13, IO2, IO4 on Fysetc E4
+
+**`GpioPull` enum** (defined in `api.ts`): `None = 0`, `Up = 1`, `Down = 2`. Import it from `@/lib/api.ts` when needed in components or defaults.
+
+**Pull / active-level UI pattern** — use shadcn `Select` for both. Pull options: None / Pull-up / Pull-down. Active level: `High (1)` / `Low (0)`. Enabled state uses a `Switch` from `@/components/ui/switch`. Each row dims with `opacity-60` when `!enabled`.
+
+**Array field updaters pattern** (used in `Settings.Board.tsx`):
+```ts
+const updateGpioInput = (id: number, field: keyof GpioInputConfig, value: number | boolean) => {
+  setConfig((current) => ({
+    ...current,
+    gpio_inputs: current.gpio_inputs.map((inp) => inp.id === id ? { ...inp, [field]: value } : inp),
+  }));
+};
+```
+Same pattern for `updateAdcChannel` and `updateGpioOutput`.
+
+**`updateSharedField` type** — must Omit all array fields so TypeScript enforces the value is `number`:
+```ts
+const updateSharedField = (
+  field: keyof Omit<BoardConfigState, 'channels' | 'adc_channels' | 'gpio_inputs' | 'gpio_outputs'>,
+  value: number,
+) => { ... }
+```
 
 **I2C address inputs** — use text inputs (not number) with `formatI2cAddr` (number → `"0x6F"`) for display and `parseI2cInput` (accepts `"0x6F"` or `"111"`) on change. Both helpers are in `src/lib/board-config.ts`.
 
@@ -567,4 +601,4 @@ Always confirm with the user before committing. Never push, force-push, or amend
 
 ---
 
-*Last updated: Font scale selector (Default/Large) in header toolbar; Board Configuration presets (Fysetc E4 v1.0 — 1/2/4ch) + extended peripheral fields (RTC/EEPROM I2C addr, CAN GPIO); Backup & Restore page (`/settings/backup`) with selective section export/import and version compatibility check; language/i18n deferred — will be built from scratch when started.*
+*Last updated: Font scale selector (Default/Large) in header toolbar; Board Configuration presets (Fysetc E4 v1.0 — 1/2/4ch) + extended peripheral fields (I2C bus SDA/SCL, RTC/EEPROM I2C addr, CAN GPIO, 2× ADC channels, 3× digital inputs with pull/active-level, 3× digital outputs with active-level); Backup & Restore page (`/settings/backup`) with selective section export/import and version compatibility check; language/i18n deferred — will be built from scratch when started.*

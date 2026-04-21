@@ -278,6 +278,33 @@ export type BoardConfigChannel = {
   micro_steps: number;
 };
 
+export enum GpioPull {
+  None = 0,
+  Up = 1,
+  Down = 2,
+}
+
+export type AdcChannelConfig = {
+  id: number;
+  pin: number;
+  enabled: boolean;
+};
+
+export type GpioInputConfig = {
+  id: number;
+  pin: number;
+  enabled: boolean;
+  pull: GpioPull;
+  active_level: number; // 0 = active-low, 1 = active-high
+};
+
+export type GpioOutputConfig = {
+  id: number;
+  pin: number;
+  enabled: boolean;
+  active_level: number; // 0 = active-low, 1 = active-high
+};
+
 export type BoardConfigState = {
   uart: number;
   tx_pin: number;
@@ -286,10 +313,16 @@ export type BoardConfigState = {
   channels: BoardConfigChannel[];
   rtc_i2c_addr: number;    // 7-bit I2C address; 0 = not present
   eeprom_i2c_addr: number; // 7-bit I2C address; 0 = not present
+  i2c_sda_pin: number;
+  i2c_scl_pin: number;
   can_tx_pin: number;      // -1 = disabled
   can_rx_pin: number;      // -1 = disabled
+  adc_channels: AdcChannelConfig[];
+  gpio_inputs: GpioInputConfig[];
+  gpio_outputs: GpioOutputConfig[];
 };
 
+/** Firmware returns the full saved config on POST /api/board-config */
 export type BoardConfigSaveResponse = BoardConfigState;
 
 export type CalibrationResponse = {

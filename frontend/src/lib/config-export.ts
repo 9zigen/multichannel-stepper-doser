@@ -68,6 +68,27 @@ const boardConfigChannelSchema = z.object({
   micro_steps: z.number(),
 });
 
+const adcChannelSchema = z.object({
+  id: z.number(),
+  pin: z.number(),
+  enabled: z.boolean(),
+});
+
+const gpioInputSchema = z.object({
+  id: z.number(),
+  pin: z.number(),
+  enabled: z.boolean(),
+  pull: z.number(),
+  active_level: z.number(),
+});
+
+const gpioOutputSchema = z.object({
+  id: z.number(),
+  pin: z.number(),
+  enabled: z.boolean(),
+  active_level: z.number(),
+});
+
 const boardConfigSchema = z.object({
   uart: z.number(),
   tx_pin: z.number(),
@@ -76,8 +97,13 @@ const boardConfigSchema = z.object({
   channels: z.array(boardConfigChannelSchema),
   rtc_i2c_addr: z.number(),
   eeprom_i2c_addr: z.number(),
+  i2c_sda_pin: z.number().optional(),
+  i2c_scl_pin: z.number().optional(),
   can_tx_pin: z.number(),
   can_rx_pin: z.number(),
+  adc_channels: z.array(adcChannelSchema).optional(),
+  gpio_inputs: z.array(gpioInputSchema).optional(),
+  gpio_outputs: z.array(gpioOutputSchema).optional(),
 });
 
 const scheduleStateSchema = z.object({
