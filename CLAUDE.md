@@ -237,7 +237,64 @@ Key files: `src/components/font-scale-provider.tsx`, `src/components/site-header
 
 **Not yet implemented.** UI strings are hardcoded English. A locale switcher is planned — build it from scratch when the time comes. Do not add any i18n library or translation infrastructure until that work is explicitly started.
 
-### 3.11 How forms dim disabled dependent fields
+### 3.11 Board configuration presets
+
+Preset definitions live in `src/lib/board-presets.ts`. Each `BoardPreset` has `{ id, name, description, config: BoardConfigState }`. The three Fysetc E4 v1.0 presets (1ch / 2ch / 4ch) are the only ones currently defined — add new hardware here when it is validated against physical hardware.
+
+**Preset picker pattern** — a shadcn `Popover` in the card header, opened by a small "Presets" button. Preset list items are plain `<button>` elements (not shadcn `Button`) to avoid focus-ring overhead inside the popover.
+
+**Active preset detection** — `JSON.stringify(config) === JSON.stringify(preset.config)`. Exact match; a `✓` icon appears on the matching row.
+
+**Dirty-state confirmation** — if `isDirty` when a preset is clicked, the preset is stored as `pendingPreset` state instead of being applied immediately. The popover body switches to an inline amber confirmation (`AlertTriangle` + "Apply anyway" / "Cancel"). No modal.
+
+```tsx
+const applyPreset = (preset: BoardPreset) => {
+  if (isDirty) { setPendingPreset(preset); }
+  else { setConfig(preset.config); setPresetOpen(false); }
+};
+```
+
+**When `BoardConfigState` gains a new field** — update four places in lockstep:
+1. `src/lib/api.ts` — add the field to `BoardConfigState`
+2. `src/lib/board-config.ts` — add default in `createEmptyBoardConfig()`
+3. `src/lib/board-presets.ts` — add the value to `FYSETC_E4_BASE` (and any other preset bases)
+4. `src/lib/mock-backend.ts` — add default to `initialState.boardConfig`
+
+**I2C address inputs** — use text inputs (not number) with `formatI2cAddr` (number → `"0x6F"`) for display and `parseI2cInput` (accepts `"0x6F"` or `"111"`) on change. Both helpers are in `src/lib/board-config.ts`.
+
+**CAN pin inputs** — use number inputs. Empty/zero value maps to `-1` (disabled) via `parseNumericInput(v) || -1`.
+
+### 3.12 Config export / import (Backup & Restore)
+
+`src/lib/config-export.ts` owns all export/import logic. The page (`Settings.Backup.tsx`) is purely UI.
+
+**Export shape**:
+
+```ts
+type ConfigExport = {
+  version: number;        // CONFIG_EXPORT_VERSION = 1
+  exported_at: string;    // ISO 8601
+  device_info: { firmware_version: string; hardware_version: string };
+  networks?: NetworkState[];
+  services?: ServiceState;
+  board?: BoardConfigState;
+  pumps?: ConfigExportPump[];   // subset of PumpState — no runtime fields
+};
+```
+
+**Always excluded from export**: `auth` (credentials), `running_hours`, `tank_current_vol`, `tank_concentration_total` (runtime/wear data), `time.date/time` (device-local).
+
+**Version compatibility** — `checkVersion(n)` returns `'ok' | 'older' | 'newer'`. Both directions show an amber warning and let the user proceed. Hard reject only on structural Zod failure.
+
+**Zod schema uses `.passthrough()`** on `networkStateSchema` and `serviceStateSchema` so exports from firmware versions with extra/missing fields still validate. The structural core (required fields) is still checked strictly.
+
+**`applyImport(data, selected)`** applies sections **sequentially** (not `Promise.all`) so a failure in one section doesn't cancel the others. Returns `ApplyResult[]` — the page iterates results for per-section toasts.
+
+**Restart recommendation** — `SECTION_META` maps each `ImportSection` to `{ requiresRestart: boolean }`. After a successful apply, if any applied section has `requiresRestart: true`, an amber banner with a "Restart now" button appears.
+
+**Import UX flow**: drop zone → `parseImportFile` → file info panel (version, date, firmware) → section checkboxes pre-ticked for available sections → "Import N sections" button → results inline (✓ / ✗ per row) → restart banner if needed.
+
+### 3.13 How forms dim disabled dependent fields
 
 The established pattern for a boolean toggle controlling a group of inputs:
 
@@ -472,7 +529,7 @@ Always confirm with the user before committing. Never push, force-push, or amend
 ## 8. Things to Avoid
 
 - **Don't add new UI libraries** — everything must go through shadcn/ui + Tailwind. Bundle size is sacred.
-- **Don't add runtime validators** for internal data — Zod is for form input boundaries only.
+- **Don't add runtime validators** for internal data — Zod is for user-input boundaries only (forms, file imports). Never validate API responses with Zod at runtime.
 - **Don't refactor unrelated files** while making a targeted change.
 - **Don't add `console.log`** debugging statements to committed code.
 - **Don't add backwards-compat shims** for code the user asked to remove — delete it cleanly.
@@ -491,7 +548,10 @@ Always confirm with the user before committing. Never push, force-push, or amend
 | `frontend/design/DESIGN_SYSTEM.md`                | Full design system reference              |
 | `frontend/components.json`                        | shadcn/ui config                          |
 | `frontend/src/lib/api.ts`                         | API client + shared types                 |
-| `frontend/src/lib/board-config.ts`                | Board config helpers, `createEmptyBoardConfig`, RPM math |
+| `frontend/src/lib/api.ts`                         | API client + shared types                 |
+| `frontend/src/lib/board-config.ts`                | Board config helpers, `createEmptyBoardConfig`, RPM math, `parseI2cInput`, `formatI2cAddr` |
+| `frontend/src/lib/board-presets.ts`               | `BOARD_PRESETS` — Fysetc E4 v1.0 preset definitions |
+| `frontend/src/lib/config-export.ts`               | `ConfigExport` type, Zod schema, `buildExport`, `downloadExport`, `parseImportFile`, `applyImport` |
 | `frontend/src/hooks/use-store.ts`                 | Zustand global store                      |
 | `frontend/src/lib/utils.ts`                       | `cn()` utility                            |
 | `frontend/src/components/home/pump-history/utils.ts` | Heatmap intensity + flag helpers      |
@@ -502,8 +562,9 @@ Always confirm with the user before committing. Never push, force-push, or amend
 | `.claude/launch.json`                             | Dev server launch config (corepack workaround) |
 | `frontend/src/pages/Home.tsx`                     | Complex grid layout reference             |
 | `frontend/src/pages/History.tsx`                  | Single-card layout reference              |
-| `frontend/src/pages/Settings.Board.tsx`           | Board config page — `validateBoardConfig` as `useCallback`, no-form pattern |
+| `frontend/src/pages/Settings.Board.tsx`           | Board config page — preset picker (Popover), Peripherals section, no-form pattern |
+| `frontend/src/pages/Settings.Backup.tsx`          | Backup & Restore page — export/import UI  |
 
 ---
 
-*Last updated: Font scale selector (Default/Large) in header toolbar; Board Configuration presets planned (Fysetc E4 v1.0 + extended peripheral fields: RTC/EEPROM I2C addr, CAN GPIO); language/i18n deferred — will be built from scratch when started.*
+*Last updated: Font scale selector (Default/Large) in header toolbar; Board Configuration presets (Fysetc E4 v1.0 — 1/2/4ch) + extended peripheral fields (RTC/EEPROM I2C addr, CAN GPIO); Backup & Restore page (`/settings/backup`) with selective section export/import and version compatibility check; language/i18n deferred — will be built from scratch when started.*
