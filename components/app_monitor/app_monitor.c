@@ -3,6 +3,7 @@
 ***/
 
 #include <esp_mac.h>
+#include <time.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -14,9 +15,9 @@
 #include "esp_err.h"
 #include "esp_system.h"
 
+#include "app_settings.h"
 #include "app_settings_storage.h"
 #include "app_events.h"
-#include "app_mqtt.h"
 #include "app_time.h"
 #include "connect.h"
 #include "tools.h"
@@ -33,6 +34,19 @@ typedef struct {
     uint8_t magic;
     uint32_t reboot_count;
 } reboot_status_t;
+
+typedef enum {
+    MQTT_DISABLED = 0,
+    MQTT_ENABLED_NOT_CONNECTED,
+    MQTT_ENABLED_CONNECTED,
+} mqtt_service_status_t;
+
+extern mqtt_service_status_t get_mqtt_status(void);
+
+static uint8_t monitor_storage_i2c_addr(void)
+{
+    return get_eeprom_i2c_addr();
+}
 
 static const char *reset_reason_to_string(esp_reset_reason_t reason)
 {
@@ -70,7 +84,7 @@ static const char *reset_reason_to_string(esp_reset_reason_t reason)
 static void init_reboot_status(void)
 {
     reboot_status_t reboot_status = {0};
-    eeprom_read(0x50, EEPROM_REBOOT_STATUS_ADDR, (uint8_t *)&reboot_status, sizeof(reboot_status));
+    eeprom_read(monitor_storage_i2c_addr(), EEPROM_REBOOT_STATUS_ADDR, (uint8_t *)&reboot_status, sizeof(reboot_status));
 
     if (reboot_status.magic == EEPROM_MAGIC) {
         reboot_status.reboot_count += 1;
@@ -85,7 +99,7 @@ static void init_reboot_status(void)
              "%s",
              reset_reason_to_string(esp_reset_reason()));
 
-    eeprom_write(0x50, EEPROM_REBOOT_STATUS_ADDR, (uint8_t *)&reboot_status, sizeof(reboot_status));
+    eeprom_write(monitor_storage_i2c_addr(), EEPROM_REBOOT_STATUS_ADDR, (uint8_t *)&reboot_status, sizeof(reboot_status));
 }
 
 static void update_system_info(void)

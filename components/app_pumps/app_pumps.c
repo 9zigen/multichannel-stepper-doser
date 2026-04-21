@@ -40,6 +40,11 @@ static double s_today_history_manual_volume_accum[MAX_PUMP][APP_PUMP_HISTORY_HOU
 
 uint8_t tank_volume_changed = 0;
 
+static uint8_t pump_storage_i2c_addr(void)
+{
+    return get_eeprom_i2c_addr();
+}
+
 static uint32_t current_local_day_stamp(void)
 {
     time_t now;
@@ -390,7 +395,7 @@ static void run_timer_callback(void *arg)
 static void restore_eeprom_tank_status(void)
 {
     tank_status_t tank;
-    eeprom_read(0x50, EEPROM_TANK_STATUS_ADDR, (uint8_t *)&tank, sizeof(tank_status_t));
+    eeprom_read(pump_storage_i2c_addr(), EEPROM_TANK_STATUS_ADDR, (uint8_t *)&tank, sizeof(tank_status_t));
     if (tank.magic == EEPROM_MAGIC) {
         for (int i = 0; i < MAX_PUMP; ++i) {
             get_pump_config(i)->tank_current_vol = tank.tank_current_vol[i];
@@ -489,8 +494,11 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
 
             run_pump_on_volume(schedule->pump_id, volume, schedule->speed);
 
-            eeprom_write(0x50, EEPROM_SCHEDULE_STATUS_ADDR, (uint8_t *)last_run_schedule_hour, sizeof(last_run_schedule_hour));
-            eeprom_write_byte(0x50, 0x31, 0x82);
+            eeprom_write(pump_storage_i2c_addr(),
+                         EEPROM_SCHEDULE_STATUS_ADDR,
+                         (uint8_t *)last_run_schedule_hour,
+                         sizeof(last_run_schedule_hour));
+            eeprom_write_byte(pump_storage_i2c_addr(), 0x31, 0x82);
             break;
         }
     }
@@ -672,7 +680,7 @@ void backup_eeprom_tank_status(void)
         tank.tank_current_vol[i] = get_pump_config(i)->tank_current_vol;
     }
     tank.magic = EEPROM_MAGIC;
-    eeprom_write(0x50, EEPROM_TANK_STATUS_ADDR, (uint8_t *)&tank, sizeof(tank_status_t));
+    eeprom_write(pump_storage_i2c_addr(), EEPROM_TANK_STATUS_ADDR, (uint8_t *)&tank, sizeof(tank_status_t));
 }
 
 int init_pumps(void)
@@ -693,8 +701,11 @@ int init_pumps(void)
         runtime_event_dirty[i] = false;
     }
 
-    if (eeprom_read_byte(0x50, 0x31) == 0x82) {
-        eeprom_read(0x50, EEPROM_SCHEDULE_STATUS_ADDR, (uint8_t *)last_run_schedule_hour, sizeof(last_run_schedule_hour));
+    if (eeprom_read_byte(pump_storage_i2c_addr(), 0x31) == 0x82) {
+        eeprom_read(pump_storage_i2c_addr(),
+                    EEPROM_SCHEDULE_STATUS_ADDR,
+                    (uint8_t *)last_run_schedule_hour,
+                    sizeof(last_run_schedule_hour));
         for (uint8_t j = 0; j < MAX_SCHEDULE; ++j) {
             ESP_LOGI(TAG, "EEPROM last_run:%d:%lu", j, last_run_schedule_hour[j]);
         }

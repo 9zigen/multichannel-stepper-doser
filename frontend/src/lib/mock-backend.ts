@@ -718,7 +718,14 @@ export const mockAdapter: AxiosAdapter = async (config) => {
     ensureAuthorized(config, method, url, requestBody);
     const payload = parseRequestBody<Partial<SettingsState>>(config.data);
     applySettingsPatch(payload);
-    const mockResponse = response(config, { success: true });
+    const mockResponse = response(config, {
+      pumps: clone(state.pumps),
+      networks: clone(state.networks),
+      services: clone(state.services),
+      time: clone(state.time),
+      auth: clone(state.auth),
+      app: clone(state.app),
+    });
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;
   }
@@ -734,7 +741,7 @@ export const mockAdapter: AxiosAdapter = async (config) => {
     ensureAuthorized(config, method, url, requestBody);
     const payload = parseRequestBody<BoardConfigState>(config.data);
     state.boardConfig = clone(payload);
-    const mockResponse = response(config, { success: true });
+    const mockResponse = response(config, clone(state.boardConfig));
     debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
     return mockResponse;
   }

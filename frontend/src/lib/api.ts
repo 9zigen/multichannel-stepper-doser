@@ -268,9 +268,7 @@ export type PumpHistoryState = {
   pumps: PumpHistoryPump[];
 };
 
-export type SettingsSaveResponse = {
-  success: boolean;
-};
+export type SettingsSaveResponse = SettingsState;
 
 export type BoardConfigChannel = {
   id: number;
@@ -291,6 +289,8 @@ export type BoardConfigState = {
   can_tx_pin: number;      // -1 = disabled
   can_rx_pin: number;      // -1 = disabled
 };
+
+export type BoardConfigSaveResponse = BoardConfigState;
 
 export type CalibrationResponse = {
   success: boolean;

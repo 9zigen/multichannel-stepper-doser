@@ -4,7 +4,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { BoardConfigChannel, BoardConfigState, getBoardConfig, setBoardConfig } from '@/lib/api.ts';
+import { BoardConfigChannel, BoardConfigSaveResponse, BoardConfigState, getBoardConfig, setBoardConfig } from '@/lib/api.ts';
 import {
   createEmptyBoardConfig,
   formatI2cAddr,
@@ -186,8 +186,9 @@ const BoardPage: React.FC = (): React.ReactElement => {
 
     try {
       setIsSaving(true);
-      await setBoardConfig<{ success: boolean }>(config);
-      setInitialConfig(config);
+      const savedConfig = await setBoardConfig<BoardConfigSaveResponse>(config);
+      setConfig(savedConfig);
+      setInitialConfig(savedConfig);
       toast.success('Board configuration saved and reloaded.');
     } catch (error) {
       if (axios.isAxiosError(error)) {

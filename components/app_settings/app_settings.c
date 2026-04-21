@@ -53,8 +53,17 @@ typedef struct {
     bool state;
 } pump_storage_t;
 
+typedef struct {
+    uint8_t uart;
+    int32_t tx_pin;
+    int32_t rx_pin;
+    uint8_t motors_num;
+    stepper_channel_config_t channels[MAX_PUMP];
+} legacy_stepper_board_config_t;
+
 static esp_err_t app_settings_get_blob(const char *key, void *data, size_t *data_len);
 static esp_err_t app_settings_set_blob(const char *key, const void *data, size_t data_len, bool commit);
+static esp_err_t app_settings_try_load_legacy_stepper_board_config(legacy_stepper_board_config_t *config);
 
 static void app_settings_reset_ip(uint8_t ip[4], uint8_t a, uint8_t b, uint8_t c, uint8_t d)
 {
@@ -398,6 +407,38 @@ static esp_err_t app_settings_get_blob(const char *key, void *data, size_t *data
     }
 }
 
+static esp_err_t app_settings_try_load_legacy_stepper_board_config(legacy_stepper_board_config_t *config)
+{
+    if (config == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (xSemaphoreTake(nvs_lock, pdMS_TO_TICKS(2000)) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to take NVS lock");
+        return ESP_FAIL;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open("storage", NVS_READWRITE, &handle);
+    if (ret != ESP_OK) {
+        xSemaphoreGive(nvs_lock);
+        return ret;
+    }
+
+    size_t required_size = 0;
+    ret = nvs_get_blob(handle, "stepper_cfg", NULL, &required_size);
+    if (ret == ESP_OK && required_size == sizeof(*config)) {
+        size_t legacy_size = sizeof(*config);
+        ret = nvs_get_blob(handle, "stepper_cfg", config, &legacy_size);
+    } else if (ret == ESP_OK) {
+        ret = ESP_ERR_NVS_INVALID_LENGTH;
+    }
+
+    nvs_close(handle);
+    xSemaphoreGive(nvs_lock);
+    return ret;
+}
+
 static esp_err_t app_settings_set_blob(const char *key, const void *data, size_t data_len, bool commit)
 {
     if (key == NULL || data == NULL) {
@@ -536,8 +577,29 @@ void init_settings()
     if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND && ret != ESP_ERR_NVS_INVALID_LENGTH) {
         ESP_LOGE(TAG, "config not saved yet! error: %s", esp_err_to_name(ret));
     } else if (ret == ESP_ERR_NVS_NOT_FOUND || ret == ESP_ERR_NVS_INVALID_LENGTH) {
-        ESP_LOGI(TAG, "default stepper board config used.");
-        set_default_stepper_board_config();
+        bool migrated_legacy_config = false;
+
+        if (ret == ESP_ERR_NVS_INVALID_LENGTH) {
+            legacy_stepper_board_config_t legacy_config = {0};
+            if (app_settings_try_load_legacy_stepper_board_config(&legacy_config) == ESP_OK) {
+                set_default_stepper_board_config();
+                stepper_board_config.uart = legacy_config.uart;
+                stepper_board_config.tx_pin = legacy_config.tx_pin;
+                stepper_board_config.rx_pin = legacy_config.rx_pin;
+                stepper_board_config.motors_num = legacy_config.motors_num;
+                memcpy(stepper_board_config.channels,
+                       legacy_config.channels,
+                       sizeof(legacy_config.channels));
+                save_stepper_board_config();
+                migrated_legacy_config = true;
+                ESP_LOGI(TAG, "Migrated legacy stepper board config to the current format.");
+            }
+        }
+
+        if (!migrated_legacy_config) {
+            ESP_LOGI(TAG, "default stepper board config used.");
+            set_default_stepper_board_config();
+        }
     }
 
     /* Read App State */
@@ -644,6 +706,10 @@ void set_default_stepper_board_config(void)
     stepper_board_config.tx_pin = GPIO_NUM_22;
     stepper_board_config.rx_pin = GPIO_NUM_21;
     stepper_board_config.motors_num = MAX_PUMP;
+    stepper_board_config.rtc_i2c_addr = 0x6f;
+    stepper_board_config.eeprom_i2c_addr = 0x50;
+    stepper_board_config.can_tx_pin = -1;
+    stepper_board_config.can_rx_pin = -1;
 
     for (uint8_t i = 0; i < MAX_PUMP; ++i) {
         stepper_board_config.channels[i].dir_pin = default_dir_pins[i];
@@ -793,6 +859,26 @@ pump_aging_config_t *get_pump_aging_config(uint8_t pump_id)
 app_state_t *get_app_state_config(void)
 {
     return &app_state;
+}
+
+uint8_t get_rtc_i2c_addr(void)
+{
+    return get_stepper_board_config()->rtc_i2c_addr;
+}
+
+uint8_t get_eeprom_i2c_addr(void)
+{
+    return get_stepper_board_config()->eeprom_i2c_addr;
+}
+
+int32_t get_can_tx_pin(void)
+{
+    return get_stepper_board_config()->can_tx_pin;
+}
+
+int32_t get_can_rx_pin(void)
+{
+    return get_stepper_board_config()->can_rx_pin;
 }
 
 void ip_to_string(uint8_t ip[4], char *string) {

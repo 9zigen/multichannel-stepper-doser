@@ -301,6 +301,10 @@ char *get_board_config_json(void)
     cJSON_AddNumberToObject(root, "tx_pin", config->tx_pin);
     cJSON_AddNumberToObject(root, "rx_pin", config->rx_pin);
     cJSON_AddNumberToObject(root, "motors_num", config->motors_num);
+    cJSON_AddNumberToObject(root, "rtc_i2c_addr", config->rtc_i2c_addr);
+    cJSON_AddNumberToObject(root, "eeprom_i2c_addr", config->eeprom_i2c_addr);
+    cJSON_AddNumberToObject(root, "can_tx_pin", config->can_tx_pin);
+    cJSON_AddNumberToObject(root, "can_rx_pin", config->can_rx_pin);
 
     cJSON *channels = cJSON_CreateArray();
     for (uint8_t i = 0; i < MAX_PUMP; ++i) {

@@ -12,6 +12,7 @@
 #include "driver/i2c.h"
 #include "nvs.h"
 
+#include "app_settings.h"
 #include "app_settings_storage.h"
 #include "i2c_driver.h"
 
@@ -34,6 +35,7 @@ typedef enum {
 } eeprom_backend_t;
 
 static eeprom_backend_t eeprom_backend = EEPROM_BACKEND_UNKNOWN;
+static uint8_t eeprom_backend_address = 0;
 
 static void eeprom_make_key(uint16_t eeaddress, char *key, size_t key_size)
 {
@@ -109,21 +111,28 @@ static esp_err_t eeprom_probe_i2c(uint8_t deviceaddress)
 
 static eeprom_backend_t eeprom_detect_backend(uint8_t deviceaddress)
 {
+    if (eeprom_backend_address != 0 && eeprom_backend_address != deviceaddress) {
+        eeprom_backend = EEPROM_BACKEND_UNKNOWN;
+    }
+
     if (eeprom_backend != EEPROM_BACKEND_UNKNOWN) {
         return eeprom_backend;
     }
 
     if (!i2c_is_supported() || !i2c_is_initialized()) {
         eeprom_backend = EEPROM_BACKEND_NVS;
+        eeprom_backend_address = deviceaddress;
         ESP_LOGW(TAG, "I2C not supported. Using NVS fallback for EEPROM.");
         return eeprom_backend;
     }
 
     if (eeprom_probe_i2c(deviceaddress) == ESP_OK) {
         eeprom_backend = EEPROM_BACKEND_I2C;
+        eeprom_backend_address = deviceaddress;
         ESP_LOGI(TAG, "Using I2C EEPROM backend");
     } else {
         eeprom_backend = EEPROM_BACKEND_NVS;
+        eeprom_backend_address = deviceaddress;
         ESP_LOGW(TAG, "I2C EEPROM not detected, falling back to NVS");
     }
 
@@ -132,7 +141,7 @@ static eeprom_backend_t eeprom_detect_backend(uint8_t deviceaddress)
 
 const char *eeprom_backend_name(void)
 {
-    switch (eeprom_detect_backend(0x50)) {
+    switch (eeprom_detect_backend(get_eeprom_i2c_addr())) {
         case EEPROM_BACKEND_I2C:
             return "I2C EEPROM";
         case EEPROM_BACKEND_NVS:
@@ -145,7 +154,7 @@ const char *eeprom_backend_name(void)
 
 bool eeprom_using_fallback(void)
 {
-    return eeprom_detect_backend(0x50) == EEPROM_BACKEND_NVS;
+    return eeprom_detect_backend(get_eeprom_i2c_addr()) == EEPROM_BACKEND_NVS;
 }
 
 esp_err_t eeprom_write_byte(uint8_t deviceaddress, uint16_t eeaddress, uint8_t byte)
@@ -173,6 +182,7 @@ esp_err_t eeprom_write_byte(uint8_t deviceaddress, uint16_t eeaddress, uint8_t b
 
     if (err != ESP_OK) {
         eeprom_backend = EEPROM_BACKEND_NVS;
+        eeprom_backend_address = deviceaddress;
         return eeprom_nvs_write(eeaddress, &byte, sizeof(byte));
     }
 
@@ -204,6 +214,7 @@ esp_err_t eeprom_write(uint8_t deviceaddress, uint16_t eeaddress, uint8_t *data,
 
     if (err != ESP_OK) {
         eeprom_backend = EEPROM_BACKEND_NVS;
+        eeprom_backend_address = deviceaddress;
         return eeprom_nvs_write(eeaddress, data, size);
     }
 
@@ -237,6 +248,7 @@ uint8_t eeprom_read_byte(uint8_t deviceaddress, uint16_t eeaddress)
 
         if (err != ESP_OK) {
             eeprom_backend = EEPROM_BACKEND_NVS;
+            eeprom_backend_address = deviceaddress;
             eeprom_nvs_read(eeaddress, &data, sizeof(data));
         }
     }
@@ -274,6 +286,7 @@ esp_err_t eeprom_read(uint8_t deviceaddress, uint16_t eeaddress, uint8_t *data, 
 
     if (err != ESP_OK) {
         eeprom_backend = EEPROM_BACKEND_NVS;
+        eeprom_backend_address = deviceaddress;
         return eeprom_nvs_read(eeaddress, data, size);
     }
 

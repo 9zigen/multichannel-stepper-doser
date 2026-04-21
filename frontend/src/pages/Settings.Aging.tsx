@@ -31,7 +31,6 @@ const statusConfig = {
 const AgingPage: React.FC = (): React.ReactElement => {
   const pumps = useAppStore((state: AppStoreState) => state.settings.pumps);
   const saveSettings = useAppStore((state: AppStoreState) => state.saveSettings);
-  const loadSettings = useAppStore((state: AppStoreState) => state.loadSettings);
   const [draftPumps, setDraftPumps] = useState<PumpState[]>([]);
   const [clipboard, setClipboard] = useState<PumpAgingState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -75,7 +74,6 @@ const AgingPage: React.FC = (): React.ReactElement => {
         toast.error('Aging settings not saved.');
         return;
       }
-      await loadSettings();
       toast.success('Aging settings saved.');
     } finally {
       setIsSaving(false);

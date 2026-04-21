@@ -40,6 +40,17 @@ function normalizePumps(pumps: PumpState[]): PumpState[] {
   return pumps.map((pump) => normalizePump(pump));
 }
 
+function normalizeSettingsState(settings: SettingsState): SettingsState {
+  return {
+    auth: cloneSettings(settings.auth),
+    app: cloneSettings(settings.app),
+    services: cloneSettings(settings.services),
+    networks: cloneSettings(settings.networks),
+    pumps: normalizePumps(settings.pumps),
+    time: cloneSettings(settings.time),
+  };
+}
+
 export type AppStoreState = {
   isAuthenticated: boolean;
   status: StatusState;
@@ -199,22 +210,12 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
   loadSettings: async () => {
     try {
       const response = (await getSettings()) as SettingsState;
-      const normalizedPumps = normalizePumps(response.pumps);
+      const normalizedSettings = normalizeSettingsState(response);
       set({
-        settings: {
-          auth: response.auth,
-          app: response.app,
-          services: response.services,
-          networks: response.networks,
-          pumps: normalizedPumps,
-          time: response.time,
-        },
+        settings: normalizedSettings,
         error: null,
       });
-      return {
-        ...response,
-        pumps: normalizedPumps,
-      };
+      return normalizedSettings;
     } catch (e) {
       set({ error: 'Failed to load Settings' });
       return null;
@@ -232,16 +233,9 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
   },
 
   applyRealtimeSettings: (settings: SettingsState) => {
-    const normalizedPumps = normalizePumps(settings.pumps);
+    const normalizedSettings = normalizeSettingsState(settings);
     set(() => ({
-      settings: {
-        auth: cloneSettings(settings.auth),
-        app: cloneSettings(settings.app),
-        services: cloneSettings(settings.services),
-        networks: cloneSettings(settings.networks),
-        pumps: normalizedPumps,
-        time: cloneSettings(settings.time),
-      },
+      settings: normalizedSettings,
       error: null,
     }));
   },
@@ -266,7 +260,11 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
       }
 
       const response = (await setSettings(message)) as SettingsSaveResponse;
-      return response.success;
+      set(() => ({
+        settings: normalizeSettingsState(response),
+        error: null,
+      }));
+      return true;
     } catch (e) {
       set(() => ({ error: 'Failed to save settings' }));
       return false;
@@ -330,15 +328,24 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     } as NetworkState;
     const nextNetworks = [...networks, nextNetwork];
 
+    const previousSettings = cloneSettings(get().settings);
     set({
       settings: {
         ...get().settings,
         networks: nextNetworks,
       },
     });
-
-    const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
-    return response.success;
+    try {
+      const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
+      set(() => ({
+        settings: normalizeSettingsState(response),
+        error: null,
+      }));
+      return true;
+    } catch (e) {
+      set(() => ({ settings: previousSettings, error: 'Failed to save settings' }));
+      return false;
+    }
   },
 
   updateNetwork: async (data: NetworkState): Promise<boolean> => {
@@ -354,14 +361,24 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
         ...cloneSettings(data),
         is_dirty: false,
       };
+      const previousSettings = cloneSettings(get().settings);
       set({
         settings: {
           ...get().settings,
           networks: nextNetworks,
         },
       });
-      const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
-      return response.success;
+      try {
+        const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
+        set(() => ({
+          settings: normalizeSettingsState(response),
+          error: null,
+        }));
+        return true;
+      } catch (e) {
+        set(() => ({ settings: previousSettings, error: 'Failed to save settings' }));
+        return false;
+      }
     }
 
     return false;
@@ -377,14 +394,24 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     const nextNetworks = [...networks];
     nextNetworks.splice(idx, 1);
 
+    const previousSettings = cloneSettings(get().settings);
     set({
       settings: {
         ...get().settings,
         networks: nextNetworks,
       },
     });
-    const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
-    return response.success;
+    try {
+      const response = (await setSettings({ networks: nextNetworks })) as SettingsSaveResponse;
+      set(() => ({
+        settings: normalizeSettingsState(response),
+        error: null,
+      }));
+      return true;
+    } catch (e) {
+      set(() => ({ settings: previousSettings, error: 'Failed to save settings' }));
+      return false;
+    }
   },
 
   updateServices: async (data: ServiceState): Promise<boolean> => {
@@ -393,14 +420,24 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
     }
 
     const nextServices = cloneSettings(data);
+    const previousSettings = cloneSettings(get().settings);
     set({
       settings: {
         ...get().settings,
         services: nextServices,
       },
     });
-    const response = (await setSettings({ services: nextServices })) as SettingsSaveResponse;
-    return response.success;
+    try {
+      const response = (await setSettings({ services: nextServices })) as SettingsSaveResponse;
+      set(() => ({
+        settings: normalizeSettingsState(response),
+        error: null,
+      }));
+      return true;
+    } catch (e) {
+      set(() => ({ settings: previousSettings, error: 'Failed to save settings' }));
+      return false;
+    }
   },
 
   updatePump: async (data: PumpState, persist: boolean): Promise<boolean> => {
@@ -421,12 +458,22 @@ const useAppStore = create<AppStoreState>()((set, get) => ({
         ...nextPump,
         aging: nextPump.aging ?? currentPump.aging,
       };
+      const previousSettings = cloneSettings(get().settings);
       set((state) => ({
         settings: { ...state.settings, pumps: nextPumps },
       }));
       if (persist) {
-        const response = (await setSettings({ pumps: nextPumps })) as SettingsSaveResponse;
-        return response.success;
+        try {
+          const response = (await setSettings({ pumps: nextPumps })) as SettingsSaveResponse;
+          set(() => ({
+            settings: normalizeSettingsState(response),
+            error: null,
+          }));
+          return true;
+        } catch (e) {
+          set(() => ({ settings: previousSettings, error: 'Failed to save settings' }));
+          return false;
+        }
       }
       return true;
     }

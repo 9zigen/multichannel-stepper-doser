@@ -9,17 +9,22 @@
 
 #include "driver/i2c.h"
 
+#include "app_settings.h"
 #include "board.h"
 #include "i2c_driver.h"
 #include "app_time_rtc_mcp7940.h"
 
 static bool mcp7940_available = false;
-static const uint8_t dev_address = 0x6f;
+
+static uint8_t mcp7940_device_address(void)
+{
+    return get_rtc_i2c_addr();
+}
 
 esp_err_t mcp7940_probe(void)
 {
     uint8_t value = 0;
-    esp_err_t err = i2c_read_reg_data(dev_address, MCP7940_RTCSEC, &value, 1);
+    esp_err_t err = i2c_read_reg_data(mcp7940_device_address(), MCP7940_RTCSEC, &value, 1);
     mcp7940_available = (err == ESP_OK);
     return err;
 }
@@ -31,12 +36,12 @@ bool mcp7940_is_available(void)
 
 static uint8_t read_register(uint8_t reg_address)
 {
-    return i2c_read_reg_8bit(dev_address, reg_address);
+    return i2c_read_reg_8bit(mcp7940_device_address(), reg_address);
 }
 
 static void write_register(uint8_t reg_address, uint8_t value)
 {
-    ESP_ERROR_CHECK(i2c_reg_write_8bit(dev_address, reg_address, value));
+    ESP_ERROR_CHECK(i2c_reg_write_8bit(mcp7940_device_address(), reg_address, value));
 }
 
 static void clear_bit(uint8_t reg_address, uint8_t bit)
@@ -82,7 +87,7 @@ void mcp7940_get_datetime(datetime_t *datetime)
     }
 
     uint8_t data[7];
-    i2c_read_reg_data(dev_address, MCP7940_RTCSEC, data, 7);
+    i2c_read_reg_data(mcp7940_device_address(), MCP7940_RTCSEC, data, 7);
 
     uint8_t sec = data[0] & 0xF;
     sec += ((data[0] & 0x70) >> 4) * 10;
@@ -136,7 +141,7 @@ void mcp7940_set_datetime(datetime_t *datetime)
     }
 
     uint8_t data[8];
-    i2c_read_reg_data(dev_address, MCP7940_RTCSEC, data, 7);
+    i2c_read_reg_data(mcp7940_device_address(), MCP7940_RTCSEC, data, 7);
 
     if (!is_set_bit(MCP7940_RTCWKDAY, MCP7940_OSCRUN)) {
         clear_bit(MCP7940_RTCSEC, MCP7940_ST);
@@ -175,7 +180,7 @@ void mcp7940_set_datetime(datetime_t *datetime)
     data[6] &= 0x00;
     data[6] |= dec2bcd(datetime->year);
 
-    i2c_reg_write_data(dev_address, MCP7940_RTCSEC, data, 7);
+    i2c_reg_write_data(mcp7940_device_address(), MCP7940_RTCSEC, data, 7);
 
     if (!is_set_bit(MCP7940_RTCWKDAY, MCP7940_OSCRUN)) {
         set_bit(MCP7940_RTCSEC, MCP7940_ST);
@@ -192,7 +197,7 @@ esp_err_t mcp7940_read_ram(uint8_t offset, uint8_t *buf, uint8_t len)
         return ESP_ERR_NO_MEM;
     }
 
-    return i2c_read_reg_data(dev_address, MCP7940_RAM_ADDRESS + offset, buf, len);
+    return i2c_read_reg_data(mcp7940_device_address(), MCP7940_RAM_ADDRESS + offset, buf, len);
 }
 
 esp_err_t mcp7940_write_ram(uint8_t offset, uint8_t *buf, uint8_t len)
@@ -204,5 +209,5 @@ esp_err_t mcp7940_write_ram(uint8_t offset, uint8_t *buf, uint8_t len)
         return ESP_ERR_NO_MEM;
     }
 
-    return i2c_reg_write_data(dev_address, MCP7940_RAM_ADDRESS + offset, buf, len);
+    return i2c_reg_write_data(mcp7940_device_address(), MCP7940_RAM_ADDRESS + offset, buf, len);
 }

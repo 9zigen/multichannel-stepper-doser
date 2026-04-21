@@ -21,6 +21,8 @@
 #include "soc/gpio_num.h"
 
 #include "app_events.h"
+#include "app_interfaces.h"
+#include "app_monitor.h"
 #include "app_settings.h"
 #include "auth.h"
 #include "connect.h"
@@ -70,6 +72,11 @@ static bool board_config_microsteps_valid(uint16_t micro_steps)
     }
 }
 
+static bool board_config_i2c_addr_valid(uint8_t address)
+{
+    return address <= 0x7f;
+}
+
 static esp_err_t board_config_validate(const stepper_board_config_t *config, char *error, size_t error_size)
 {
     if (config->motors_num == 0 || config->motors_num > MAX_PUMP) {
@@ -97,6 +104,55 @@ static esp_err_t board_config_validate(const stepper_board_config_t *config, cha
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (!board_config_i2c_addr_valid(config->rtc_i2c_addr)) {
+        snprintf(error, error_size, "rtc_i2c_addr must be between 0x00 and 0x7F");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!board_config_i2c_addr_valid(config->eeprom_i2c_addr)) {
+        snprintf(error, error_size, "eeprom_i2c_addr must be between 0x00 and 0x7F");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (config->rtc_i2c_addr != 0 &&
+        config->eeprom_i2c_addr != 0 &&
+        config->rtc_i2c_addr == config->eeprom_i2c_addr) {
+        snprintf(error, error_size, "rtc_i2c_addr and eeprom_i2c_addr must be different");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const bool can_tx_disabled = config->can_tx_pin < 0;
+    const bool can_rx_disabled = config->can_rx_pin < 0;
+    if (can_tx_disabled != can_rx_disabled) {
+        snprintf(error, error_size, "can_tx_pin and can_rx_pin must be enabled or disabled together");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!can_tx_disabled) {
+        if (!GPIO_IS_VALID_OUTPUT_GPIO(config->can_tx_pin)) {
+            snprintf(error, error_size, "can_tx_pin must be a valid output GPIO");
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!GPIO_IS_VALID_GPIO(config->can_rx_pin)) {
+            snprintf(error, error_size, "can_rx_pin must be a valid GPIO");
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (config->can_tx_pin == config->can_rx_pin) {
+            snprintf(error, error_size, "can_tx_pin and can_rx_pin must be different");
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (config->can_tx_pin == config->tx_pin ||
+            config->can_tx_pin == config->rx_pin ||
+            config->can_rx_pin == config->tx_pin ||
+            config->can_rx_pin == config->rx_pin) {
+            snprintf(error, error_size, "CAN pins must not overlap UART pins");
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
     for (uint8_t i = 0; i < config->motors_num; ++i) {
         const stepper_channel_config_t *channel = &config->channels[i];
         if (!GPIO_IS_VALID_OUTPUT_GPIO(channel->dir_pin) ||
@@ -122,6 +178,14 @@ static esp_err_t board_config_validate(const stepper_board_config_t *config, cha
             channel->step_pin == config->tx_pin || channel->step_pin == config->rx_pin ||
             channel->en_pin == config->tx_pin || channel->en_pin == config->rx_pin) {
             snprintf(error, error_size, "channel %u pins must not overlap UART pins", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!can_tx_disabled &&
+            (channel->dir_pin == config->can_tx_pin || channel->dir_pin == config->can_rx_pin ||
+             channel->step_pin == config->can_tx_pin || channel->step_pin == config->can_rx_pin ||
+             channel->en_pin == config->can_tx_pin || channel->en_pin == config->can_rx_pin)) {
+            snprintf(error, error_size, "channel %u pins must not overlap CAN pins", (unsigned)i);
             return ESP_ERR_INVALID_ARG;
         }
     }
@@ -580,6 +644,10 @@ esp_err_t board_config_post_handler(httpd_req_t *req)
     cJSON *tx_pin = cJSON_GetObjectItem(root, "tx_pin");
     cJSON *rx_pin = cJSON_GetObjectItem(root, "rx_pin");
     cJSON *motors_num = cJSON_GetObjectItem(root, "motors_num");
+    cJSON *rtc_i2c_addr = cJSON_GetObjectItem(root, "rtc_i2c_addr");
+    cJSON *eeprom_i2c_addr = cJSON_GetObjectItem(root, "eeprom_i2c_addr");
+    cJSON *can_tx_pin = cJSON_GetObjectItem(root, "can_tx_pin");
+    cJSON *can_rx_pin = cJSON_GetObjectItem(root, "can_rx_pin");
     cJSON *channels = cJSON_GetObjectItem(root, "channels");
 
     if (cJSON_IsNumber(uart)) {
@@ -593,6 +661,28 @@ esp_err_t board_config_post_handler(httpd_req_t *req)
     }
     if (cJSON_IsNumber(motors_num)) {
         next_config.motors_num = (uint8_t)motors_num->valueint;
+    }
+    if (cJSON_IsNumber(rtc_i2c_addr)) {
+        if (rtc_i2c_addr->valueint < 0 || rtc_i2c_addr->valueint > 0x7f) {
+            cJSON_Delete(root);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "rtc_i2c_addr must be between 0x00 and 0x7F");
+            return ESP_FAIL;
+        }
+        next_config.rtc_i2c_addr = (uint8_t)rtc_i2c_addr->valueint;
+    }
+    if (cJSON_IsNumber(eeprom_i2c_addr)) {
+        if (eeprom_i2c_addr->valueint < 0 || eeprom_i2c_addr->valueint > 0x7f) {
+            cJSON_Delete(root);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "eeprom_i2c_addr must be between 0x00 and 0x7F");
+            return ESP_FAIL;
+        }
+        next_config.eeprom_i2c_addr = (uint8_t)eeprom_i2c_addr->valueint;
+    }
+    if (cJSON_IsNumber(can_tx_pin)) {
+        next_config.can_tx_pin = can_tx_pin->valueint;
+    }
+    if (cJSON_IsNumber(can_rx_pin)) {
+        next_config.can_rx_pin = can_rx_pin->valueint;
     }
 
     if (cJSON_IsArray(channels)) {
@@ -642,7 +732,13 @@ esp_err_t board_config_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    char *response = app_http_success_response_json(true);
+    esp_err_t interfaces_reload_result = app_interfaces_reload();
+    if (interfaces_reload_result != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to reload interfaces");
+        return ESP_FAIL;
+    }
+
+    char *response = get_board_config_json();
     httpd_resp_send(req, response, (ssize_t)strlen(response));
     free(response);
     return ESP_OK;
@@ -1205,6 +1301,7 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     cJSON *time = cJSON_GetObjectItem(root, "time");
     if (cJSON_IsObject(time)) {
         datetime_t datetime = {0};
+        (void)datetime;
         cJSON *date = cJSON_GetObjectItem(time, "date");
         cJSON *clock = cJSON_GetObjectItem(time, "time");
         cJSON *time_zone = cJSON_GetObjectItem(time, "time_zone");
@@ -1275,10 +1372,9 @@ esp_err_t settings_post_handler(httpd_req_t *req)
     }
 
     cJSON_Delete(root);
-    app_http_ws_broadcast_settings_snapshot();
     monitor_refresh_and_publish();
 
-    char *response = app_http_success_response_json(true);
+    char *response = get_settings_json();
     httpd_resp_send(req, response, (ssize_t)strlen(response));
     free(response);
 

@@ -16,7 +16,6 @@ const OnboardingPage: React.FC = (): React.ReactElement => {
   const isAuthenticated = useAppStore((state: AppStoreState) => state.isAuthenticated);
   const settings = useAppStore((state: AppStoreState) => state.settings);
   const saveSettings = useAppStore((state: AppStoreState) => state.saveSettings);
-  const loadSettings = useAppStore((state: AppStoreState) => state.loadSettings);
   const [username, setUsername] = useState(settings.auth.username);
   const [password, setPassword] = useState(settings.auth.password);
   const [isSavingAuth, setIsSavingAuth] = useState(false);
@@ -46,8 +45,6 @@ const OnboardingPage: React.FC = (): React.ReactElement => {
         toast.error('Failed to save admin credentials.');
         return;
       }
-
-      await loadSettings();
       toast.success('Admin credentials updated.');
     } finally {
       setIsSavingAuth(false);
@@ -71,8 +68,6 @@ const OnboardingPage: React.FC = (): React.ReactElement => {
         toast.error('Failed to finish onboarding.');
         return;
       }
-
-      await loadSettings();
       navigate('/', { replace: true });
     } finally {
       setIsCompleting(false);

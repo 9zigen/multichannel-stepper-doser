@@ -29,7 +29,7 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
             <div className="mb-3">
               <div className="mb-1 text-xs font-medium text-muted-foreground">Endpoints</div>
               <Code>
-                {'GET  /api/status\nGET  /api/settings\nPOST /api/settings\nPOST /api/run\nPOST /api/calibration\nGET  /api/pumps/runtime\nPOST /api/device/restart\nPOST /api/device/factory-reset\nPOST /upload'}
+                {'GET  /api/status\nGET  /api/settings\nPOST /api/settings\nGET  /api/board-config\nPOST /api/board-config\nPOST /api/run\nPOST /api/calibration\nGET  /api/pumps/runtime\nPOST /api/device/restart\nPOST /api/device/factory-reset\nPOST /upload'}
               </Code>
             </div>
             <div>
@@ -37,6 +37,10 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
               <Code>
                 {'POST /api/run\nAuthorization: Bearer <token>\n{"id":0,"direction":true,"speed":1,"time":1}'}
               </Code>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Settings and board-config POST endpoints respond with the updated resource body, so the UI can commit the
+                saved state without waiting for a websocket snapshot.
+              </p>
             </div>
           </>
         ),

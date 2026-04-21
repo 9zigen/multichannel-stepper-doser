@@ -157,6 +157,10 @@ typedef struct {
     int32_t rx_pin;
     uint8_t motors_num;
     stepper_channel_config_t channels[MAX_PUMP];
+    uint8_t rtc_i2c_addr;
+    uint8_t eeprom_i2c_addr;
+    int32_t can_tx_pin;
+    int32_t can_rx_pin;
 } stepper_board_config_t;
 
 void init_settings(void);
@@ -190,6 +194,10 @@ auth_t *get_auth_config(void);
 stepper_board_config_t *get_stepper_board_config(void);
 pump_aging_config_t *get_pump_aging_config(uint8_t pump_id);
 app_state_t *get_app_state_config(void);
+uint8_t get_rtc_i2c_addr(void);
+uint8_t get_eeprom_i2c_addr(void);
+int32_t get_can_tx_pin(void);
+int32_t get_can_rx_pin(void);
 
 void ip_to_string(uint8_t ip[4], char* string);
 void string_to_ip(const char *ip_string, uint8_t *octets);
