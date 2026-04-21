@@ -55,6 +55,7 @@ dkms.conf
 .DS_Store
 
 build/
+build-legacy/
 sdkconfig.old
 sdkconfig
 
