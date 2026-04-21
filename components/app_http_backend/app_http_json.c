@@ -303,6 +303,8 @@ char *get_board_config_json(void)
     cJSON_AddNumberToObject(root, "motors_num", config->motors_num);
     cJSON_AddNumberToObject(root, "rtc_i2c_addr", config->rtc_i2c_addr);
     cJSON_AddNumberToObject(root, "eeprom_i2c_addr", config->eeprom_i2c_addr);
+    cJSON_AddNumberToObject(root, "i2c_sda_pin", config->i2c_sda_pin);
+    cJSON_AddNumberToObject(root, "i2c_scl_pin", config->i2c_scl_pin);
     cJSON_AddNumberToObject(root, "can_tx_pin", config->can_tx_pin);
     cJSON_AddNumberToObject(root, "can_rx_pin", config->can_rx_pin);
 
@@ -318,6 +320,40 @@ char *get_board_config_json(void)
     }
 
     cJSON_AddItemToObject(root, "channels", channels);
+
+    cJSON *adc_channels = cJSON_CreateArray();
+    for (uint8_t i = 0; i < MAX_BOARD_ADC_CHANNELS; ++i) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddNumberToObject(item, "id", config->adc_channels[i].id);
+        cJSON_AddNumberToObject(item, "pin", config->adc_channels[i].pin);
+        cJSON_AddBoolToObject(item, "enabled", config->adc_channels[i].enabled);
+        cJSON_AddItemToArray(adc_channels, item);
+    }
+    cJSON_AddItemToObject(root, "adc_channels", adc_channels);
+
+    cJSON *gpio_inputs = cJSON_CreateArray();
+    for (uint8_t i = 0; i < MAX_BOARD_GPIO_INPUTS; ++i) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddNumberToObject(item, "id", config->gpio_inputs[i].id);
+        cJSON_AddNumberToObject(item, "pin", config->gpio_inputs[i].pin);
+        cJSON_AddBoolToObject(item, "enabled", config->gpio_inputs[i].enabled);
+        cJSON_AddNumberToObject(item, "pull", config->gpio_inputs[i].pull);
+        cJSON_AddNumberToObject(item, "active_level", config->gpio_inputs[i].active_level);
+        cJSON_AddItemToArray(gpio_inputs, item);
+    }
+    cJSON_AddItemToObject(root, "gpio_inputs", gpio_inputs);
+
+    cJSON *gpio_outputs = cJSON_CreateArray();
+    for (uint8_t i = 0; i < MAX_BOARD_GPIO_OUTPUTS; ++i) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddNumberToObject(item, "id", config->gpio_outputs[i].id);
+        cJSON_AddNumberToObject(item, "pin", config->gpio_outputs[i].pin);
+        cJSON_AddBoolToObject(item, "enabled", config->gpio_outputs[i].enabled);
+        cJSON_AddNumberToObject(item, "active_level", config->gpio_outputs[i].active_level);
+        cJSON_AddItemToArray(gpio_outputs, item);
+    }
+    cJSON_AddItemToObject(root, "gpio_outputs", gpio_outputs);
+
     string = cJSON_Print(root);
     cJSON_Delete(root);
     return string;

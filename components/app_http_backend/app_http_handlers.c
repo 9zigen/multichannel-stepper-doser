@@ -77,6 +77,44 @@ static bool board_config_i2c_addr_valid(uint8_t address)
     return address <= 0x7f;
 }
 
+static bool board_config_gpio_pull_valid(uint8_t pull)
+{
+    switch (pull) {
+        case BOARD_GPIO_PULL_NONE:
+        case BOARD_GPIO_PULL_UP:
+        case BOARD_GPIO_PULL_DOWN:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool board_config_active_level_valid(uint8_t active_level)
+{
+    return active_level <= 1;
+}
+
+static bool board_config_pin_conflicts_with_runtime_io(const stepper_board_config_t *config, int32_t pin)
+{
+    if (pin == config->tx_pin || pin == config->rx_pin) {
+        return true;
+    }
+
+    if ((config->can_tx_pin >= 0 && pin == config->can_tx_pin) ||
+        (config->can_rx_pin >= 0 && pin == config->can_rx_pin)) {
+        return true;
+    }
+
+    for (uint8_t i = 0; i < config->motors_num; ++i) {
+        const stepper_channel_config_t *channel = &config->channels[i];
+        if (pin == channel->dir_pin || pin == channel->en_pin || pin == channel->step_pin) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static esp_err_t board_config_validate(const stepper_board_config_t *config, char *error, size_t error_size)
 {
     if (config->motors_num == 0 || config->motors_num > MAX_PUMP) {
@@ -118,6 +156,21 @@ static esp_err_t board_config_validate(const stepper_board_config_t *config, cha
         config->eeprom_i2c_addr != 0 &&
         config->rtc_i2c_addr == config->eeprom_i2c_addr) {
         snprintf(error, error_size, "rtc_i2c_addr and eeprom_i2c_addr must be different");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(config->i2c_sda_pin)) {
+        snprintf(error, error_size, "i2c_sda_pin must be a valid output GPIO");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(config->i2c_scl_pin)) {
+        snprintf(error, error_size, "i2c_scl_pin must be a valid output GPIO");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (config->i2c_sda_pin == config->i2c_scl_pin) {
+        snprintf(error, error_size, "i2c_sda_pin and i2c_scl_pin must be different");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -203,6 +256,132 @@ static esp_err_t board_config_validate(const stepper_board_config_t *config, cha
                 left->en_pin == right->step_pin ||
                 left->en_pin == right->dir_pin) {
                 snprintf(error, error_size, "channels %u and %u have conflicting pins", (unsigned)i, (unsigned)j);
+                return ESP_ERR_INVALID_ARG;
+            }
+        }
+    }
+
+    for (uint8_t i = 0; i < MAX_BOARD_ADC_CHANNELS; ++i) {
+        const adc_channel_config_t *channel = &config->adc_channels[i];
+        if (channel->id != i) {
+            snprintf(error, error_size, "adc_channels[%u].id must equal %u", (unsigned)i, (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!GPIO_IS_VALID_GPIO(channel->pin)) {
+            snprintf(error, error_size, "adc_channels[%u].pin must be a valid GPIO", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (channel->enabled && board_config_pin_conflicts_with_runtime_io(config, channel->pin)) {
+            snprintf(error, error_size, "adc_channels[%u].pin conflicts with active board IO", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    for (uint8_t i = 0; i < MAX_BOARD_GPIO_INPUTS; ++i) {
+        const gpio_input_config_t *input = &config->gpio_inputs[i];
+        if (input->id != i) {
+            snprintf(error, error_size, "gpio_inputs[%u].id must equal %u", (unsigned)i, (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!GPIO_IS_VALID_GPIO(input->pin)) {
+            snprintf(error, error_size, "gpio_inputs[%u].pin must be a valid GPIO", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!board_config_gpio_pull_valid(input->pull)) {
+            snprintf(error, error_size, "gpio_inputs[%u].pull is invalid", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!board_config_active_level_valid(input->active_level)) {
+            snprintf(error, error_size, "gpio_inputs[%u].active_level must be 0 or 1", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (input->enabled && board_config_pin_conflicts_with_runtime_io(config, input->pin)) {
+            snprintf(error, error_size, "gpio_inputs[%u].pin conflicts with active board IO", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    for (uint8_t i = 0; i < MAX_BOARD_GPIO_OUTPUTS; ++i) {
+        const gpio_output_config_t *output = &config->gpio_outputs[i];
+        if (output->id != i) {
+            snprintf(error, error_size, "gpio_outputs[%u].id must equal %u", (unsigned)i, (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!GPIO_IS_VALID_OUTPUT_GPIO(output->pin)) {
+            snprintf(error, error_size, "gpio_outputs[%u].pin must be a valid output GPIO", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (!board_config_active_level_valid(output->active_level)) {
+            snprintf(error, error_size, "gpio_outputs[%u].active_level must be 0 or 1", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (output->enabled && board_config_pin_conflicts_with_runtime_io(config, output->pin)) {
+            snprintf(error, error_size, "gpio_outputs[%u].pin conflicts with active board IO", (unsigned)i);
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    for (uint8_t i = 0; i < MAX_BOARD_ADC_CHANNELS; ++i) {
+        if (!config->adc_channels[i].enabled) {
+            continue;
+        }
+
+        for (uint8_t j = i + 1; j < MAX_BOARD_ADC_CHANNELS; ++j) {
+            if (config->adc_channels[j].enabled &&
+                config->adc_channels[i].pin == config->adc_channels[j].pin) {
+                snprintf(error, error_size, "adc_channels %u and %u share the same pin",
+                         (unsigned)i, (unsigned)j);
+                return ESP_ERR_INVALID_ARG;
+            }
+        }
+
+        for (uint8_t j = 0; j < MAX_BOARD_GPIO_INPUTS; ++j) {
+            if (config->gpio_inputs[j].enabled &&
+                config->adc_channels[i].pin == config->gpio_inputs[j].pin) {
+                snprintf(error, error_size, "adc_channels[%u] conflicts with gpio_inputs[%u]",
+                         (unsigned)i, (unsigned)j);
+                return ESP_ERR_INVALID_ARG;
+            }
+        }
+
+        for (uint8_t j = 0; j < MAX_BOARD_GPIO_OUTPUTS; ++j) {
+            if (config->gpio_outputs[j].enabled &&
+                config->adc_channels[i].pin == config->gpio_outputs[j].pin) {
+                snprintf(error, error_size, "adc_channels[%u] conflicts with gpio_outputs[%u]",
+                         (unsigned)i, (unsigned)j);
+                return ESP_ERR_INVALID_ARG;
+            }
+        }
+    }
+
+    for (uint8_t i = 0; i < MAX_BOARD_GPIO_INPUTS; ++i) {
+        if (!config->gpio_inputs[i].enabled) {
+            continue;
+        }
+
+        for (uint8_t j = i + 1; j < MAX_BOARD_GPIO_INPUTS; ++j) {
+            if (config->gpio_inputs[j].enabled &&
+                config->gpio_inputs[i].pin == config->gpio_inputs[j].pin) {
+                snprintf(error, error_size, "gpio_inputs %u and %u share the same pin",
+                         (unsigned)i, (unsigned)j);
+                return ESP_ERR_INVALID_ARG;
+            }
+        }
+
+        for (uint8_t j = 0; j < MAX_BOARD_GPIO_OUTPUTS; ++j) {
+            if (config->gpio_outputs[j].enabled &&
+                config->gpio_inputs[i].pin == config->gpio_outputs[j].pin) {
+                snprintf(error, error_size, "gpio_inputs[%u] conflicts with gpio_outputs[%u]",
+                         (unsigned)i, (unsigned)j);
                 return ESP_ERR_INVALID_ARG;
             }
         }
@@ -646,9 +825,14 @@ esp_err_t board_config_post_handler(httpd_req_t *req)
     cJSON *motors_num = cJSON_GetObjectItem(root, "motors_num");
     cJSON *rtc_i2c_addr = cJSON_GetObjectItem(root, "rtc_i2c_addr");
     cJSON *eeprom_i2c_addr = cJSON_GetObjectItem(root, "eeprom_i2c_addr");
+    cJSON *i2c_sda_pin = cJSON_GetObjectItem(root, "i2c_sda_pin");
+    cJSON *i2c_scl_pin = cJSON_GetObjectItem(root, "i2c_scl_pin");
     cJSON *can_tx_pin = cJSON_GetObjectItem(root, "can_tx_pin");
     cJSON *can_rx_pin = cJSON_GetObjectItem(root, "can_rx_pin");
     cJSON *channels = cJSON_GetObjectItem(root, "channels");
+    cJSON *adc_channels = cJSON_GetObjectItem(root, "adc_channels");
+    cJSON *gpio_inputs = cJSON_GetObjectItem(root, "gpio_inputs");
+    cJSON *gpio_outputs = cJSON_GetObjectItem(root, "gpio_outputs");
 
     if (cJSON_IsNumber(uart)) {
         next_config.uart = (uint8_t)uart->valueint;
@@ -677,6 +861,12 @@ esp_err_t board_config_post_handler(httpd_req_t *req)
             return ESP_FAIL;
         }
         next_config.eeprom_i2c_addr = (uint8_t)eeprom_i2c_addr->valueint;
+    }
+    if (cJSON_IsNumber(i2c_sda_pin)) {
+        next_config.i2c_sda_pin = i2c_sda_pin->valueint;
+    }
+    if (cJSON_IsNumber(i2c_scl_pin)) {
+        next_config.i2c_scl_pin = i2c_scl_pin->valueint;
     }
     if (cJSON_IsNumber(can_tx_pin)) {
         next_config.can_tx_pin = can_tx_pin->valueint;
@@ -710,6 +900,84 @@ esp_err_t board_config_post_handler(httpd_req_t *req)
             }
             if (cJSON_IsNumber(micro_steps_item)) {
                 channel->micro_steps = (uint16_t)micro_steps_item->valueint;
+            }
+        }
+    }
+
+    if (cJSON_IsArray(adc_channels)) {
+        cJSON *adc_item;
+        cJSON_ArrayForEach(adc_item, adc_channels) {
+            cJSON *id = cJSON_GetObjectItem(adc_item, "id");
+            if (!cJSON_IsNumber(id) || id->valueint < 0 || id->valueint >= MAX_BOARD_ADC_CHANNELS) {
+                continue;
+            }
+
+            adc_channel_config_t *adc_channel = &next_config.adc_channels[id->valueint];
+            cJSON *pin_item = cJSON_GetObjectItem(adc_item, "pin");
+            cJSON *enabled_item = cJSON_GetObjectItem(adc_item, "enabled");
+
+            adc_channel->id = (uint8_t)id->valueint;
+            if (cJSON_IsNumber(pin_item)) {
+                adc_channel->pin = pin_item->valueint;
+            }
+            if (cJSON_IsBool(enabled_item)) {
+                adc_channel->enabled = cJSON_IsTrue(enabled_item);
+            }
+        }
+    }
+
+    if (cJSON_IsArray(gpio_inputs)) {
+        cJSON *gpio_input_item;
+        cJSON_ArrayForEach(gpio_input_item, gpio_inputs) {
+            cJSON *id = cJSON_GetObjectItem(gpio_input_item, "id");
+            if (!cJSON_IsNumber(id) || id->valueint < 0 || id->valueint >= MAX_BOARD_GPIO_INPUTS) {
+                continue;
+            }
+
+            gpio_input_config_t *gpio_input = &next_config.gpio_inputs[id->valueint];
+            cJSON *pin_item = cJSON_GetObjectItem(gpio_input_item, "pin");
+            cJSON *enabled_item = cJSON_GetObjectItem(gpio_input_item, "enabled");
+            cJSON *pull_item = cJSON_GetObjectItem(gpio_input_item, "pull");
+            cJSON *active_level_item = cJSON_GetObjectItem(gpio_input_item, "active_level");
+
+            gpio_input->id = (uint8_t)id->valueint;
+            if (cJSON_IsNumber(pin_item)) {
+                gpio_input->pin = pin_item->valueint;
+            }
+            if (cJSON_IsBool(enabled_item)) {
+                gpio_input->enabled = cJSON_IsTrue(enabled_item);
+            }
+            if (cJSON_IsNumber(pull_item)) {
+                gpio_input->pull = (uint8_t)pull_item->valueint;
+            }
+            if (cJSON_IsNumber(active_level_item)) {
+                gpio_input->active_level = (uint8_t)active_level_item->valueint;
+            }
+        }
+    }
+
+    if (cJSON_IsArray(gpio_outputs)) {
+        cJSON *gpio_output_item;
+        cJSON_ArrayForEach(gpio_output_item, gpio_outputs) {
+            cJSON *id = cJSON_GetObjectItem(gpio_output_item, "id");
+            if (!cJSON_IsNumber(id) || id->valueint < 0 || id->valueint >= MAX_BOARD_GPIO_OUTPUTS) {
+                continue;
+            }
+
+            gpio_output_config_t *gpio_output = &next_config.gpio_outputs[id->valueint];
+            cJSON *pin_item = cJSON_GetObjectItem(gpio_output_item, "pin");
+            cJSON *enabled_item = cJSON_GetObjectItem(gpio_output_item, "enabled");
+            cJSON *active_level_item = cJSON_GetObjectItem(gpio_output_item, "active_level");
+
+            gpio_output->id = (uint8_t)id->valueint;
+            if (cJSON_IsNumber(pin_item)) {
+                gpio_output->pin = pin_item->valueint;
+            }
+            if (cJSON_IsBool(enabled_item)) {
+                gpio_output->enabled = cJSON_IsTrue(enabled_item);
+            }
+            if (cJSON_IsNumber(active_level_item)) {
+                gpio_output->active_level = (uint8_t)active_level_item->valueint;
             }
         }
     }

@@ -9,6 +9,9 @@
 #define MAX_PUMP_CALIBRATION_POINTS     8
 #define MAX_NETWORK_STR_LEN             64
 #define MAX_SERVICE_URL_LEN             256
+#define MAX_BOARD_ADC_CHANNELS          2
+#define MAX_BOARD_GPIO_INPUTS           3
+#define MAX_BOARD_GPIO_OUTPUTS          3
 
 #define HOUR_0              1 << 0
 #define HOUR_1              1 << 1
@@ -151,6 +154,33 @@ typedef struct {
     uint16_t micro_steps;
 } stepper_channel_config_t;
 
+typedef enum {
+    BOARD_GPIO_PULL_NONE = 0,
+    BOARD_GPIO_PULL_UP = 1,
+    BOARD_GPIO_PULL_DOWN = 2,
+} board_gpio_pull_t;
+
+typedef struct {
+    uint8_t id;
+    int32_t pin;
+    bool enabled;
+} adc_channel_config_t;
+
+typedef struct {
+    uint8_t id;
+    int32_t pin;
+    bool enabled;
+    uint8_t pull;
+    uint8_t active_level;
+} gpio_input_config_t;
+
+typedef struct {
+    uint8_t id;
+    int32_t pin;
+    bool enabled;
+    uint8_t active_level;
+} gpio_output_config_t;
+
 typedef struct {
     uint8_t uart;
     int32_t tx_pin;
@@ -159,8 +189,13 @@ typedef struct {
     stepper_channel_config_t channels[MAX_PUMP];
     uint8_t rtc_i2c_addr;
     uint8_t eeprom_i2c_addr;
+    int32_t i2c_sda_pin;
+    int32_t i2c_scl_pin;
     int32_t can_tx_pin;
     int32_t can_rx_pin;
+    adc_channel_config_t adc_channels[MAX_BOARD_ADC_CHANNELS];
+    gpio_input_config_t gpio_inputs[MAX_BOARD_GPIO_INPUTS];
+    gpio_output_config_t gpio_outputs[MAX_BOARD_GPIO_OUTPUTS];
 } stepper_board_config_t;
 
 void init_settings(void);
