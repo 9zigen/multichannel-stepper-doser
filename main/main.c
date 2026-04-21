@@ -29,6 +29,7 @@
 #include "main.h"
 #include "adc.h"
 #include "app_events.h"
+#include "app_interfaces.h"
 #include "mcp7940.h"
 #include "led.h"
 #include "ota.h"
@@ -144,6 +145,7 @@ void app_main()
     /* Pumps */
     ESP_ERROR_CHECK(register_stepper_pump_backend());
     ESP_ERROR_CHECK(init_pumps());
+    ESP_ERROR_CHECK(app_interfaces_init());
 
     /* web server */
     start_webserver();

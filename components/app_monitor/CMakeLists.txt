@@ -4,5 +4,5 @@ idf_component_register(
     SRCS ${SOURCES}
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "../../main/include"
-    REQUIRES esp_netif esp_wifi app_settings
+    REQUIRES esp_netif esp_wifi app_adc app_settings app_time
 )
