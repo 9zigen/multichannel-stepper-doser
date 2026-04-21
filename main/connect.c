@@ -18,6 +18,10 @@
 #include "mdns.h"
 
 #include "led.h"
+#include "app_events.h"
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+#include "app_provisioning.h"
+#endif
 #include "connect.h"
 #include "app_settings.h"
 #include "captive_dns.h"
@@ -28,25 +32,46 @@
 #define AP_WIFI_PASSWORD               CONFIG_CONTROLLER_WIFI_PASS
 #define AP_WIFI_CHANNEL                CONFIG_CONTROLLER_WIFI_CHANNEL
 #define WIFI_STA_MAX_ATTEMPTS          3
-#define WIFI_AP_FALLBACK_TIMEOUT_MS    (5 * 60 * 1000)
+#define WIFI_AP_FALLBACK_TIMEOUT_MS    (CONFIG_CONTROLLER_WIFI_AP_FALLBACK_TIMEOUT_SEC * 1000)
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+#define WIFI_AP_GRACE_TIMEOUT_MS       (CONFIG_CONTROLLER_WIFI_AP_GRACE_TIMEOUT_SEC * 1000)
+#else
+#define WIFI_AP_GRACE_TIMEOUT_MS       WIFI_AP_FALLBACK_TIMEOUT_MS
+#endif
 #define WIFI_SCAN_LIST_SIZE            16
 
 static void initialise_mdns(void);
+static void apply_runtime_hostname(void);
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+static void connect_services_updated_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 static esp_err_t wifi_manager_init(void);
 static esp_err_t wifi_start_current_mode(void);
 static void wifi_collect_profiles(void);
 static network_t *wifi_get_active_profile(void);
 static bool wifi_should_keep_ap_enabled(void);
+static void wifi_sync_onboarding_services(void);
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+static void wifi_enable_recovery_mode(void);
+static void wifi_disable_recovery_mode(void);
+static void wifi_begin_ap_grace_period(void);
+static void wifi_end_ap_grace_period(void);
+#endif
 static void wifi_enable_ap_fallback(void);
 static void wifi_disable_ap_fallback(void);
-static void wifi_arm_ap_timeout_if_needed(void);
+static void wifi_arm_ap_fallback_timeout_if_needed(void);
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+static void wifi_arm_ap_grace_timeout_if_needed(void);
+#endif
+static void wifi_refresh_ap_timers(void);
 static void wifi_restart_cycle(void);
 static void wifi_rotate_or_fallback(void);
 static void wifi_try_next_station_profile(void);
 static void wifi_configure_ap(wifi_config_t *wifi_config);
 static void wifi_configure_sta(wifi_config_t *wifi_config, const network_t *config);
 static void vApFallbackTimerCallback(TimerHandle_t pxTimer);
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+static void vApGraceTimerCallback(TimerHandle_t pxTimer);
+#endif
 static void build_mdns_hostname(const char *source, char *target, size_t target_size);
 
 static const char *TAG = "CONNECT";
@@ -54,10 +79,13 @@ static esp_netif_t *wifi_sta_netif = NULL;
 static esp_netif_t *wifi_ap_netif = NULL;
 static esp_event_handler_instance_t instance_any_id;
 static esp_event_handler_instance_t instance_got_ip;
+static esp_event_handler_instance_t services_updated_event_ctx;
 static bool wifi_manager_ready = false;
 static bool station_connected = false;
+static bool recovery_mode_active = false;
 static bool ap_fallback_active = false;
-static bool booted_without_networks = false;
+static bool ap_grace_active = false;
+static bool legacy_booted_without_networks = false;
 static uint8_t ap_client_count = 0;
 static uint8_t wifi_profile_ids[MAX_NETWORKS];
 static uint8_t wifi_profile_count = 0;
@@ -66,6 +94,9 @@ static uint8_t tested_profiles_in_cycle = 0;
 static uint8_t current_profile_attempts = 0;
 
 TimerHandle_t xApFallbackTimer = NULL;
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+static TimerHandle_t xApGraceTimer = NULL;
+#endif
 EventGroupHandle_t wifi_event_group;
 
 static bool wifi_has_profiles(void);
@@ -91,8 +122,22 @@ bool connect_ap_fallback_is_active(void)
     return ap_fallback_active;
 }
 
+bool connect_ap_recovery_is_active(void)
+{
+    return recovery_mode_active;
+}
+
+bool connect_ap_grace_is_active(void)
+{
+    return ap_grace_active;
+}
+
 void connect_on_network_settings_updated(void)
 {
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+    bool had_profiles = wifi_has_profiles();
+#endif
+
     wifi_collect_profiles();
     monitor_refresh_and_publish();
 
@@ -100,12 +145,27 @@ void connect_on_network_settings_updated(void)
         return;
     }
 
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+    if (!wifi_has_profiles()) {
+        wifi_enable_recovery_mode();
+        xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        wifi_start_current_mode();
+        return;
+    }
+
+    if (!had_profiles) {
+        wifi_enable_recovery_mode();
+    }
+
+    xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
+    wifi_restart_cycle();
+#else
     if (!wifi_has_profiles()) {
         return;
     }
 
     network_t *profile = wifi_get_active_profile();
-    if (!booted_without_networks &&
+    if (!legacy_booted_without_networks &&
         station_connected &&
         !ap_fallback_active &&
         ap_client_count == 0 &&
@@ -113,6 +173,7 @@ void connect_on_network_settings_updated(void)
         ESP_LOGI(TAG, "Network settings updated: disabling AP without reboot");
         wifi_start_current_mode();
     }
+#endif
 }
 
 static bool wifi_has_profiles(void)
@@ -197,6 +258,11 @@ static esp_err_t wifi_manager_init(void)
                                                         NULL,
                                                         &instance_got_ip));
 
+    app_events_register_handler(SERVICES_UPDATED,
+                                NULL,
+                                connect_services_updated_handler,
+                                &services_updated_event_ctx);
+
     wifi_manager_ready = true;
     return ESP_OK;
 }
@@ -233,15 +299,38 @@ static bool wifi_should_keep_ap_enabled(void)
         return true;
     }
 
-    if (booted_without_networks) {
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+    if (recovery_mode_active) {
+        return true;
+    }
+
+    if (ap_fallback_active || ap_grace_active || ap_client_count > 0) {
+        return true;
+    }
+#else
+    if (legacy_booted_without_networks) {
         return true;
     }
 
     if (ap_fallback_active || ap_client_count > 0) {
         return true;
     }
+#endif
 
     return false;
+}
+
+static void wifi_sync_onboarding_services(void)
+{
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+    bool should_enable_ble = recovery_mode_active || ap_fallback_active || ap_grace_active;
+
+    if (should_enable_ble) {
+        app_provisioning_start();
+    } else {
+        app_provisioning_stop();
+    }
+#endif
 }
 
 static void wifi_stop_dns_if_running(void)
@@ -306,12 +395,13 @@ static esp_err_t wifi_start_current_mode(void)
     }
 
     set_led_mode(ap_enabled ? LED_INDICATE_OK : LED_INDICATE_ERROR, ap_enabled ? LED_SLOW_BLINK : LED_THREE_BLINK, 255);
-    wifi_arm_ap_timeout_if_needed();
+    wifi_refresh_ap_timers();
+    wifi_sync_onboarding_services();
 
     return ESP_OK;
 }
 
-static void wifi_arm_ap_timeout_if_needed(void)
+static void wifi_arm_ap_fallback_timeout_if_needed(void)
 {
     if (xApFallbackTimer == NULL) {
         return;
@@ -327,13 +417,97 @@ static void wifi_arm_ap_timeout_if_needed(void)
     }
 }
 
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+static void wifi_arm_ap_grace_timeout_if_needed(void)
+{
+    if (xApGraceTimer == NULL) {
+        return;
+    }
+
+    bool should_timeout = ap_grace_active && ap_client_count == 0;
+    if (should_timeout) {
+        xTimerStop(xApGraceTimer, 0);
+        xTimerChangePeriod(xApGraceTimer, pdMS_TO_TICKS(WIFI_AP_GRACE_TIMEOUT_MS), 0);
+        xTimerStart(xApGraceTimer, 0);
+    } else {
+        xTimerStop(xApGraceTimer, 0);
+    }
+}
+#endif
+
+static void wifi_refresh_ap_timers(void)
+{
+    wifi_arm_ap_fallback_timeout_if_needed();
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+    wifi_arm_ap_grace_timeout_if_needed();
+#endif
+}
+
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+static void wifi_enable_recovery_mode(void)
+{
+    if (!recovery_mode_active) {
+        ESP_LOGI(TAG, "Enabling recovery mode");
+    }
+    recovery_mode_active = true;
+    ap_grace_active = false;
+    wifi_refresh_ap_timers();
+    wifi_sync_onboarding_services();
+}
+
+static void wifi_disable_recovery_mode(void)
+{
+    if (!recovery_mode_active) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Disabling recovery mode");
+    recovery_mode_active = false;
+    wifi_refresh_ap_timers();
+    wifi_sync_onboarding_services();
+}
+
+static void wifi_begin_ap_grace_period(void)
+{
+    network_t *profile = wifi_get_active_profile();
+
+    if (!wifi_has_profiles() || (profile != NULL && profile->keep_ap_active)) {
+        ap_grace_active = false;
+        wifi_refresh_ap_timers();
+        wifi_sync_onboarding_services();
+        return;
+    }
+
+    if (!ap_grace_active) {
+        ESP_LOGI(TAG, "Starting temporary AP grace period");
+    }
+    ap_grace_active = true;
+    wifi_refresh_ap_timers();
+    wifi_sync_onboarding_services();
+}
+
+static void wifi_end_ap_grace_period(void)
+{
+    if (!ap_grace_active) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Ending AP grace period");
+    ap_grace_active = false;
+    wifi_refresh_ap_timers();
+    wifi_sync_onboarding_services();
+}
+#endif
+
 static void wifi_enable_ap_fallback(void)
 {
     if (!ap_fallback_active) {
         ESP_LOGI(TAG, "Enabling fallback AP for onboarding/recovery");
     }
     ap_fallback_active = true;
-    wifi_arm_ap_timeout_if_needed();
+    ap_grace_active = false;
+    wifi_refresh_ap_timers();
+    wifi_sync_onboarding_services();
 }
 
 static void wifi_disable_ap_fallback(void)
@@ -344,7 +518,8 @@ static void wifi_disable_ap_fallback(void)
 
     ESP_LOGI(TAG, "Disabling fallback AP");
     ap_fallback_active = false;
-    wifi_arm_ap_timeout_if_needed();
+    wifi_refresh_ap_timers();
+    wifi_sync_onboarding_services();
 }
 
 static void wifi_restart_cycle(void)
@@ -433,6 +608,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         network_t *profile = wifi_get_active_profile();
         wifi_mode_t mode = WIFI_MODE_NULL;
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+        bool completed_provisioning_cycle = recovery_mode_active || ap_fallback_active;
+#endif
         ESP_LOGI(TAG, "got station ip:" IPSTR, IP2STR(&event->ip_info.ip));
         station_connected = true;
         current_profile_attempts = 0;
@@ -445,7 +623,24 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             mode = WIFI_MODE_NULL;
         }
 
-        if (!booted_without_networks &&
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+        if (completed_provisioning_cycle) {
+            wifi_disable_ap_fallback();
+            wifi_disable_recovery_mode();
+            wifi_begin_ap_grace_period();
+        }
+
+        if (!recovery_mode_active &&
+            !ap_fallback_active &&
+            !ap_grace_active &&
+            ap_client_count == 0 &&
+            mode != WIFI_MODE_STA &&
+            (profile == NULL || !profile->keep_ap_active)) {
+            ESP_LOGI(TAG, "Station connected on a normal boot, disabling AP");
+            wifi_start_current_mode();
+        }
+#else
+        if (!legacy_booted_without_networks &&
             !ap_fallback_active &&
             ap_client_count == 0 &&
             mode != WIFI_MODE_STA &&
@@ -453,6 +648,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             ESP_LOGI(TAG, "Station connected on a normal boot, disabling AP");
             wifi_start_current_mode();
         }
+#endif
         return;
     }
 
@@ -461,7 +657,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ap_client_count++;
         ESP_LOGI(TAG, "AP client " MACSTR " joined, AID=%d, clients=%u",
                  MAC2STR(event->mac), event->aid, (unsigned)ap_client_count);
-        wifi_arm_ap_timeout_if_needed();
+        wifi_refresh_ap_timers();
         monitor_refresh_and_publish();
         return;
     }
@@ -473,9 +669,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         }
         ESP_LOGI(TAG, "AP client " MACSTR " left, AID=%d, clients=%u",
                  MAC2STR(event->mac), event->aid, (unsigned)ap_client_count);
-        wifi_arm_ap_timeout_if_needed();
+        wifi_refresh_ap_timers();
         monitor_refresh_and_publish();
-        if (ap_client_count == 0 && !ap_fallback_active && !booted_without_networks) {
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+        if (ap_client_count == 0 && !recovery_mode_active && !ap_fallback_active && !ap_grace_active) {
+#else
+        if (ap_client_count == 0 && !ap_fallback_active && !legacy_booted_without_networks) {
+#endif
             network_t *profile = wifi_get_active_profile();
             if (wifi_has_profiles() && (profile == NULL || !profile->keep_ap_active)) {
                 wifi_start_current_mode();
@@ -498,6 +698,23 @@ static void vApFallbackTimerCallback(TimerHandle_t pxTimer)
     wifi_restart_cycle();
 }
 
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+static void vApGraceTimerCallback(TimerHandle_t pxTimer)
+{
+    (void)pxTimer;
+
+    if (!ap_grace_active || ap_client_count > 0) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "AP grace period expired without clients, switching to STA-only");
+    wifi_end_ap_grace_period();
+    if (wifi_has_profiles()) {
+        wifi_start_current_mode();
+    }
+}
+#endif
+
 void initialise_wifi(void *arg)
 {
     (void)arg;
@@ -510,11 +727,33 @@ void initialise_wifi(void *arg)
                                     pdFALSE,
                                     NULL,
                                     vApFallbackTimerCallback);
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+    xApGraceTimer = xTimerCreate("WiFiApGraceTimer",
+                                 pdMS_TO_TICKS(WIFI_AP_GRACE_TIMEOUT_MS),
+                                 pdFALSE,
+                                 NULL,
+                                 vApGraceTimerCallback);
+#endif
 
     initialise_mdns();
     wifi_collect_profiles();
-    booted_without_networks = !wifi_has_profiles();
-
+    legacy_booted_without_networks = !wifi_has_profiles();
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+    if (wifi_has_profiles()) {
+        active_profile_cursor = 0;
+        tested_profiles_in_cycle = 1;
+        current_profile_attempts = 0;
+        recovery_mode_active = false;
+        ap_fallback_active = false;
+        ap_grace_active = false;
+    } else {
+        recovery_mode_active = true;
+        ap_fallback_active = false;
+        ap_grace_active = false;
+    }
+#else
+    recovery_mode_active = false;
+    ap_grace_active = false;
     if (wifi_has_profiles()) {
         active_profile_cursor = 0;
         tested_profiles_in_cycle = 1;
@@ -523,6 +762,7 @@ void initialise_wifi(void *arg)
     } else {
         ap_fallback_active = true;
     }
+#endif
 
     ESP_ERROR_CHECK(wifi_start_current_mode());
 }
@@ -567,22 +807,43 @@ static void build_mdns_hostname(const char *source, char *target, size_t target_
     }
 }
 
-/* initialize mDNS */
-static void initialise_mdns(void)
+static void apply_runtime_hostname(void)
 {
     services_t *services = get_service_config();
     char mdns_hostname[sizeof(services->hostname)];
     const char *instance_name = services->hostname;
+
+    if (wifi_sta_netif != NULL) {
+        esp_netif_set_hostname(wifi_sta_netif, services->hostname);
+    }
 
     build_mdns_hostname(services->hostname, mdns_hostname, sizeof(mdns_hostname));
     if (instance_name == NULL || instance_name[0] == '\0') {
         instance_name = AP_WIFI_SSID;
     }
 
-    ESP_ERROR_CHECK(mdns_init());
-    ESP_ERROR_CHECK(mdns_hostname_set(mdns_hostname));
-    ESP_LOGI(TAG, "mdns hostname set to: [%s]", mdns_hostname);
+    mdns_hostname_set(mdns_hostname);
+    mdns_instance_name_set(instance_name);
+    ESP_LOGI(TAG, "Updated runtime hostname to [%s]", mdns_hostname);
+}
 
-    ESP_ERROR_CHECK(mdns_instance_name_set(instance_name));
+static void connect_services_updated_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_base;
+
+    if (event_id != SERVICES_UPDATED) {
+        return;
+    }
+
+    apply_runtime_hostname();
+    monitor_refresh_and_publish();
+}
+
+/* initialize mDNS */
+static void initialise_mdns(void)
+{
+    ESP_ERROR_CHECK(mdns_init());
     mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+    apply_runtime_hostname();
 }

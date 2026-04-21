@@ -1,5 +1,13 @@
 menu "Dosing Pump Controller Configuration"
 
+config CONTROLLER_ENABLE_BLE_PROVISIONING
+    bool "Enable BLE provisioning"
+    default y
+    help
+        Enable the BLE-assisted onboarding flow. When disabled, the firmware
+        uses the legacy AP-only onboarding behavior and does not depend on the
+        BLE provisioning component.
+
 config CONTROLLER_WIFI_SSID
     string "AP WiFi SSID"
     default "DOSING"
@@ -19,5 +27,23 @@ config CONTROLLER_WIFI_CHANNEL
     default 1
     help
         WiFi SoftAp channel (network channel).
+
+config CONTROLLER_WIFI_AP_GRACE_TIMEOUT_SEC
+    int "AP grace timeout (seconds)"
+    depends on CONTROLLER_ENABLE_BLE_PROVISIONING
+    range 10 3600
+    default 120
+    help
+        How long the fallback AP should remain available after a successful
+        provisioning/recovery station connection before switching to STA-only,
+        unless keep_ap_active is enabled.
+
+config CONTROLLER_WIFI_AP_FALLBACK_TIMEOUT_SEC
+    int "AP fallback timeout (seconds)"
+    range 30 3600
+    default 300
+    help
+        How long the recovery/fallback AP should remain active without clients
+        before retrying the station connection sequence.
 
 endmenu

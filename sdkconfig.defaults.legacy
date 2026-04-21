@@ -1,0 +1,7 @@
+# Legacy AP-only firmware profile.
+# Apply this on top of defconfig to strip BLE provisioning and re-enable the
+# faster Wi-Fi IRAM path when Bluetooth is not needed.
+
+# CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING is not set
+# CONFIG_BT_ENABLED is not set
+CONFIG_ESP_WIFI_IRAM_OPT=y

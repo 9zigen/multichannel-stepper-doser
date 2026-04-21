@@ -30,6 +30,9 @@
 #include "adc.h"
 #include "app_events.h"
 #include "app_interfaces.h"
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+#include "app_provisioning.h"
+#endif
 #include "mcp7940.h"
 #include "led.h"
 #include "ota.h"
@@ -93,6 +96,9 @@ void app_main()
     /* Base */
     init_settings();
     init_events();
+#if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
+    ESP_ERROR_CHECK(app_provisioning_init());
+#endif
     ESP_ERROR_CHECK(esp_register_shutdown_handler(app_shutdown_handler));
 
     /* Stepper */
