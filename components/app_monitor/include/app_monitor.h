@@ -44,6 +44,7 @@ typedef struct {
     uint32_t free_heap;
     uint32_t wifi_disconnects;
     uint32_t reboot_count;
+    int16_t board_temperature;
     char last_reboot_reason[32];
 } system_status_t;
 

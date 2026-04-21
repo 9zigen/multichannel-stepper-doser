@@ -22,7 +22,6 @@
 #include "connect.h"
 #include "tools.h"
 #include "app_monitor.h"
-#include "adc.h"
 
 static TimerHandle_t xMonitorTimer;
 static const char *TAG = "MONITOR";
@@ -131,6 +130,9 @@ static void update_system_info(void)
     system_status.ap_clients = connect_get_ap_client_count();
     system_status.rssi = 0;
 
+    /* TODO use NTC or MCU sensor */
+    system_status.board_temperature = 32;
+
     if (mode == WIFI_MODE_STA) {
         snprintf(system_status.wifi_mode, sizeof(system_status.wifi_mode), "STA");
     } else if (mode == WIFI_MODE_AP) {
@@ -225,7 +227,7 @@ static void monitor_capture_status_event(app_status_event_t *event)
     strlcpy(event->ap_ssid, system_status.ap_ssid, sizeof(event->ap_ssid));
     strlcpy(event->ap_ip_address, system_status.ap_ip_address, sizeof(event->ap_ip_address));
     event->ap_clients = system_status.ap_clients;
-    event->board_temperature = read_ntc_temperature();
+    event->board_temperature = system_status.board_temperature;
     event->wifi_disconnects = system_status.wifi_disconnects;
     event->time_valid = app_time_is_valid();
     strlcpy(event->time_warning, app_time_warning_message(), sizeof(event->time_warning));

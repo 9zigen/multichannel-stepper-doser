@@ -93,7 +93,7 @@ char *get_status_json(void)
     cJSON_AddItemToObject(status, "hardware_version", cJSON_CreateString(HARDWARE_VERSION));
     cJSON_AddItemToObject(status, "firmware_version", cJSON_CreateString(app_description->version));
     cJSON_AddItemToObject(status, "firmware_date", cJSON_CreateString(app_description->date));
-    cJSON_AddItemToObject(status, "board_temperature", cJSON_CreateNumber(read_ntc_temperature()));
+    cJSON_AddItemToObject(status, "board_temperature", cJSON_CreateNumber(system_status->board_temperature));
     cJSON_AddItemToObject(status, "wifi_disconnects", cJSON_CreateNumber(system_status->wifi_disconnects));
     cJSON_AddItemToObject(status, "reboot_count", cJSON_CreateNumber(system_status->reboot_count));
     cJSON_AddItemToObject(status, "last_reboot_reason", cJSON_CreateString(system_status->last_reboot_reason));
