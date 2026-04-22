@@ -101,7 +101,9 @@ private final class AESCTRStreamCipher {
             throw BLEProvisioningError.securityFailure("The BLE session cipher is unavailable.")
         }
 
-        var output = Data(count: data.count + kCCBlockSizeAES128)
+        let inputCount = data.count
+        let outputCapacity = inputCount + kCCBlockSizeAES128
+        var output = Data(count: outputCapacity)
         var moved = 0
 
         let status = data.withUnsafeBytes { inputBytes in
@@ -109,9 +111,9 @@ private final class AESCTRStreamCipher {
                 CCCryptorUpdate(
                     cryptor,
                     inputBytes.baseAddress,
-                    data.count,
+                    inputCount,
                     outputBytes.baseAddress,
-                    output.count,
+                    outputCapacity,
                     &moved
                 )
             }

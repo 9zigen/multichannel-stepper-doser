@@ -28,11 +28,13 @@ final class BLEProvisioningManager: NSObject {
     private var discoveredPeripherals: [UUID: CBPeripheral] = [:]
     private var endpointCharacteristics: [BLEProvisioningEndpoint: CBCharacteristic] = [:]
     private var activePeripheral: CBPeripheral?
+    private var discoveredService: CBService?
+    private var discoveredCharacteristics: [CBCharacteristic] = []
 
     private var bluetoothWaiters: [CheckedContinuation<Void, Error>] = []
     private var connectContinuation: CheckedContinuation<Void, Error>?
-    private var serviceContinuation: CheckedContinuation<CBService, Error>?
-    private var characteristicContinuation: CheckedContinuation<[CBCharacteristic], Error>?
+    private var serviceContinuation: CheckedContinuation<Void, Error>?
+    private var characteristicContinuation: CheckedContinuation<Void, Error>?
     private var endpointDiscovery: EndpointDiscovery?
     private var writeContinuations: [CBUUID: CheckedContinuation<Void, Error>] = [:]
     private var readContinuations: [CBUUID: CheckedContinuation<Data, Error>] = [:]
@@ -220,21 +222,28 @@ final class BLEProvisioningManager: NSObject {
             centralManager.connect(peripheral)
         }
 
-        let service = try await discoverProvisioningService(on: peripheral)
-        let characteristics = try await discoverCharacteristics(on: peripheral, service: service)
+        try await discoverProvisioningService(on: peripheral)
+        guard let service = discoveredService else {
+            throw BLEProvisioningError.serviceNotFound
+        }
+
+        try await discoverCharacteristics(on: peripheral, service: service)
+        let characteristics = discoveredCharacteristics
         endpointCharacteristics = try await resolveEndpoints(on: peripheral, characteristics: characteristics)
         return peripheral
     }
 
-    private func discoverProvisioningService(on peripheral: CBPeripheral) async throws -> CBService {
+    private func discoverProvisioningService(on peripheral: CBPeripheral) async throws {
         try await withCheckedThrowingContinuation { continuation in
+            discoveredService = nil
             serviceContinuation = continuation
             peripheral.discoverServices([serviceUUID])
         }
     }
 
-    private func discoverCharacteristics(on peripheral: CBPeripheral, service: CBService) async throws -> [CBCharacteristic] {
+    private func discoverCharacteristics(on peripheral: CBPeripheral, service: CBService) async throws {
         try await withCheckedThrowingContinuation { continuation in
+            discoveredCharacteristics = []
             characteristicContinuation = continuation
             peripheral.discoverCharacteristics(nil, for: service)
         }
@@ -250,6 +259,8 @@ final class BLEProvisioningManager: NSObject {
                 peripheral.discoverDescriptors(for: characteristic)
             }
         }
+
+        return endpointCharacteristics
     }
 
     private func fetchProtocolVersion() async throws -> String {
@@ -415,7 +426,8 @@ extension BLEProvisioningManager: @preconcurrency CBPeripheralDelegate {
             return
         }
 
-        serviceContinuation?.resume(returning: service)
+        discoveredService = service
+        serviceContinuation?.resume()
         serviceContinuation = nil
     }
 
@@ -426,7 +438,8 @@ extension BLEProvisioningManager: @preconcurrency CBPeripheralDelegate {
             return
         }
 
-        characteristicContinuation?.resume(returning: service.characteristics ?? [])
+        discoveredCharacteristics = service.characteristics ?? []
+        characteristicContinuation?.resume()
         characteristicContinuation = nil
     }
 
@@ -504,7 +517,8 @@ extension BLEProvisioningManager: @preconcurrency CBPeripheralDelegate {
             map[endpoint] = characteristic
         }
 
-        endpointDiscovery.continuation.resume(returning: map)
+        endpointCharacteristics = map
+        endpointDiscovery.continuation.resume()
         self.endpointDiscovery = nil
     }
 }
@@ -518,11 +532,11 @@ private struct EndpointDiscovery {
     }
 
     var entries: [CBUUID: Entry]
-    let continuation: CheckedContinuation<[BLEProvisioningEndpoint: CBCharacteristic], Error>
+    let continuation: CheckedContinuation<Void, Error>
 
     init(
         characteristics: [CBCharacteristic],
-        continuation: CheckedContinuation<[BLEProvisioningEndpoint: CBCharacteristic], Error>
+        continuation: CheckedContinuation<Void, Error>
     ) {
         self.entries = Dictionary(
             uniqueKeysWithValues: characteristics.map { ($0.uuid, Entry(characteristic: $0)) }

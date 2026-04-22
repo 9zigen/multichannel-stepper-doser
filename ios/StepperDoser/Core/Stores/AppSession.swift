@@ -127,12 +127,9 @@ final class AppSession {
         syncAPIClient()
 
         do {
-            async let statusRequest = apiClient.fetchStatus()
-            async let settingsRequest = apiClient.fetchSettings()
-            async let runtimeRequest = apiClient.fetchPumpRuntime()
-            status = try await statusRequest
-            settings = try await settingsRequest
-            runtime = try await runtimeRequest
+            status = try await apiClient.fetchStatus()
+            settings = try await apiClient.fetchSettings()
+            runtime = try await apiClient.fetchPumpRuntime()
             errorMessage = nil
             await refreshRealtimeIfNeeded()
         } catch APIError.unauthorized {

@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 final class DeviceAPIClient {
     private let session: URLSession
     private let decoder = JSONDecoder.deviceAPI
