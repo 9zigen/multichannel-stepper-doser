@@ -35,7 +35,7 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
             <div>
               <div className="mb-1 text-xs font-medium text-muted-foreground">Manual pump run</div>
               <Code>
-                {'POST /api/run\nAuthorization: Bearer <token>\n{"id":0,"direction":true,"speed":1,"time":1}'}
+                {'POST /api/run\nAuthorization: Bearer <token>\n{"id":0,"direction":true,"speed":1,"time_seconds":10}'}
               </Code>
               <p className="mt-2 text-xs text-muted-foreground">
                 Settings and board-config POST endpoints respond with the updated resource body, so the UI can commit the

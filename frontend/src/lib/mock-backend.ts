@@ -530,13 +530,15 @@ function updatePumpRuntime(payload: PumpRunState) {
     return;
   }
 
-  if (payload.time === 0) {
+  const durationSeconds = payload.time_seconds ?? ((payload.time ?? 0) * 60);
+
+  if (durationSeconds === 0) {
     delete pumpRuntimeState[payload.id];
     emitPumpRuntimeUpdate(payload.id);
     return;
   }
 
-  if (payload.time < 0) {
+  if ((payload.time_seconds ?? 1) < 0 || (payload.time ?? 1) < 0) {
     pumpRuntimeState[payload.id] = {
       state: 'calibration',
       speed: payload.speed,
@@ -552,9 +554,9 @@ function updatePumpRuntime(payload: PumpRunState) {
   const calibration = [...pump.calibration].sort((a, b) => a.speed - b.speed);
   const selected = calibration.find((item) => item.speed === payload.speed) ?? calibration[0];
   if (selected) {
-    const pumpedVolume = Number(((selected.flow / 60) * payload.time).toFixed(2));
+    const pumpedVolume = Number(((selected.flow / 60) * durationSeconds).toFixed(2));
     pump.tank_current_vol = Number(Math.max(0, pump.tank_current_vol - pumpedVolume).toFixed(2));
-    pump.running_hours = Number((pump.running_hours + payload.time / 60).toFixed(2));
+    pump.running_hours = Number((pump.running_hours + durationSeconds / 3600).toFixed(2));
   }
 
   pumpRuntimeState[payload.id] = {
@@ -562,8 +564,8 @@ function updatePumpRuntime(payload: PumpRunState) {
     speed: payload.speed,
     direction: payload.direction,
     started_at: Date.now(),
-    ends_at: Date.now() + payload.time * 60 * 1000,
-    duration_seconds: payload.time * 60,
+    ends_at: Date.now() + durationSeconds * 1000,
+    duration_seconds: durationSeconds,
   };
   emitPumpRuntimeUpdate(payload.id);
 }

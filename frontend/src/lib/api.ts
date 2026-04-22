@@ -226,7 +226,8 @@ export type PumpRunState = {
   id: number;
   speed: number;
   direction: boolean;
-  time: number;
+  time?: number;
+  time_seconds?: number;
 };
 
 export type PumpRuntimeMode = 'off' | 'timed' | 'continuous' | 'calibration';

@@ -281,15 +281,27 @@ final class AppSession {
         }
     }
 
-    func runPump(id: Int, seconds: Double, speed: Double = 100, direction: Bool = true) async -> Bool {
+    func runPump(id: Int, durationSeconds: Int, speed: Double = 100, direction: Bool = true) async -> Bool {
         do {
-            _ = try await apiClient.runPump(PumpRunRequest(id: id, speed: speed, direction: direction, time: seconds))
+            _ = try await apiClient.runPump(
+                PumpRunRequest(
+                    id: id,
+                    speed: speed,
+                    direction: direction,
+                    time: nil,
+                    timeSeconds: max(0, durationSeconds)
+                )
+            )
             await refresh()
             return true
         } catch {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    func stopPump(id: Int, speed: Double = 1, direction: Bool = true) async -> Bool {
+        await runPump(id: id, durationSeconds: 0, speed: speed, direction: direction)
     }
 
     func restartDevice() async {

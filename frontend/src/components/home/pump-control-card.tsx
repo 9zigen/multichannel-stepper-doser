@@ -31,14 +31,14 @@ type FormData = {
   pump_id: number;
   direction: boolean;
   speed: number;
-  time: number;
+  time_seconds: number;
 };
 
 const FormSchema = z.object({
   pump_id: z.number().min(0, 'Please select a pump to control.'),
   direction: z.boolean(),
   speed: z.number().min(0.1, 'Please select a pump working speed.'),
-  time: z.number().min(1, 'Please select a pump working time.'),
+  time_seconds: z.number().min(1, 'Please select a pump working time.'),
 });
 
 export default function PumpControlCard(props: PumpControlProps) {
@@ -58,7 +58,7 @@ export default function PumpControlCard(props: PumpControlProps) {
       pump_id: undefined,
       direction: true,
       speed: 1,
-      time: 1,
+      time_seconds: 10,
     },
   });
 
@@ -158,7 +158,7 @@ export default function PumpControlCard(props: PumpControlProps) {
         id: data.pump_id,
         direction: data.direction,
         speed: data.speed,
-        time: data.time,
+        time_seconds: data.time_seconds,
       };
       const response = (await runPump(action)) as PumpRunResponse;
       if (response.success) {
@@ -183,7 +183,7 @@ export default function PumpControlCard(props: PumpControlProps) {
         id: selectedActiveRun.id,
         direction: true,
         speed: selectedActiveRun.speed || 1,
-        time: 0,
+        time_seconds: 0,
       })) as PumpRunResponse;
 
       if (response.success) {
@@ -311,17 +311,31 @@ export default function PumpControlCard(props: PumpControlProps) {
 
               <div className="mb-4 w-[50%]">
                 <div className="text-muted-foreground pb-1">
-                  <label>Working time [min]</label>
+                  <label>Working time [sec]</label>
                 </div>
                 <Input
                   type="number"
-                  placeholder="minutes"
+                  placeholder="seconds"
                   step="1"
-                  defaultValue={1}
+                  defaultValue={10}
                   disabled={pumpIsRunning}
-                  {...register('time', { valueAsNumber: true })}
+                  {...register('time_seconds', { valueAsNumber: true })}
                 />
-                {errors.time && <p role="alert">{errors.time?.message}</p>}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[10, 30, 60].map((seconds) => (
+                    <Button
+                      key={seconds}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={pumpIsRunning}
+                      onClick={() => setValue('time_seconds', seconds)}
+                    >
+                      {seconds === 60 ? '1 min' : `${seconds}s`}
+                    </Button>
+                  ))}
+                </div>
+                {errors.time_seconds && <p role="alert">{errors.time_seconds?.message}</p>}
               </div>
             </div>
 

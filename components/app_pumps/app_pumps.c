@@ -644,6 +644,48 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
     return err;
 }
 
+esp_err_t run_pump_manual_seconds(uint8_t pump_id, float rpm, bool direction, int32_t time_seconds)
+{
+    if (pump_id >= MAX_PUMP) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "run_pump_manual_seconds: pump_id=%u, rpm=%.2f, direction=%d, time_seconds=%d",
+             pump_id, rpm, direction, time_seconds);
+
+    if (time_seconds <= 0) {
+        stop_pump(pump_id);
+        pumps[pump_id].state = PUMP_OFF;
+        pumps[pump_id].time = 0;
+        pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
+        mark_pump_runtime_dirty(pump_id);
+        return ESP_OK;
+    }
+
+    if (rpm <= 0.0f) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    pump_t *pump_config = get_pump_config(pump_id);
+    double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
+
+    pumps[pump_id].time = (uint32_t)time_seconds * PUMP_TIMER_UNIT_IN_SEC;
+    pumps[pump_id].flow_per_unit =
+        flow_ml_per_min > 0.0 ? flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0 : 0.0;
+    pumps[pump_id].volume = 0;
+    pumps[pump_id].rpm = rpm;
+    pumps[pump_id].direction = direction;
+    pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_MANUAL;
+    pumps[pump_id].state = PUMP_ON;
+    esp_err_t err = start_pump(pump_id, rpm, direction);
+    if (err != ESP_OK) {
+        pumps[pump_id].state = PUMP_OFF;
+        pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
+    }
+    mark_pump_runtime_dirty(pump_id);
+    return err;
+}
+
 void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direction)
 {
     if (pump_id >= MAX_PUMP) {

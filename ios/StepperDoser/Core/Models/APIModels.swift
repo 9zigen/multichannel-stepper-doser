@@ -200,7 +200,8 @@ struct PumpRunRequest: Codable, Sendable {
     var id: Int
     var speed: Double
     var direction: Bool
-    var time: Double
+    var time: Double?
+    var timeSeconds: Int?
 }
 
 struct SettingsUpdatePayload: Codable, Sendable {

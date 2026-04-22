@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @Environment(AppSession.self) private var session
+    @State private var customRunSeconds: [Int: String] = [:]
     private let metricColumns = [
         GridItem(.flexible(), spacing: StepperSpacing.md),
         GridItem(.flexible(), spacing: StepperSpacing.md),
@@ -151,18 +152,13 @@ struct DashboardView: View {
                                     )
                                     .frame(height: 8)
 
-                                    Button("Run \(pump.name) for 10s") {
-                                        Task {
-                                            let speed = max(1, pump.schedule.speed)
-                                            _ = await session.runPump(
-                                                id: pump.id,
-                                                seconds: 10,
-                                                speed: speed,
-                                                direction: pump.direction
-                                            )
-                                        }
-                                    }
-                                    .buttonStyle(StepperSecondaryButtonStyle())
+                                    PumpManualRunControls(
+                                        pump: pump,
+                                        runtimeEntry: runtimeEntry(for: pump.id),
+                                        customSeconds: customSecondsBinding(for: pump.id),
+                                        onRun: runPump,
+                                        onStop: stopPump
+                                    )
                                 }
                                 .padding(.bottom, StepperSpacing.sm)
                             }
@@ -179,15 +175,6 @@ struct DashboardView: View {
                             }
                         }
                         .buttonStyle(StepperSecondaryButtonStyle())
-
-                        if let firstPump = session.settings?.pumps.first {
-                            Button("Run \(firstPump.name) for 10s") {
-                                Task {
-                                    _ = await session.runPump(id: firstPump.id, seconds: 10)
-                                }
-                            }
-                            .buttonStyle(StepperPrimaryButtonStyle())
-                        }
                     }
                 }
                 // Bottom breath — outer panel has padding: 0 so last section needs a gap
@@ -202,6 +189,40 @@ struct DashboardView: View {
 
     private var status: StatusSnapshot {
         session.status ?? .placeholder
+    }
+
+    private func runtimeEntry(for pumpID: Int) -> PumpRuntimeEntry? {
+        session.runtime.first(where: { $0.id == pumpID })
+    }
+
+    private func customSecondsBinding(for pumpID: Int) -> Binding<String> {
+        Binding(
+            get: { customRunSeconds[pumpID] ?? "" },
+            set: { customRunSeconds[pumpID] = $0 }
+        )
+    }
+
+    private func runPump(_ pump: PumpConfiguration, seconds: Int) {
+        Task {
+            let speed = max(1, pump.schedule.speed)
+            _ = await session.runPump(
+                id: pump.id,
+                durationSeconds: seconds,
+                speed: speed,
+                direction: pump.direction
+            )
+        }
+    }
+
+    private func stopPump(_ pump: PumpConfiguration) {
+        Task {
+            let speed = max(1, pump.schedule.speed)
+            _ = await session.stopPump(
+                id: pump.id,
+                speed: speed,
+                direction: pump.direction
+            )
+        }
     }
 
     private func scheduleHeadline(for pump: PumpConfiguration) -> String {
@@ -272,5 +293,87 @@ struct DashboardView: View {
 
     private func formatHours(_ value: Double) -> String {
         value.rounded(.towardZero) == value ? String(Int(value)) : String(format: "%.1f", value)
+    }
+}
+
+private struct PumpManualRunControls: View {
+    let pump: PumpConfiguration
+    let runtimeEntry: PumpRuntimeEntry?
+    @Binding var customSeconds: String
+    let onRun: (PumpConfiguration, Int) -> Void
+    let onStop: (PumpConfiguration) -> Void
+
+    private let presetDurations = [10, 30, 60]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: StepperSpacing.md) {
+            if let runtimeEntry, runtimeEntry.active {
+                Button("Stop \(pump.name)") {
+                    onStop(pump)
+                }
+                .buttonStyle(StepperPrimaryButtonStyle())
+            } else {
+                HStack(spacing: StepperSpacing.sm) {
+                    ForEach(presetDurations, id: \.self) { seconds in
+                        Button(presetLabel(for: seconds)) {
+                            onRun(pump, seconds)
+                        }
+                        .buttonStyle(StepperCompactButtonStyle())
+                    }
+                }
+
+                HStack(spacing: StepperSpacing.sm) {
+                    TextField("Seconds", text: $customSeconds)
+                        .keyboardType(.numberPad)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .stepperInputField()
+
+                    Button("Start") {
+                        if let seconds = customDuration, seconds > 0 {
+                            onRun(pump, seconds)
+                            customSeconds = ""
+                        }
+                    }
+                    .buttonStyle(StepperSecondaryButtonStyle())
+                    .frame(maxWidth: 120)
+                    .disabled(customDuration == nil)
+                }
+            }
+        }
+    }
+
+    private var customDuration: Int? {
+        let trimmed = customSeconds.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Int(trimmed), value > 0 else { return nil }
+        return value
+    }
+
+    private func presetLabel(for seconds: Int) -> String {
+        switch seconds {
+        case 60:
+            "1 min"
+        default:
+            "\(seconds)s"
+        }
+    }
+}
+
+private struct StepperCompactButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(StepperFont.small.weight(.medium))
+            .foregroundStyle(StepperColor.foreground)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, StepperSpacing.md)
+            .padding(.vertical, StepperSpacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
+                    .fill(StepperColor.secondary.opacity(configuration.isPressed ? 0.24 : 0.14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
+                            .stroke(StepperColor.border.opacity(0.55), lineWidth: 1)
+                    )
+            )
     }
 }

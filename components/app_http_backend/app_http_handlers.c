@@ -1045,16 +1045,25 @@ esp_err_t run_post_handler(httpd_req_t *req)
         cJSON *speed = cJSON_GetObjectItem(root, "speed");
         cJSON *direction = cJSON_GetObjectItem(root, "direction");
         cJSON *time = cJSON_GetObjectItem(root, "time");
+        cJSON *time_seconds = cJSON_GetObjectItem(root, "time_seconds");
 
         uint8_t pump_id = cJSON_IsNumber(id) ? id->valueint : 0;
         float rpm = cJSON_IsNumber(speed) ? speed->valuedouble : 0.0f;
         bool dir = cJSON_IsTrue(direction);
         int32_t time_minutes = cJSON_IsNumber(time) ? time->valueint : 0;
+        int32_t duration_seconds = cJSON_IsNumber(time_seconds) ? time_seconds->valueint : -1;
 
-        ESP_LOGI(TAG, "run_post_handler id=%u speed=%.2f dir=%u time=%ld",
-                 pump_id, rpm, dir, (long)time_minutes);
+        ESP_LOGI(TAG, "run_post_handler id=%u speed=%.2f dir=%u time_minutes=%ld time_seconds=%ld",
+                 pump_id, rpm, dir, (long)time_minutes, (long)duration_seconds);
 
-        if (time_minutes < 0) {
+        if (duration_seconds >= 0) {
+            if (run_pump_manual_seconds(pump_id, rpm, dir, duration_seconds) != ESP_OK) {
+                cJSON_Delete(root);
+                free(buf);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pump run request");
+                return ESP_FAIL;
+            }
+        } else if (time_minutes < 0) {
             run_pump_calibration(pump_id, true, rpm, dir);
         } else if (run_pump_manual(pump_id, rpm, dir, time_minutes) != ESP_OK) {
             cJSON_Delete(root);
