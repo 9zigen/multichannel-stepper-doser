@@ -30,8 +30,11 @@ static bool rtc_fallback = true;
 static bool time_valid = false;
 static esp_event_handler_instance_t services_updated_event_ctx;
 static bool services_event_registered = false;
+static TaskHandle_t ntp_wait_task_handle = NULL;
 
 #define APP_TIME_VALID_YEAR_MIN 2024
+#define APP_TIME_SNTP_WAIT_RETRIES 15
+#define APP_TIME_SNTP_WAIT_INTERVAL_MS 2000
 
 typedef struct {
     const char *name;
@@ -107,6 +110,10 @@ static const app_time_zone_entry_t APP_TIME_ZONES[] = {
 
 static void initialize_sntp(services_t *config);
 static void app_time_reconfigure_services(const services_t *services, bool restart_sntp);
+static void app_time_finalize_ntp_sync(void);
+static void app_time_cancel_ntp_wait_task(void);
+static void app_time_start_ntp_wait_task(void);
+static void app_time_wait_for_sync_task(void *arg);
 
 static const char *app_time_lookup_tz(const char *time_zone_name)
 {
@@ -161,6 +168,8 @@ static void app_time_apply_ntp_settings(const services_t *services)
         return;
     }
 
+    app_time_cancel_ntp_wait_task();
+
     if (esp_sntp_enabled()) {
         ESP_LOGI(TAG, "Stopping SNTP");
         esp_sntp_stop();
@@ -170,6 +179,7 @@ static void app_time_apply_ntp_settings(const services_t *services)
 
     if (services->enable_ntp && strlen(services->ntp_server) > 5) {
         initialize_sntp((services_t *)services);
+        app_time_start_ntp_wait_task();
     } else {
         ESP_LOGI(TAG, "SNTP disabled by services settings");
     }
@@ -228,6 +238,113 @@ static void initialize_sntp(services_t *config)
     esp_sntp_setservername(0, config->ntp_server);
     esp_sntp_set_time_sync_notification_cb(time_sync_notification_cb);
     esp_sntp_init();
+}
+
+static void app_time_finalize_ntp_sync(void)
+{
+    time_t now = 0;
+    struct tm timeinfo = {0};
+    char strftime_buf[64];
+
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    time_valid = app_time_is_datetime_valid(&timeinfo);
+    ntp_sync = time_valid ? 1 : ntp_sync;
+
+    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+    ESP_LOGI(TAG, "The NTP date/time is: %s", strftime_buf);
+
+    if (!time_valid) {
+        return;
+    }
+
+    datetime_t datetime = {0};
+    bool i2c_available = i2c_is_supported() && i2c_is_initialized();
+    bool rtc_chip_available = i2c_available && (mcp7940_probe() == ESP_OK);
+
+    datetime.year = 1900 + timeinfo.tm_year - 2000;
+    datetime.month = timeinfo.tm_mon + 1;
+    datetime.day = timeinfo.tm_mday;
+    datetime.weekday = timeinfo.tm_wday + 1;
+    datetime.hour = timeinfo.tm_hour;
+    datetime.min = timeinfo.tm_min;
+    datetime.sec = timeinfo.tm_sec;
+
+    if (rtc_chip_available) {
+        mcp7940_set_datetime(&datetime);
+        rtc_backend = "MCP7940 RTC";
+        rtc_fallback = false;
+    } else {
+        rtc_backend = "NTP fallback";
+        rtc_fallback = true;
+    }
+}
+
+static void app_time_cancel_ntp_wait_task(void)
+{
+    if (ntp_wait_task_handle != NULL) {
+        vTaskDelete(ntp_wait_task_handle);
+        ntp_wait_task_handle = NULL;
+    }
+}
+
+static void app_time_start_ntp_wait_task(void)
+{
+    if (ntp_wait_task_handle != NULL) {
+        return;
+    }
+
+    BaseType_t created = xTaskCreate(
+        app_time_wait_for_sync_task,
+        "app_time_sntp",
+        4096,
+        NULL,
+        tskIDLE_PRIORITY + 1,
+        &ntp_wait_task_handle);
+
+    if (created != pdPASS) {
+        ntp_wait_task_handle = NULL;
+        ESP_LOGW(TAG, "Failed to create SNTP wait task");
+    }
+}
+
+static void app_time_wait_for_sync_task(void *arg)
+{
+    (void)arg;
+
+    EventBits_t bits = xEventGroupWaitBits(
+        wifi_event_group,
+        WIFI_CONNECTED_BIT,
+        false,
+        true,
+        pdMS_TO_TICKS(30000));
+
+    if ((bits & WIFI_CONNECTED_BIT) == 0) {
+        ESP_LOGW(TAG, "Timed out waiting for Wi-Fi before SNTP sync");
+        ntp_wait_task_handle = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    int retry = 0;
+    sntp_sync_status_t sync_status = SNTP_SYNC_STATUS_RESET;
+
+    while ((sync_status = esp_sntp_get_sync_status()) == SNTP_SYNC_STATUS_RESET &&
+           !ntp_sync &&
+           ++retry < APP_TIME_SNTP_WAIT_RETRIES) {
+        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, APP_TIME_SNTP_WAIT_RETRIES);
+        vTaskDelay(pdMS_TO_TICKS(APP_TIME_SNTP_WAIT_INTERVAL_MS));
+    }
+
+    if (ntp_sync || sync_status == SNTP_SYNC_STATUS_COMPLETED || sync_status == SNTP_SYNC_STATUS_IN_PROGRESS) {
+        app_time_finalize_ntp_sync();
+    } else {
+        app_time_refresh_validity_from_system_clock();
+        ESP_LOGW(TAG, "SNTP sync did not complete after enabling NTP at runtime");
+    }
+
+    ntp_wait_task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
 static void obtain_time(void)
