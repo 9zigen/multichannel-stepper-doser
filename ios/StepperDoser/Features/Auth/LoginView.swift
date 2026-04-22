@@ -8,22 +8,34 @@ struct LoginView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Controller") {
-                    LabeledContent("Endpoint") {
-                        Text(session.endpointStore.normalizedURL?.host() ?? session.endpointStore.rawValue)
-                            .foregroundStyle(.secondary)
+            StepperPage {
+                StepperCard {
+                    StepperSectionLabel(text: "Authentication")
+                    Text("Sign In")
+                        .font(StepperFont.title)
+                        .foregroundStyle(StepperColor.foreground)
+                    Text("Authenticate against the device API before loading settings and realtime status.")
+                        .font(StepperFont.small)
+                        .foregroundStyle(StepperColor.mutedForeground)
+
+                    HStack(spacing: StepperSpacing.sm) {
+                        StepperBadge(text: "Local Device", tone: .secondary)
+                        StepperBadge(text: session.endpointStore.normalizedURL?.host() ?? session.endpointStore.rawValue, tone: .outline)
                     }
-                }
 
-                Section("Credentials") {
-                    TextField("Username", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    SecureField("Password", text: $password)
-                }
+                    StepperPanel {
+                        StepperSectionLabel(text: "Credentials")
+                        VStack(spacing: StepperSpacing.lg) {
+                            TextField("Username", text: $username)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .stepperInputField()
 
-                Section {
+                            SecureField("Password", text: $password)
+                                .stepperInputField()
+                        }
+                    }
+
                     Button(isSubmitting ? "Signing In..." : "Sign In") {
                         Task {
                             isSubmitting = true
@@ -31,10 +43,17 @@ struct LoginView: View {
                             _ = await session.login(username: username, password: password)
                         }
                     }
+                    .buttonStyle(StepperPrimaryButtonStyle())
                     .disabled(isSubmitting || username.isEmpty || password.isEmpty)
                 }
             }
-            .navigationTitle("Sign In")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if let suggestedLogin = session.suggestedLogin {
+                    username = suggestedLogin.username
+                    password = suggestedLogin.password
+                }
+            }
         }
     }
 }

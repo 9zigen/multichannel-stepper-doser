@@ -204,6 +204,7 @@ struct SettingsUpdatePayload: Codable, Sendable {
     var app: AppConfiguration?
     var services: ServiceConfiguration?
     var networks: [WiFiNetworkConfiguration]?
+    var pumps: [PumpConfiguration]?
 }
 
 struct RealtimeStatusPatch: Codable, Sendable {

@@ -18,6 +18,7 @@ final class AppSession {
     var hasAttemptedBootstrap = false
     var isSaving = false
     var errorMessage: String?
+    var suggestedLogin: AuthCredentials?
 
     init() {
         let endpointStore = DeviceEndpointStore()
@@ -61,6 +62,36 @@ final class AppSession {
         endpointStore.save(value)
         syncAPIClient()
         hasAttemptedBootstrap = false
+    }
+
+    func beginProvisionedConnection(
+        status: BLEProvisioningStatus,
+        username: String?,
+        password: String?
+    ) {
+        let lanIP = status.stationIPAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !lanIP.isEmpty else {
+            errorMessage = "Provisioning succeeded, but the controller did not report a LAN IP yet."
+            return
+        }
+
+        authToken = nil
+        settings = nil
+        self.status = nil
+        runtime = []
+        history = nil
+        tokenStore.deleteToken()
+        realtime.disconnect()
+
+        if let username,
+           let password,
+           !username.isEmpty,
+           !password.isEmpty {
+            suggestedLogin = AuthCredentials(username: username, password: password)
+        }
+
+        configureEndpoint(lanIP)
+        errorMessage = nil
     }
 
     func login(username: String, password: String) async -> Bool {
@@ -135,7 +166,8 @@ final class AppSession {
             auth: AuthCredentials(username: username, password: password),
             app: nil,
             services: nil,
-            networks: nil
+            networks: nil,
+            pumps: nil
         )
 
         do {
@@ -158,7 +190,8 @@ final class AppSession {
             auth: nil,
             app: AppConfiguration(onboardingCompleted: true),
             services: nil,
-            networks: nil
+            networks: nil,
+            pumps: nil
         )
 
         do {
@@ -171,9 +204,37 @@ final class AppSession {
         }
     }
 
-    func runPump(id: Int, seconds: Double) async -> Bool {
+    func savePumpConfiguration(_ updatedPump: PumpConfiguration) async -> Bool {
+        guard var settings else { return false }
+        guard let index = settings.pumps.firstIndex(where: { $0.id == updatedPump.id }) else { return false }
+
+        isSaving = true
+        defer { isSaving = false }
+
+        settings.pumps[index] = updatedPump
+
+        let payload = SettingsUpdatePayload(
+            auth: nil,
+            app: nil,
+            services: nil,
+            networks: nil,
+            pumps: settings.pumps
+        )
+
         do {
-            _ = try await apiClient.runPump(PumpRunRequest(id: id, speed: 100, direction: true, time: seconds))
+            let saved = try await apiClient.saveSettings(payload)
+            self.settings = saved
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func runPump(id: Int, seconds: Double, speed: Double = 100, direction: Bool = true) async -> Bool {
+        do {
+            _ = try await apiClient.runPump(PumpRunRequest(id: id, speed: speed, direction: direction, time: seconds))
             await refresh()
             return true
         } catch {

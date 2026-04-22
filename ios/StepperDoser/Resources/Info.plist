@@ -25,6 +25,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Stepper Doser uses Bluetooth to provision new controllers onto your Wi-Fi network.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Stepper Doser needs local network access to discover and control your dosing controller.</string>
 	<key>UIApplicationSceneManifest</key>

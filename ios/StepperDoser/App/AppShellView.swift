@@ -16,6 +16,9 @@ struct AppShellView: View {
                 .tag(tab)
             }
         }
+        .toolbarBackground(StepperColor.sidebar, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarColorScheme(.dark, for: .tabBar)
         .task {
             await session.refreshRealtimeIfNeeded()
         }
