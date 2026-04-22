@@ -34,7 +34,8 @@ final class DeviceAPIClient {
     }
 
     func fetchPumpRuntime() async throws -> [PumpRuntimeEntry] {
-        try await send(path: "api/pumps/runtime")
+        let response: PumpRuntimeEnvelope = try await send(path: "api/pumps/runtime")
+        return response.pumps
     }
 
     func fetchPumpHistory() async throws -> PumpHistoryResponse {

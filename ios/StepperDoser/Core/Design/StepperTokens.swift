@@ -59,6 +59,16 @@ enum StepperSpacing {
     static let pagePadding: CGFloat = 12
 }
 
+enum StepperLayout {
+    static let pageVerticalPadding: CGFloat = StepperSpacing.lg
+    static let cardSpacing: CGFloat = StepperSpacing.lg
+    static let cardPadding: CGFloat = StepperSpacing.xl
+    static let panelSpacing: CGFloat = StepperSpacing.lg
+    static let panelPadding: CGFloat = StepperSpacing.lg
+    static let inputHorizontalPadding: CGFloat = StepperSpacing.lg
+    static let inputVerticalPadding: CGFloat = 10
+}
+
 enum StepperFont {
     static let title = Font.system(size: 18, weight: .medium)
     static let section = Font.system(size: 16, weight: .medium)
@@ -102,7 +112,7 @@ struct StepperPage<Content: View>: View {
                 }
                 .frame(maxWidth: 900)
                 .padding(.horizontal, StepperSpacing.pagePadding)
-                .padding(.vertical, StepperSpacing.lg)
+                .padding(.vertical, StepperLayout.pageVerticalPadding)
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
@@ -137,9 +147,15 @@ struct StepperBackground: View {
 struct StepperCard<Content: View>: View {
     private let content: Content
     private let spacing: CGFloat
+    private let padding: CGFloat
 
-    init(spacing: CGFloat = StepperSpacing.lg, @ViewBuilder content: () -> Content) {
+    init(
+        spacing: CGFloat = StepperLayout.cardSpacing,
+        padding: CGFloat = StepperLayout.cardPadding,
+        @ViewBuilder content: () -> Content
+    ) {
         self.spacing = spacing
+        self.padding = padding
         self.content = content()
     }
 
@@ -147,7 +163,7 @@ struct StepperCard<Content: View>: View {
         VStack(alignment: .leading, spacing: spacing) {
             content
         }
-        .padding(StepperSpacing.xl)
+        .padding(padding)
         .background(
             RoundedRectangle(cornerRadius: StepperRadius.card, style: .continuous)
                 .fill(StepperColor.card.opacity(0.82))
@@ -163,16 +179,24 @@ struct StepperCard<Content: View>: View {
 
 struct StepperPanel<Content: View>: View {
     private let content: Content
+    private let spacing: CGFloat
+    private let padding: CGFloat
 
-    init(@ViewBuilder content: () -> Content) {
+    init(
+        spacing: CGFloat = StepperLayout.panelSpacing,
+        padding: CGFloat = StepperLayout.panelPadding,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.spacing = spacing
+        self.padding = padding
         self.content = content()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: StepperSpacing.lg) {
+        VStack(alignment: .leading, spacing: spacing) {
             content
         }
-        .padding(StepperSpacing.lg)
+        .padding(padding)
         .background(
             RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
                 .fill(StepperColor.secondary.opacity(0.10))
@@ -377,8 +401,8 @@ struct StepperInputShell: ViewModifier {
         content
             .font(StepperFont.body)
             .foregroundStyle(StepperColor.foreground)
-            .padding(.horizontal, StepperSpacing.lg)
-            .padding(.vertical, 10)
+            .padding(.horizontal, StepperLayout.inputHorizontalPadding)
+            .padding(.vertical, StepperLayout.inputVerticalPadding)
             .background(
                 RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
                     .fill(StepperColor.popover.opacity(0.92))

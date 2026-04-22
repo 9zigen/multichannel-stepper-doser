@@ -161,6 +161,10 @@ struct PumpRuntimeEntry: Codable, Equatable, Identifiable, Sendable {
     var volumeMl: Double
 }
 
+struct PumpRuntimeEnvelope: Codable, Sendable {
+    var pumps: [PumpRuntimeEntry]
+}
+
 struct PumpHistoryHour: Codable, Equatable, Sendable {
     var hour: Int
     var scheduledVolumeMl: Double

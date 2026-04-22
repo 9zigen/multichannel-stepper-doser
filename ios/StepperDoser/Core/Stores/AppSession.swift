@@ -229,8 +229,24 @@ final class AppSession {
 
         do {
             settings = try await apiClient.saveSettings(payload)
+            syncSelectedDeviceMetadata()
             errorMessage = nil
             return true
+        } catch APIError.server(let message) where message == "Failed to decode controller response." {
+            do {
+                let refreshedSettings = try await apiClient.fetchSettings()
+                settings = refreshedSettings
+                syncSelectedDeviceMetadata()
+                if refreshedSettings.app.onboardingCompleted {
+                    errorMessage = nil
+                    return true
+                }
+                errorMessage = message
+                return false
+            } catch {
+                errorMessage = error.localizedDescription
+                return false
+            }
         } catch {
             errorMessage = error.localizedDescription
             return false

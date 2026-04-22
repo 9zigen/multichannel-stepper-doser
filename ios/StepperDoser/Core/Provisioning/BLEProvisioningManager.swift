@@ -42,6 +42,7 @@ final class BLEProvisioningManager: NSObject {
     private var endpointDiscovery: EndpointDiscovery?
     private var writeContinuations: [CBUUID: CheckedContinuation<Void, Error>] = [:]
     private var readContinuations: [CBUUID: CheckedContinuation<Data, Error>] = [:]
+    private var disconnectContinuation: CheckedContinuation<Void, Never>?
 
     override init() {
         super.init()
@@ -119,17 +120,15 @@ final class BLEProvisioningManager: NSObject {
 
             var finalStatus = immediateStatus
             if !finalStatus.stationConnected {
-                let clock = ContinuousClock()
-                let deadline = clock.now + waitTimeout
-                while clock.now < deadline {
-                    phase = .waitingForWiFi(payload.network.ssid)
-                    try await Task.sleep(for: pollInterval)
-                    finalStatus = try await fetchStatus()
-                    latestStatus = finalStatus
-                    if finalStatus.stationConnected,
-                       !finalStatus.stationIPAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        break
-                    }
+                await disconnect()
+                if let reachableEndpoint = try await waitForReachableProvisionedEndpoint(
+                    payload: payload,
+                    status: finalStatus,
+                    timeout: waitTimeout,
+                    pollInterval: pollInterval
+                ) {
+                    finalStatus.stationConnected = true
+                    finalStatus.stationIPAddress = reachableEndpoint
                 }
             }
 
@@ -158,34 +157,119 @@ final class BLEProvisioningManager: NSObject {
     }
 
     func disconnect() async {
-        if let activePeripheral {
+        guard let activePeripheral else {
+            cleanupConnectionState()
+            return
+        }
+
+        guard activePeripheral.state != .disconnected else {
+            cleanupConnectionState()
+            return
+        }
+
+        logger.info("Disconnecting from \(activePeripheral.identifier.uuidString, privacy: .public)")
+        await withCheckedContinuation { continuation in
+            disconnectContinuation = continuation
             logger.info("Disconnecting from \(activePeripheral.identifier.uuidString, privacy: .public)")
             centralManager.cancelPeripheralConnection(activePeripheral)
         }
+    }
 
+    private func cleanupConnectionState(with error: Error = BLEProvisioningError.disconnected) {
         activePeripheral = nil
         endpointCharacteristics = [:]
-        connectContinuation?.resume(throwing: BLEProvisioningError.disconnected)
+        securitySession = nil
+
+        connectContinuation?.resume(throwing: error)
         connectContinuation = nil
-        serviceContinuation?.resume(throwing: BLEProvisioningError.disconnected)
+        serviceContinuation?.resume(throwing: error)
         serviceContinuation = nil
-        characteristicContinuation?.resume(throwing: BLEProvisioningError.disconnected)
+        characteristicContinuation?.resume(throwing: error)
         characteristicContinuation = nil
 
         if let endpointDiscovery {
-            endpointDiscovery.continuation.resume(throwing: BLEProvisioningError.disconnected)
+            endpointDiscovery.continuation.resume(throwing: error)
             self.endpointDiscovery = nil
         }
 
         for continuation in writeContinuations.values {
-            continuation.resume(throwing: BLEProvisioningError.disconnected)
+            continuation.resume(throwing: error)
         }
         writeContinuations.removeAll()
 
         for continuation in readContinuations.values {
-            continuation.resume(throwing: BLEProvisioningError.disconnected)
+            continuation.resume(throwing: error)
         }
         readContinuations.removeAll()
+    }
+
+    private func waitForReachableProvisionedEndpoint(
+        payload: BLEProvisioningPayload,
+        status: BLEProvisioningStatus,
+        timeout: Duration,
+        pollInterval: Duration
+    ) async throws -> String? {
+        let candidates = provisioningEndpointCandidates(payload: payload, status: status)
+        guard !candidates.isEmpty else { return nil }
+
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+
+        while clock.now < deadline {
+            phase = .waitingForWiFi(payload.network.ssid)
+            try await Task.sleep(for: pollInterval)
+
+            for candidate in candidates {
+                if await isEndpointReachable(candidate) {
+                    logger.info("Provisioned controller became reachable at \(candidate, privacy: .public)")
+                    return candidate
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func provisioningEndpointCandidates(
+        payload: BLEProvisioningPayload,
+        status: BLEProvisioningStatus
+    ) -> [String] {
+        var candidates: [String] = []
+
+        let reportedIP = status.stationIPAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !reportedIP.isEmpty {
+            candidates.append(reportedIP)
+        }
+
+        let hostname = payload.services?.hostname.trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? status.hostname.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !hostname.isEmpty {
+            candidates.append(hostname)
+            if !hostname.contains(".") {
+                candidates.append("\(hostname).local")
+            }
+        }
+
+        var seen = Set<String>()
+        return candidates.filter { seen.insert($0.lowercased()).inserted }
+    }
+
+    private func isEndpointReachable(_ endpoint: String) async -> Bool {
+        guard let url = DeviceEndpointStore.normalize(endpoint) else {
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 3
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            return response is HTTPURLResponse
+        } catch {
+            logger.debug("Provisioned endpoint \(endpoint, privacy: .public) not reachable yet: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
     }
 
     private func ensurePoweredOn() async throws {
@@ -338,11 +422,41 @@ final class BLEProvisioningManager: NSObject {
             throw BLEProvisioningError.securityFailure("The BLE security session has not been established.")
         }
         let decrypted = try securitySession.crypt(data)
-        let status = try jsonDecoder.decode(BLEProvisioningStatus.self, from: decrypted)
-        if !status.success {
-            throw BLEProvisioningError.controllerRejected(status.message ?? "The controller rejected the provisioning request.")
+        do {
+            let status = try jsonDecoder.decode(BLEProvisioningStatus.self, from: decrypted)
+            if !status.success {
+                throw BLEProvisioningError.controllerRejected(status.message ?? "The controller rejected the provisioning request.")
+            }
+            return status
+        } catch let decodingError as DecodingError {
+            let payload = String(data: decrypted, encoding: .utf8) ?? "<non-utf8 \(decrypted.count) bytes>"
+            logger.error("Failed to decode provisioning status payload: \(payload, privacy: .public)")
+            throw BLEProvisioningError.invalidResponse(Self.describe(decodingError))
+        } catch {
+            let payload = String(data: decrypted, encoding: .utf8) ?? "<non-utf8 \(decrypted.count) bytes>"
+            logger.error("Unexpected provisioning status decode failure: \(payload, privacy: .public)")
+            throw error
         }
-        return status
+    }
+
+    private static func describe(_ error: DecodingError) -> String {
+        switch error {
+        case let .typeMismatch(type, context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "The controller returned \(type) for \(path.isEmpty ? "the status payload" : path) instead of the expected shape."
+        case let .valueNotFound(type, context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "The controller did not include \(type) for \(path.isEmpty ? "the status payload" : path)."
+        case let .keyNotFound(key, context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return path.isEmpty
+                ? "The controller did not include the \(key.stringValue) field."
+                : "The controller did not include the \(key.stringValue) field inside \(path)."
+        case let .dataCorrupted(context):
+            return "The controller returned malformed provisioning JSON: \(context.debugDescription)"
+        @unknown default:
+            return "The controller returned unreadable provisioning data."
+        }
     }
 
     private func send(endpoint: BLEProvisioningEndpoint, data: Data) async throws -> Data {
@@ -472,31 +586,9 @@ extension BLEProvisioningManager: @preconcurrency CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         let resolvedError = error ?? BLEProvisioningError.disconnected
         logger.error("Peripheral disconnected \(peripheral.identifier.uuidString, privacy: .public): \(resolvedError.localizedDescription, privacy: .public)")
-        activePeripheral = nil
-        endpointCharacteristics = [:]
-        securitySession = nil
-
-        connectContinuation?.resume(throwing: resolvedError)
-        connectContinuation = nil
-        serviceContinuation?.resume(throwing: resolvedError)
-        serviceContinuation = nil
-        characteristicContinuation?.resume(throwing: resolvedError)
-        characteristicContinuation = nil
-
-        if let endpointDiscovery {
-            endpointDiscovery.continuation.resume(throwing: resolvedError)
-            self.endpointDiscovery = nil
-        }
-
-        for continuation in writeContinuations.values {
-            continuation.resume(throwing: resolvedError)
-        }
-        writeContinuations.removeAll()
-
-        for continuation in readContinuations.values {
-            continuation.resume(throwing: resolvedError)
-        }
-        readContinuations.removeAll()
+        cleanupConnectionState(with: resolvedError)
+        disconnectContinuation?.resume()
+        disconnectContinuation = nil
     }
 }
 

@@ -39,6 +39,56 @@ struct BLEProvisioningStatus: Codable, Equatable, Sendable {
         case timeZone = "time_zone"
         case message
     }
+
+    init(
+        success: Bool = false,
+        bleActive: Bool = false,
+        recoveryMode: Bool = false,
+        fallbackMode: Bool = false,
+        graceMode: Bool = false,
+        stationConnected: Bool = false,
+        stationSSID: String = "",
+        stationIPAddress: String = "",
+        apSSID: String = "",
+        apIPAddress: String = "",
+        apClients: Int = 0,
+        hostname: String = "",
+        timeZone: String = "",
+        message: String? = nil
+    ) {
+        self.success = success
+        self.bleActive = bleActive
+        self.recoveryMode = recoveryMode
+        self.fallbackMode = fallbackMode
+        self.graceMode = graceMode
+        self.stationConnected = stationConnected
+        self.stationSSID = stationSSID
+        self.stationIPAddress = stationIPAddress
+        self.apSSID = apSSID
+        self.apIPAddress = apIPAddress
+        self.apClients = apClients
+        self.hostname = hostname
+        self.timeZone = timeZone
+        self.message = message
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        success = try container.decodeIfPresent(Bool.self, forKey: .success) ?? false
+        bleActive = try container.decodeIfPresent(Bool.self, forKey: .bleActive) ?? false
+        recoveryMode = try container.decodeIfPresent(Bool.self, forKey: .recoveryMode) ?? false
+        fallbackMode = try container.decodeIfPresent(Bool.self, forKey: .fallbackMode) ?? false
+        graceMode = try container.decodeIfPresent(Bool.self, forKey: .graceMode) ?? false
+        stationConnected = try container.decodeIfPresent(Bool.self, forKey: .stationConnected) ?? false
+        stationSSID = try container.decodeIfPresent(String.self, forKey: .stationSSID) ?? ""
+        stationIPAddress = try container.decodeIfPresent(String.self, forKey: .stationIPAddress) ?? ""
+        apSSID = try container.decodeIfPresent(String.self, forKey: .apSSID) ?? ""
+        apIPAddress = try container.decodeIfPresent(String.self, forKey: .apIPAddress) ?? ""
+        apClients = try container.decodeIfPresent(Int.self, forKey: .apClients) ?? 0
+        hostname = try container.decodeIfPresent(String.self, forKey: .hostname) ?? ""
+        timeZone = try container.decodeIfPresent(String.self, forKey: .timeZone) ?? ""
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+    }
 }
 
 struct BLEProvisioningPayload: Codable, Equatable, Sendable {

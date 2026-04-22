@@ -59,10 +59,10 @@ struct BLEProvisioningSheetView: View {
                         StepperPanel {
                             StepperSectionLabel(text: "Wi-Fi")
                             VStack(spacing: StepperSpacing.lg) {
-                                TextField("SSID", text: $ssid)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .textContentType(nil)
+                                provisioningInputField(
+                                    "SSID",
+                                    text: $ssid
+                                )
                                     .stepperInputField()
 
                                 nonCredentialSecretField(
@@ -70,16 +70,16 @@ struct BLEProvisioningSheetView: View {
                                     text: $wifiPassword
                                 )
 
-                                TextField("Hostname", text: $hostname)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .textContentType(nil)
+                                provisioningInputField(
+                                    "Hostname",
+                                    text: $hostname
+                                )
                                     .stepperInputField()
 
-                                TextField("Time zone", text: $timeZone)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .textContentType(nil)
+                                provisioningInputField(
+                                    "Time zone",
+                                    text: $timeZone
+                                )
                                     .stepperInputField()
 
                                 Toggle("Keep AP active after provisioning", isOn: $keepApActive)
@@ -98,14 +98,17 @@ struct BLEProvisioningSheetView: View {
                                     .foregroundStyle(StepperColor.foreground)
 
                                 if configureAdmin {
-                                    TextField("Admin username", text: $adminUsername)
-                                        .textInputAutocapitalization(.never)
-                                        .autocorrectionDisabled()
-                                        .textContentType(.username)
+                                    provisioningInputField(
+                                        "Admin username",
+                                        text: $adminUsername
+                                    )
                                         .stepperInputField()
 
-                                    SecureField("Admin password", text: $adminPassword)
-                                        .textContentType(.newPassword)
+                                    provisioningInputField(
+                                        "Admin password",
+                                        text: $adminPassword,
+                                        secure: true
+                                    )
                                         .stepperInputField()
 
                                     Toggle("Mark onboarding complete", isOn: $completeOnboarding)
@@ -295,12 +298,82 @@ struct BLEProvisioningSheetView: View {
 
     @ViewBuilder
     private func nonCredentialSecretField(title: String, text: Binding<String>) -> some View {
-        TextField(title, text: text)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .textContentType(nil)
-            .keyboardType(.asciiCapable)
+        provisioningInputField(title, text: text)
             .privacySensitive()
             .stepperInputField()
+    }
+
+    @ViewBuilder
+    private func provisioningInputField(_ title: String, text: Binding<String>, secure: Bool = false) -> some View {
+        ProvisioningUIKitTextField(
+            title: title,
+            text: text,
+            secure: secure
+        )
+        .frame(minHeight: 24)
+    }
+}
+
+private struct ProvisioningUIKitTextField: UIViewRepresentable {
+    let title: String
+    @Binding var text: String
+    var secure: Bool = false
+
+    func makeUIView(context: Context) -> UITextField {
+        let textField = UITextField(frame: .zero)
+        textField.delegate = context.coordinator
+        textField.borderStyle = .none
+        textField.backgroundColor = .clear
+        textField.textColor = UIColor(StepperColor.foreground)
+        textField.tintColor = UIColor(StepperColor.primary)
+        textField.attributedPlaceholder = NSAttributedString(
+            string: title,
+            attributes: [.foregroundColor: UIColor(StepperColor.mutedForeground)]
+        )
+        textField.textContentType = nil
+        textField.autocorrectionType = .no
+        textField.spellCheckingType = .no
+        textField.autocapitalizationType = .none
+        textField.smartQuotesType = .no
+        textField.smartDashesType = .no
+        textField.smartInsertDeleteType = .no
+        textField.keyboardType = .asciiCapable
+        textField.returnKeyType = .done
+        textField.enablesReturnKeyAutomatically = false
+        textField.isSecureTextEntry = secure
+        textField.clearButtonMode = .never
+        textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return textField
+    }
+
+    func updateUIView(_ textField: UITextField, context: Context) {
+        if textField.text != text {
+            textField.text = text
+        }
+        textField.isSecureTextEntry = secure
+        textField.textColor = UIColor(StepperColor.foreground)
+        textField.tintColor = UIColor(StepperColor.primary)
+        textField.textContentType = nil
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        private let text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        func textFieldDidChangeSelection(_ textField: UITextField) {
+            text.wrappedValue = textField.text ?? ""
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            textField.resignFirstResponder()
+            return true
+        }
     }
 }

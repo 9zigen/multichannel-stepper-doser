@@ -138,7 +138,7 @@ struct ConnectionSetupView: View {
                     provisioning.startScanning()
                 }
             }
-            .sheet(item: $selectedDevice) { device in
+            .fullScreenCover(item: $selectedDevice) { device in
                 BLEProvisioningSheetView(device: device, provisioning: provisioning) { result in
                     session.beginProvisionedConnection(
                         status: result.status,
