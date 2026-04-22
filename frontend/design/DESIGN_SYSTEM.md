@@ -1560,81 +1560,154 @@ The `aA` button in the site header uses fixed `px` sizes so it never scales with
 
 ---
 
-## 19. iOS Adaptation (SwiftUI Tokens)
+## 19. iOS Adaptation (SwiftUI)
 
-The design maps cleanly to SwiftUI because:
-- **Colors** are CSS custom properties → SwiftUI `Color` extensions
-- **Typography** uses a two-size-class scale → SwiftUI Dynamic Type
-- **Spacing** is 4px-based → SwiftUI's 4pt grid
-- **Glassmorphism** → `.ultraThinMaterial` / `.regularMaterial` backgrounds
+The native iOS app (`ios/`) uses the same visual language as the web UI. All design tokens are defined in `ios/StepperDoser/Core/Design/StepperTokens.swift`. Do not add raw hex literals or magic sizes to feature views — always reference a token.
 
-### Color Mapping (Dark Mode → SwiftUI)
+### 19.1 Color Tokens (`StepperColor`)
 
-| Web token          | Hex / computed          | SwiftUI equivalent                       |
-|--------------------|-------------------------|------------------------------------------|
-| `--background`     | `#0b0e11`               | `Color(hex: 0x0b0e11)` (custom)          |
-| `--card`           | `#131820`               | `Color(hex: 0x131820)`                   |
-| `--primary`        | `#22d3ee`               | `Color(hex: 0x22d3ee)` — cyan accent     |
-| `--foreground`     | `#e2e8f0`               | `Color(hex: 0xe2e8f0)`                   |
-| `--muted-foreground` | `#64748b`             | `Color(hex: 0x64748b)`                   |
-| `--secondary`      | `#1e293b`               | `Color(hex: 0x1e293b)`                   |
-| `--destructive`    | `#ef4444`               | `Color(hex: 0xef4444)`                   |
-| `--border`         | `rgba(148,163,184,0.08)` | `Color.white.opacity(0.08)` (approx)    |
-| Amber warning      | `amber-500` = `#f59e0b` | `Color(hex: 0xf59e0b)`                   |
-| Emerald data       | `emerald-400/80`        | `Color(hex: 0x34d399).opacity(0.8)`      |
+| Token                    | Hex        | Role                              |
+|--------------------------|------------|-----------------------------------|
+| `StepperColor.background` | `#0b0e11` | Page / app background             |
+| `StepperColor.card`       | `#131820` | Deep card surface                 |
+| `StepperColor.popover`    | `#161b22` | Metric tile / dropdown surface    |
+| `StepperColor.secondary`  | `#1e293b` | Panel fill, secondary surfaces    |
+| `StepperColor.primary`    | `#22d3ee` | Cyan accent — active states, highlights |
+| `StepperColor.accent`     | `#06b6d4` | Slightly darker cyan              |
+| `StepperColor.foreground` | `#e2e8f0` | Primary text                      |
+| `StepperColor.mutedForeground` | `#64748b` | Labels, captions, placeholders |
+| `StepperColor.destructive` | `#ef4444` | Error / danger                   |
+| `StepperColor.warning`    | `#f59e0b` | Amber warning                     |
+| `StepperColor.border`     | `white 8%` | Subtle borders                   |
+| `StepperColor.input`      | `white 12%` | Input field borders              |
+| Data intensity (emerald)  | see tokens | `dataLow` / `dataMid` / `dataHigh` / `dataPeak` |
 
-### Typography Mapping
+### 19.2 Typography (`StepperFont`)
 
-| Web class          | SwiftUI              | Points |
-|--------------------|----------------------|--------|
-| `text-lg font-medium` | `.title3` bold    | ~20pt  |
-| `text-base`        | `.body`              | ~17pt  |
-| `text-sm`          | `.subheadline`       | ~15pt  |
-| `text-xs`          | `.caption`           | ~12pt  |
-| `text-[10px]`      | `.caption2`          | ~11pt  |
-| `text-[9px]`       | custom `Font.system(size: 9)` | 9pt |
-| `font-mono`        | `.monospacedDigit()` or `Font.system(.caption, design: .monospaced)` |
+All sizes are `Font.system(...)`. **Do not use Dynamic Type** — fixed sizes are intentional for information density parity with the web UI.
 
-### Spacing
+| Token                  | Size  | Weight      | Notes                                          |
+|------------------------|-------|-------------|------------------------------------------------|
+| `StepperFont.title`    | 18pt  | semibold    | Card / panel page title ("Dashboard", "Schedule") |
+| `StepperFont.section`  | 16pt  | semibold    | List item headline, group label ("Pump 1")     |
+| `StepperFont.metricValue` | 19pt | semibold  | Primary value in `StepperMetricTile` — `+ .monospacedDigit()` |
+| `StepperFont.body`     | 15pt  | regular     | Body text, form fields                         |
+| `StepperFont.small`    | 13pt  | regular     | Secondary / subtitle text ("Timed • 288s left")|
+| `StepperFont.caption`  | 12pt  | regular     | Help text, metric tile captions                |
+| `StepperFont.micro`    | 10pt  | medium      | Uppercase section labels (OVERVIEW, CONTROLLER)|
+| `StepperFont.nano`     | 9pt   | regular     | Heatmap axes, legend labels                    |
+| `StepperFont.mono`     | 13pt  | medium mono | IP addresses, firmware hashes                  |
+| `StepperFont.monoSmall`| 11pt  | medium mono | Compact monospace (history hour rows)          |
 
-Web uses Tailwind 4px scale → SwiftUI uses `CGFloat` multiples of 4:
+### 19.3 Spacing & Radius (`StepperSpacing`, `StepperRadius`, `StepperLayout`)
 
-| Tailwind    | px  | SwiftUI              |
-|-------------|-----|----------------------|
-| `gap-1`     | 4   | `spacing: 4`         |
-| `gap-2`     | 8   | `spacing: 8`         |
-| `gap-3`     | 12  | `spacing: 12`        |
-| `gap-4`     | 16  | `spacing: 16`        |
-| `p-3`       | 12  | `.padding(12)`       |
-| `px-3`      | 12  | `.padding(.horizontal, 12)` |
+| Token                         | Value | Maps to (web) |
+|-------------------------------|-------|---------------|
+| `StepperSpacing.xs`           | 4pt   | `gap-1`       |
+| `StepperSpacing.sm`           | 6pt   | `gap-1.5`     |
+| `StepperSpacing.md`           | 8pt   | `gap-2`       |
+| `StepperSpacing.lg`           | 12pt  | `gap-3 / p-3` |
+| `StepperSpacing.xl`           | 16pt  | `gap-4`       |
+| `StepperSpacing.xxl`          | 24pt  | section gap   |
+| `StepperSpacing.pagePadding`  | 12pt  | `px-3`        |
+| `StepperLayout.cardPadding`   | 16pt  | card `p-4`    |
+| `StepperLayout.panelPadding`  | 12pt  | panel `p-3`   |
+| `StepperRadius.sm`            | 2pt   | `rounded-sm`  |
+| `StepperRadius.lg`            | 8pt   | `rounded-lg`  |
+| `StepperRadius.xl`            | 12pt  | `rounded-xl`  |
+| `StepperRadius.card`          | 16pt  | `rounded-2xl` |
+| `StepperRadius.pill`          | 999pt | `rounded-full`|
 
-### Card / Panel Equivalents
+### 19.4 Component Library (StepperTokens.swift)
 
-| Web pattern               | SwiftUI equivalent                              |
-|---------------------------|--------------------------------------------------|
-| Glassmorphic card (`bg-card/80 backdrop-blur-sm`) | `.background(.ultraThinMaterial)` + corner radius |
-| Flat inner panel (`bg-secondary/10`) | `RoundedRectangle` fill with `Color.secondary.opacity(0.1)` |
-| Cyan glow on active       | `.shadow(color: Color(hex:0x22d3ee).opacity(0.15), radius: 8)` |
-| Progress bar gradient     | `LinearGradient(colors: [.cyan, .teal], ...)` |
+All components live in `StepperTokens.swift` — never duplicate them in feature files.
 
-### Page Background Gradient
+| Component / Style           | Purpose                                                  |
+|-----------------------------|----------------------------------------------------------|
+| `StepperBackground`         | Full-screen radial gradient page background              |
+| `StepperPage`               | `ZStack(background + ScrollView)` — root page shell      |
+| `StepperCard`               | Deep glassmorphic card: `bg-card/82 + ultraThinMaterial + shadow` |
+| `StepperPanel`              | Flat inner panel: `bg-secondary/10 + border stroke`      |
+| `StepperSectionLabel`       | Uppercase 10pt micro label with 1pt kerning              |
+| `StepperBadge`              | Status pill — tones: `primary / secondary / outline / warning / destructive` |
+| `StepperMetricTile`         | Stat tile: uppercase label + 19pt semibold value + caption |
+| `StepperKeyValueRow`        | Label-left / value-right row (text-xs both sides)        |
+| `StepperEmptyState`         | Icon + title + message centred placeholder               |
+| `StepperWearBar`            | Gradient progress bar with warning + replace markers     |
+| `StepperHeatmapCell`        | 14×14pt emerald intensity cell with selection ring       |
+| `StepperWeeklyHeatmap`      | Scrollable `LazyHGrid` heatmap + legend                  |
+| `StepperMiniBarChart`       | 30-day `HStack` bar chart (dimmed; selected bar = full)  |
+| `StepperPrimaryButtonStyle` | Cyan fill, full-width, 12pt vertical padding             |
+| `StepperSecondaryButtonStyle` | Secondary fill + border, full-width                    |
+| `StepperDestructiveButtonStyle` | Destructive tint, full-width                         |
+| `StepperInputShell`         | ViewModifier for text fields — `popover/92 + input border` |
+
+### 19.5 Tab Page Layout Pattern
+
+Every tab view follows this structure. **Do not use `StepperCard` as the outermost container** — it creates double indentation when inner `StepperPanel` sections are nested inside.
 
 ```swift
-// SwiftUI equivalent of the radial gradient body background
+StepperPage {
+    StepperPanel(spacing: StepperSpacing.lg, padding: 0) {
+
+        // ── Page header ──────────────────────────────────────────
+        // HStack (with badges) or VStack (without) — always padded
+        // with panelPadding so it aligns with inner panel labels.
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: StepperSpacing.sm) {
+                StepperSectionLabel(text: "Section Label")   // ← 12pt from edge
+                Text("Page Title")
+                    .font(StepperFont.title)
+                    .foregroundStyle(StepperColor.foreground)
+            }
+            Spacer()
+            // Optional trailing badges
+            StepperBadge(text: "Status", tone: .secondary)
+        }
+        .padding(StepperLayout.panelPadding)                 // ← same 12pt
+
+        // ── Content sections ─────────────────────────────────────
+        // Each StepperPanel gets its own padding: 0 (outer)
+        // + panelPadding (inner) = 12pt from outer edge. Aligned ✓
+        StepperPanel {
+            StepperSectionLabel(text: "Section One")         // ← 12pt from edge
+            // ... content
+        }
+
+        StepperPanel {
+            StepperSectionLabel(text: "Section Two")         // ← 12pt from edge
+            // ... content
+        }
+
+        // ── Bottom breath ─────────────────────────────────────────
+        // Required: outer panel has padding:0 so the last section
+        // would otherwise flush against the rounded corner.
+        Color.clear.frame(height: StepperSpacing.xs)
+    }
+}
+.navigationTitle("Page Title")
+```
+
+**Alignment rule**: `StepperPanel(padding: 0)` + header padded with `StepperLayout.panelPadding` (12pt) + inner `StepperPanel` sections (which apply their own 12pt) → all `StepperSectionLabel` elements land at the same 12pt indent from the outer edge.
+
+**When to use `StepperCard` instead**: Only for standalone floating cards that are not full-width page containers — e.g. a summary card embedded inside a `StepperPanel`, or a widget in a future home-screen widget context.
+
+### 19.6 Page Background Gradient
+
+```swift
+// StepperBackground (from StepperTokens.swift) — use via StepperPage
 ZStack {
-  Color(hex: 0x0b0e11).ignoresSafeArea()
-  RadialGradient(
-    colors: [Color(hex: 0x06b6d4).opacity(0.06), .clear],
-    center: .topLeading, startRadius: 0, endRadius: 300
-  ).ignoresSafeArea()
-  RadialGradient(
-    colors: [Color(hex: 0x22d3ee).opacity(0.04), .clear],
-    center: .topTrailing, startRadius: 0, endRadius: 240
-  ).ignoresSafeArea()
+    StepperColor.background.ignoresSafeArea()
+    RadialGradient(colors: [StepperColor.accent.opacity(0.06), .clear],
+                   center: .topLeading, startRadius: 0, endRadius: 340)
+        .ignoresSafeArea()
+    RadialGradient(colors: [StepperColor.primary.opacity(0.04), .clear],
+                   center: .topTrailing, startRadius: 0, endRadius: 260)
+        .ignoresSafeArea()
 }
 ```
 
-See `ios/StepperDoser/Core/Design/StepperTokens.swift` for a ready-to-use Swift extension file (already part of the iOS scaffold).
+See `ios/StepperDoser/Core/Design/StepperTokens.swift` for all components.
 
 ---
 

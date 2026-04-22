@@ -230,6 +230,16 @@ struct RealtimeStatusPatch: Codable, Sendable {
     var apClients: Int?
 }
 
+struct RealtimeStatusEnvelope: Codable, Sendable {
+    var type: String?
+    var status: RealtimeStatusPatch
+}
+
+struct RealtimePumpRuntimeEnvelope: Codable, Sendable {
+    var type: String?
+    var pump: PumpRuntimeEntry
+}
+
 struct RealtimeSettingsEvent: Codable, Sendable {
     var auth: AuthCredentials
     var app: AppConfiguration
@@ -245,6 +255,7 @@ enum RealtimeEvent: Sendable {
     case shuttingDown
     case systemReady(firmwareVersion: String?)
     case statusPatch(RealtimeStatusPatch)
+    case pumpRuntime(PumpRuntimeEntry)
     case settingsUpdate(SettingsResponse)
     case ignored
 }

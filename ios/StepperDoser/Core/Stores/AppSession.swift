@@ -323,6 +323,8 @@ final class AppSession {
             }
         case .statusPatch(let patch):
             apply(statusPatch: patch)
+        case .pumpRuntime(let entry):
+            apply(pumpRuntime: entry)
         case .settingsUpdate(let settings):
             self.settings = settings
             syncSelectedDeviceMetadata()
@@ -358,6 +360,15 @@ final class AppSession {
         current.apClients = patch.apClients ?? current.apClients
         status = current
         syncSelectedDeviceMetadata()
+    }
+
+    private func apply(pumpRuntime entry: PumpRuntimeEntry) {
+        if let index = runtime.firstIndex(where: { $0.id == entry.id }) {
+            runtime[index] = entry
+        } else {
+            runtime.append(entry)
+            runtime.sort { $0.id < $1.id }
+        }
     }
 
     private func activate(device: ManagedDevice) {
