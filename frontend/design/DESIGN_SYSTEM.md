@@ -23,6 +23,8 @@ A comprehensive design system reference for the ESP32 Stepper Doser web interfac
 15. [Interaction Patterns](#15-interaction-patterns)
 16. [Production Constraints](#16-production-constraints)
 17. [File Structure](#17-file-structure)
+18. [Font Scale System](#18-font-scale-system)
+19. [iOS Adaptation (SwiftUI Tokens)](#19-ios-adaptation-swiftui-tokens)
 
 ---
 
@@ -618,6 +620,244 @@ Used for destructive actions (restart, factory reset):
 </AlertDialog>
 ```
 
+### 9.12 Preset Picker (Popover + Inline Dirty Confirmation)
+
+Used in the Board Configuration page header. A small "Presets" button opens a Popover listing hardware presets. If the form is dirty, clicking a preset swaps the Popover body to an amber inline confirmation instead of opening a modal.
+
+```tsx
+// Trigger in card header
+<Popover open={presetOpen} onOpenChange={setPresetOpen}>
+  <PopoverTrigger asChild>
+    <Button variant="outline" size="sm" class="h-7 gap-1.5 text-xs">
+      <LayoutTemplate class="size-3.5" />
+      Presets
+      <ChevronDown class="size-3" />
+    </Button>
+  </PopoverTrigger>
+  <PopoverContent class="w-72 p-0" align="end">
+    {!pendingPreset ? (
+      // Normal list
+      <div class="flex flex-col py-1">
+        {BOARD_PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            onClick={() => applyPreset(preset)}
+            class="flex flex-col gap-0.5 px-3 py-2 text-left text-sm
+              hover:bg-secondary/40 transition-colors"
+          >
+            <div class="flex items-center justify-between">
+              <span class="font-medium">{preset.name}</span>
+              {isActive(preset) && <Check class="size-3.5 text-primary" />}
+            </div>
+            <span class="text-[11px] text-muted-foreground">{preset.description}</span>
+          </button>
+        ))}
+      </div>
+    ) : (
+      // Inline amber dirty-state confirmation
+      <div class="p-3">
+        <div class="mb-2 flex items-center gap-2 text-sm font-medium text-amber-500">
+          <AlertTriangle class="size-4" /> Unsaved changes
+        </div>
+        <p class="mb-3 text-[11px] text-muted-foreground">
+          Apply "{pendingPreset.name}" and discard current edits?
+        </p>
+        <div class="flex gap-2">
+          <Button size="sm" class="h-7 flex-1" onClick={confirmApplyPreset}>
+            Apply anyway
+          </Button>
+          <Button variant="outline" size="sm" class="h-7" onClick={() => setPendingPreset(null)}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    )}
+  </PopoverContent>
+</Popover>
+```
+
+Active preset detection: `JSON.stringify(currentConfig) === JSON.stringify(preset.config)`.
+
+### 9.13 Drop Zone (File Import)
+
+Used in the Backup & Restore page. A bordered dashed area that responds to drag events and click-to-select:
+
+```tsx
+<div
+  onClick={() => fileInputRef.current?.click()}
+  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+  onDragLeave={() => setIsDragging(false)}
+  onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFile(e.dataTransfer.files[0]); }}
+  class={cn(
+    "flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-8",
+    "transition-colors text-center",
+    isDragging
+      ? "border-primary/60 bg-primary/5 text-primary"
+      : "border-border/50 bg-secondary/5 text-muted-foreground hover:border-border hover:bg-secondary/10"
+  )}
+>
+  <Upload class="size-8 opacity-50" />
+  <div>
+    <p class="text-sm font-medium">Drop config file here</p>
+    <p class="text-[11px] mt-0.5">or click to browse — .json files only</p>
+  </div>
+</div>
+<input ref={fileInputRef} type="file" accept=".json" class="hidden"
+  onChange={(e) => handleFile(e.target.files?.[0])} />
+```
+
+### 9.14 File Info Panel (Post-Parse Import)
+
+Displayed after a config file is successfully parsed:
+
+```tsx
+<div class="rounded-lg border border-border/40 bg-secondary/10 p-3">
+  <div class="flex items-start justify-between gap-2">
+    <div class="grid gap-1.5 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="text-muted-foreground">Version</span>
+        <Badge variant={versionOk ? "secondary" : "outline"}
+          class={cn("text-[10px]", !versionOk && "border-amber-500/40 text-amber-500")}>
+          v{parsed.version}
+        </Badge>
+        {versionStatus !== 'ok' && (
+          <span class="text-[10px] text-amber-500">
+            ({versionStatus === 'older' ? 'older format' : 'newer format'})
+          </span>
+        )}
+      </div>
+      <div class="flex gap-1.5">
+        <span class="text-muted-foreground">Exported</span>
+        <span class="tabular-nums">{formatDate(parsed.exported_at)}</span>
+      </div>
+      <div class="flex gap-1.5">
+        <span class="text-muted-foreground">Firmware</span>
+        <span>{parsed.device_info.firmware_version}</span>
+      </div>
+    </div>
+    <Button variant="ghost" size="icon" class="size-6 shrink-0" onClick={clearFile}>
+      <XCircle class="size-4" />
+    </Button>
+  </div>
+</div>
+```
+
+### 9.15 Per-Row Result Item (Import Outcome)
+
+Applied sequentially after import completes — each section shows ✓ or ✗:
+
+```tsx
+{applyResults.map((result) => (
+  <div key={result.section}
+    class="flex items-center gap-2 rounded-md border border-border/30 bg-secondary/10 px-3 py-2 text-xs">
+    {result.success
+      ? <CheckCircle2 class="size-3.5 shrink-0 text-emerald-500" />
+      : <XCircle class="size-3.5 shrink-0 text-destructive" />}
+    <span class="flex-1 font-medium">{SECTION_META[result.section].label}</span>
+    {!result.success && (
+      <span class="text-destructive/80 truncate max-w-[180px]">{result.error}</span>
+    )}
+  </div>
+))}
+```
+
+### 9.16 Amber Action Banner (Restart Recommendation)
+
+Displayed after a config import that requires a device restart:
+
+```tsx
+<div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+  <div class="flex items-center justify-between gap-3">
+    <div class="flex items-start gap-2">
+      <AlertTriangle class="mt-0.5 size-4 shrink-0 text-amber-500" />
+      <div>
+        <p class="text-sm font-medium text-amber-500">Restart recommended</p>
+        <p class="text-[11px] text-muted-foreground mt-0.5">
+          Applied sections require a device restart to take effect.
+        </p>
+      </div>
+    </div>
+    <Button size="sm" variant="outline"
+      class="shrink-0 border-amber-500/40 text-amber-500 hover:bg-amber-500/10">
+      Restart now
+    </Button>
+  </div>
+</div>
+```
+
+### 9.17 Peripheral Config Row (GPIO / ADC)
+
+Used in the Board Configuration page for GPIO inputs, outputs, and ADC channels. Each row is a horizontal strip with a label, a `Switch` enable toggle, and contextual selects/number inputs — all dimmed at 60% opacity when disabled:
+
+```tsx
+{config.gpio_inputs.map((inp) => (
+  <div key={inp.id}
+    class={cn(
+      "flex flex-wrap items-center gap-3 rounded-md border border-border/30 bg-background/40 px-3 py-2",
+      !inp.enabled && "opacity-60"
+    )}>
+    {/* Enable toggle */}
+    <Switch checked={inp.enabled}
+      onCheckedChange={(v) => updateGpioInput(inp.id, 'enabled', v)} />
+    {/* Pin label */}
+    <span class="min-w-[52px] text-xs font-medium tabular-nums">IO{inp.pin}</span>
+    {/* Pull resistor */}
+    <Select value={String(inp.pull)} disabled={!inp.enabled}
+      onValueChange={(v) => updateGpioInput(inp.id, 'pull', Number(v))}>
+      <SelectTrigger class="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="0">None</SelectItem>
+        <SelectItem value="1">Pull-up</SelectItem>
+        <SelectItem value="2">Pull-down</SelectItem>
+      </SelectContent>
+    </Select>
+    {/* Active level */}
+    <Select value={String(inp.active_level)} disabled={!inp.enabled}
+      onValueChange={(v) => updateGpioInput(inp.id, 'active_level', Number(v))}>
+      <SelectTrigger class="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="1">High (1)</SelectItem>
+        <SelectItem value="0">Low (0)</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+))}
+```
+
+### 9.18 Section Checkbox Selector
+
+Used in the Backup & Restore import flow to let the user choose which config sections to restore:
+
+```tsx
+{ALL_SECTIONS.map((section) => {
+  const meta = SECTION_META[section];
+  const available = !!parsed[section];
+  return (
+    <div key={section}
+      class={cn(
+        "flex items-start gap-3 rounded-lg border border-border/40 bg-secondary/10 p-3",
+        !available && "opacity-50"
+      )}>
+      <Checkbox id={section} checked={selected.has(section)} disabled={!available}
+        onCheckedChange={(checked) => toggleSection(section, !!checked)}
+        class="mt-0.5" />
+      <div class="grid gap-0.5">
+        <Label htmlFor={section} class="text-sm font-medium cursor-pointer">
+          {meta.label}
+          {meta.requiresRestart && (
+            <Badge variant="outline" class="ml-2 text-[9px] border-amber-500/40 text-amber-500">
+              restart
+            </Badge>
+          )}
+        </Label>
+        <span class="text-[11px] text-muted-foreground">{meta.description}</span>
+        {!available && <span class="text-[10px] text-muted-foreground/60">Not in this file</span>}
+      </div>
+    </div>
+  );
+})}
+```
+
 ---
 
 ## 10. Animation System
@@ -897,6 +1137,54 @@ Grid template for a row mixing inputs and a switch:
 </div>
 ```
 
+### I2C Address Input (Hex / Decimal)
+
+Board config uses text inputs for I2C addresses to support both `0x6F` and `111` notation. Display with `formatI2cAddr`, parse with `parseI2cInput` from `src/lib/board-config.ts`:
+
+```tsx
+<Input
+  type="text"
+  value={formatI2cAddr(config.rtc_i2c_addr)}      // "0x6F"
+  onChange={(e) => updateSharedField('rtc_i2c_addr', parseI2cInput(e.target.value))}
+  class="h-8 font-mono text-sm tabular-nums"
+  placeholder="0x6F"
+/>
+```
+
+`formatI2cAddr(n)` → `"0x6F"` (uppercase hex, 2-digit zero-padded)
+`parseI2cInput(s)` → accepts `"0x6F"` or `"111"`, returns 0 on invalid input.
+
+### CAN / Negative-Sentinel Pin Input
+
+GPIO pins that are disabled use `-1` as a sentinel. Map empty/zero from the input back to `-1`:
+
+```tsx
+<Input
+  type="number"
+  value={config.can_tx_pin === -1 ? '' : config.can_tx_pin}
+  onChange={(e) => updateSharedField('can_tx_pin', parseNumericInput(e.target.value) || -1)}
+  class="h-8 text-sm tabular-nums"
+  placeholder="-1 (disabled)"
+/>
+```
+
+### GPIO Peripheral Row Layout
+
+A row mixing Switch + pin label + Selects for a GPIO input/output configuration. Uses `flex-wrap` so it collapses cleanly on narrow viewports:
+
+```tsx
+// Grid wrapper for all GPIO rows
+<div class="flex flex-col gap-2">
+  {/* Each row: */}
+  <div class="flex flex-wrap items-center gap-3 rounded-md border border-border/30 bg-background/40 px-3 py-2">
+    <Switch ... />
+    <span class="min-w-[52px] text-xs font-medium tabular-nums">IO{pin}</span>
+    <Select ...>  {/* Pull: None / Pull-up / Pull-down */}
+    <Select ...>  {/* Active level: High (1) / Low (0) */}
+  </div>
+</div>
+```
+
 ### Submit Button
 
 ```html
@@ -1148,16 +1436,31 @@ frontend/
 ├── components.json              # shadcn/ui configuration
 ├── src/
 │   ├── index.css                # Theme variables, animations, gradients
+│   ├── routes.tsx               # React Router routes
 │   ├── pages/
 │   │   ├── Home.tsx             # Dashboard with 12-col grid
 │   │   ├── History.tsx          # Heatmap + day detail (single card)
-│   │   └── Schedule.tsx         # Pump schedule config (single card)
+│   │   ├── Schedule.tsx         # Pump schedule config (single card)
+│   │   ├── Login.tsx            # Basic auth login form
+│   │   ├── Onboarding.tsx       # First-run setup
+│   │   ├── Settings.Board.tsx   # Board config + preset picker + peripherals
+│   │   ├── Settings.Backup.tsx  # Export/import config (Backup & Restore)
+│   │   ├── Settings.Network.tsx # Wi-Fi / Ethernet network settings
+│   │   ├── Settings.Services.tsx# NTP, MQTT, hostname settings
+│   │   ├── Settings.Pumps.tsx   # Pump parameters
+│   │   ├── Settings.Aging.tsx   # Pump wear thresholds
+│   │   ├── Settings.Firmware.tsx# OTA firmware update
+│   │   └── Settings.Api.tsx     # REST API reference
 │   ├── components/
 │   │   ├── ui/                  # shadcn/ui primitives (50+ components)
 │   │   │   ├── badge.tsx
 │   │   │   ├── button.tsx
 │   │   │   ├── card.tsx
+│   │   │   ├── checkbox.tsx
 │   │   │   ├── input.tsx
+│   │   │   ├── popover.tsx
+│   │   │   ├── select.tsx
+│   │   │   ├── switch.tsx
 │   │   │   ├── toggle.tsx
 │   │   │   ├── toggle-group.tsx
 │   │   │   ├── alert-dialog.tsx
@@ -1169,6 +1472,7 @@ frontend/
 │   │   │   ├── pump-history-today-card.tsx
 │   │   │   ├── pump-history-card.tsx
 │   │   │   ├── connectivity-stability-card.tsx
+│   │   │   ├── maintenance-actions-card.tsx
 │   │   │   ├── system-card.tsx
 │   │   │   └── pump-history/
 │   │   │       ├── heatmap.tsx
@@ -1177,18 +1481,160 @@ frontend/
 │   │   │       ├── skeletons.tsx
 │   │   │       ├── use-pump-history.ts
 │   │   │       └── utils.ts
-│   │   ├── device-maintenance-actions.tsx
+│   │   ├── network-form/        # Modular network form components
+│   │   │   ├── add-network-combobox.tsx
+│   │   │   ├── common-ipv4-fields.tsx
+│   │   │   ├── wifi-ipv4-fields.tsx
+│   │   │   └── ethernet-ipv4-fields.tsx
+│   │   ├── app-sidebar.tsx      # Left navigation sidebar
+│   │   ├── site-header.tsx      # Top header with breadcrumb + font scale toggle
+│   │   ├── font-scale-provider.tsx  # Default/Large font preference
+│   │   ├── realtime-provider.tsx    # WebSocket lifecycle
 │   │   ├── schedule-form.tsx
-│   │   └── schedule-utils.ts
+│   │   ├── services-form.tsx
+│   │   ├── pump-form.tsx
+│   │   ├── pump-calibration.tsx
+│   │   ├── network-form.tsx
+│   │   ├── login-form.tsx
+│   │   └── device-maintenance-actions.tsx
 │   ├── hooks/
-│   │   └── use-store.ts         # Zustand store
+│   │   └── use-store.ts         # Zustand global store
 │   └── lib/
 │       ├── api.ts               # API types and fetch functions
 │       ├── utils.ts             # cn() utility (clsx + tailwind-merge)
-│       └── board-config.ts      # Hardware config helpers
+│       ├── board-config.ts      # Hardware config helpers, RPM math, I2C formatting
+│       ├── board-presets.ts     # Fysetc E4 v1.0 hardware presets
+│       ├── config-export.ts     # ConfigExport type, Zod schema, build/parse/apply
+│       └── mock-backend.ts      # Local dev mock (mirrors firmware API)
 └── design/
     └── DESIGN_SYSTEM.md         # This file
 ```
+
+---
+
+## 18. Font Scale System
+
+### Two-Size Preference
+
+The UI supports two root font sizes, stored in `localStorage` under key `"ui-font-scale"`. The active value is set as `data-font-scale="default|large"` on `document.documentElement`.
+
+| Value     | Root font-size | When to use            |
+|-----------|----------------|------------------------|
+| `default` | `16px`         | Standard density       |
+| `large`   | `19px`         | Accessibility / hi-DPI |
+
+Because all Tailwind utilities use `rem`, bumping `html { font-size }` scales the **entire UI proportionally** — no per-component overrides needed.
+
+### CSS Hook
+
+```css
+/* src/index.css — inside @layer base */
+html {
+  @apply font-sans;
+  &[data-font-scale='large'] { font-size: 19px; }
+}
+```
+
+### Toggle Button
+
+The `aA` button in the site header uses fixed `px` sizes so it never scales with the preference:
+
+```tsx
+// site-header.tsx — ButtonFontScale
+<Button
+  variant="ghost"
+  size="icon"
+  onClick={toggle}
+  aria-label="Toggle font size"
+>
+  <span aria-hidden style={{ fontSize: scale === 'large' ? '16px' : '11px' }}>
+    aA
+  </span>
+</Button>
+```
+
+### Key Files
+
+- `src/components/font-scale-provider.tsx` — reads/writes localStorage, applies `data-font-scale`
+- `src/components/site-header.tsx` — `ButtonFontScale` component
+
+---
+
+## 19. iOS Adaptation (SwiftUI Tokens)
+
+The design maps cleanly to SwiftUI because:
+- **Colors** are CSS custom properties → SwiftUI `Color` extensions
+- **Typography** uses a two-size-class scale → SwiftUI Dynamic Type
+- **Spacing** is 4px-based → SwiftUI's 4pt grid
+- **Glassmorphism** → `.ultraThinMaterial` / `.regularMaterial` backgrounds
+
+### Color Mapping (Dark Mode → SwiftUI)
+
+| Web token          | Hex / computed          | SwiftUI equivalent                       |
+|--------------------|-------------------------|------------------------------------------|
+| `--background`     | `#0b0e11`               | `Color(hex: 0x0b0e11)` (custom)          |
+| `--card`           | `#131820`               | `Color(hex: 0x131820)`                   |
+| `--primary`        | `#22d3ee`               | `Color(hex: 0x22d3ee)` — cyan accent     |
+| `--foreground`     | `#e2e8f0`               | `Color(hex: 0xe2e8f0)`                   |
+| `--muted-foreground` | `#64748b`             | `Color(hex: 0x64748b)`                   |
+| `--secondary`      | `#1e293b`               | `Color(hex: 0x1e293b)`                   |
+| `--destructive`    | `#ef4444`               | `Color(hex: 0xef4444)`                   |
+| `--border`         | `rgba(148,163,184,0.08)` | `Color.white.opacity(0.08)` (approx)    |
+| Amber warning      | `amber-500` = `#f59e0b` | `Color(hex: 0xf59e0b)`                   |
+| Emerald data       | `emerald-400/80`        | `Color(hex: 0x34d399).opacity(0.8)`      |
+
+### Typography Mapping
+
+| Web class          | SwiftUI              | Points |
+|--------------------|----------------------|--------|
+| `text-lg font-medium` | `.title3` bold    | ~20pt  |
+| `text-base`        | `.body`              | ~17pt  |
+| `text-sm`          | `.subheadline`       | ~15pt  |
+| `text-xs`          | `.caption`           | ~12pt  |
+| `text-[10px]`      | `.caption2`          | ~11pt  |
+| `text-[9px]`       | custom `Font.system(size: 9)` | 9pt |
+| `font-mono`        | `.monospacedDigit()` or `Font.system(.caption, design: .monospaced)` |
+
+### Spacing
+
+Web uses Tailwind 4px scale → SwiftUI uses `CGFloat` multiples of 4:
+
+| Tailwind    | px  | SwiftUI              |
+|-------------|-----|----------------------|
+| `gap-1`     | 4   | `spacing: 4`         |
+| `gap-2`     | 8   | `spacing: 8`         |
+| `gap-3`     | 12  | `spacing: 12`        |
+| `gap-4`     | 16  | `spacing: 16`        |
+| `p-3`       | 12  | `.padding(12)`       |
+| `px-3`      | 12  | `.padding(.horizontal, 12)` |
+
+### Card / Panel Equivalents
+
+| Web pattern               | SwiftUI equivalent                              |
+|---------------------------|--------------------------------------------------|
+| Glassmorphic card (`bg-card/80 backdrop-blur-sm`) | `.background(.ultraThinMaterial)` + corner radius |
+| Flat inner panel (`bg-secondary/10`) | `RoundedRectangle` fill with `Color.secondary.opacity(0.1)` |
+| Cyan glow on active       | `.shadow(color: Color(hex:0x22d3ee).opacity(0.15), radius: 8)` |
+| Progress bar gradient     | `LinearGradient(colors: [.cyan, .teal], ...)` |
+
+### Page Background Gradient
+
+```swift
+// SwiftUI equivalent of the radial gradient body background
+ZStack {
+  Color(hex: 0x0b0e11).ignoresSafeArea()
+  RadialGradient(
+    colors: [Color(hex: 0x06b6d4).opacity(0.06), .clear],
+    center: .topLeading, startRadius: 0, endRadius: 300
+  ).ignoresSafeArea()
+  RadialGradient(
+    colors: [Color(hex: 0x22d3ee).opacity(0.04), .clear],
+    center: .topTrailing, startRadius: 0, endRadius: 240
+  ).ignoresSafeArea()
+}
+```
+
+See `ios/StepperDoser/Core/Design/StepperTokens.swift` for a ready-to-use Swift extension file (already part of the iOS scaffold).
 
 ---
 
@@ -1208,7 +1654,8 @@ To replicate this design for a similar IoT controller product:
 10. **Add page containers**: Use Section 5 page container pattern
 11. **Enable staggered animations**: Apply `animate-fade-in-up` with `${index * 50}ms` delays
 12. **Test mobile**: Ensure all grid children have `min-w-0`, hide non-essential columns
+13. **Add font scale toggle**: Implement `font-scale-provider.tsx` + `data-font-scale` hook (Section 18)
 
 ---
 
-*Generated from the Stepper Doser v0.0.0 codebase. Last updated: 2026-04-13.*
+*Generated from the Stepper Doser codebase. Last updated: 2026-04-22.*
