@@ -70,15 +70,25 @@ enum StepperLayout {
 }
 
 enum StepperFont {
-    static let title = Font.system(size: 18, weight: .medium)
-    static let section = Font.system(size: 16, weight: .medium)
-    static let body = Font.system(size: 14)
-    static let small = Font.system(size: 12)
-    static let micro = Font.system(size: 10, weight: .medium)
-    static let nano = Font.system(size: 9)
-    static let caption = Font.system(size: 11)
-    static let mono = Font.system(size: 13, weight: .medium, design: .monospaced)
-    static let monoSmall = Font.system(size: 11, weight: .medium, design: .monospaced)
+    /// Card / panel title — e.g. "Dashboard", section heading
+    static let title        = Font.system(size: 18, weight: .semibold)
+    /// List item headline — e.g. "Pump 1", form group label
+    static let section      = Font.system(size: 16, weight: .semibold)
+    /// Primary metric value inside StepperMetricTile — large, bold, tabular
+    static let metricValue  = Font.system(size: 19, weight: .semibold).monospacedDigit()
+    /// Body / form field text
+    static let body         = Font.system(size: 15)
+    /// Secondary text — table cells, descriptions
+    static let small        = Font.system(size: 13)
+    /// Uppercase micro labels — section headers, tile labels
+    static let micro        = Font.system(size: 10, weight: .medium)
+    /// Nano — heatmap axes, legend
+    static let nano         = Font.system(size: 9)
+    /// Help text / captions beneath form fields
+    static let caption      = Font.system(size: 12)
+    /// Monospaced numeric — IP addresses, firmware hashes
+    static let mono         = Font.system(size: 13, weight: .medium, design: .monospaced)
+    static let monoSmall    = Font.system(size: 11, weight: .medium, design: .monospaced)
 }
 
 enum StepperBadgeTone {
@@ -338,17 +348,17 @@ struct StepperMetricTile: View {
     var tone: StepperMetricTone = .neutral
 
     var body: some View {
-        VStack(alignment: .leading, spacing: StepperSpacing.xs) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(label.uppercased())
                 .font(StepperFont.micro)
                 .kerning(0.8)
                 .foregroundStyle(StepperColor.mutedForeground)
 
             Text(value)
-                .font(StepperFont.section)
+                .font(StepperFont.metricValue)
                 .foregroundStyle(valueColor)
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                .minimumScaleFactor(0.75)
 
             if let caption {
                 Text(caption)
