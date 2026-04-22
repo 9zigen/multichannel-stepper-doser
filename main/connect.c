@@ -52,8 +52,6 @@ static bool wifi_should_keep_ap_enabled(void);
 static void wifi_sync_onboarding_services(void);
 #if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
 static void wifi_enable_recovery_mode(void);
-static void wifi_disable_recovery_mode(void);
-static void wifi_begin_ap_grace_period(void);
 static void wifi_end_ap_grace_period(void);
 #endif
 static void wifi_enable_ap_fallback(void);
@@ -455,37 +453,6 @@ static void wifi_enable_recovery_mode(void)
     wifi_sync_onboarding_services();
 }
 
-static void wifi_disable_recovery_mode(void)
-{
-    if (!recovery_mode_active) {
-        return;
-    }
-
-    ESP_LOGI(TAG, "Disabling recovery mode");
-    recovery_mode_active = false;
-    wifi_refresh_ap_timers();
-    wifi_sync_onboarding_services();
-}
-
-static void wifi_begin_ap_grace_period(void)
-{
-    network_t *profile = wifi_get_active_profile();
-
-    if (!wifi_has_profiles() || (profile != NULL && profile->keep_ap_active)) {
-        ap_grace_active = false;
-        wifi_refresh_ap_timers();
-        wifi_sync_onboarding_services();
-        return;
-    }
-
-    if (!ap_grace_active) {
-        ESP_LOGI(TAG, "Starting temporary AP grace period");
-    }
-    ap_grace_active = true;
-    wifi_refresh_ap_timers();
-    wifi_sync_onboarding_services();
-}
-
 static void wifi_end_ap_grace_period(void)
 {
     if (!ap_grace_active) {
@@ -494,6 +461,28 @@ static void wifi_end_ap_grace_period(void)
 
     ESP_LOGI(TAG, "Ending AP grace period");
     ap_grace_active = false;
+    wifi_refresh_ap_timers();
+    wifi_sync_onboarding_services();
+}
+
+static void wifi_complete_provisioning_cycle(void)
+{
+    network_t *profile = wifi_get_active_profile();
+    bool should_keep_grace = wifi_has_profiles() && (profile == NULL || !profile->keep_ap_active);
+
+    if (ap_fallback_active) {
+        ESP_LOGI(TAG, "Disabling fallback AP");
+    }
+    if (recovery_mode_active) {
+        ESP_LOGI(TAG, "Disabling recovery mode");
+    }
+    if (should_keep_grace && !ap_grace_active) {
+        ESP_LOGI(TAG, "Starting temporary AP grace period");
+    }
+
+    ap_fallback_active = false;
+    recovery_mode_active = false;
+    ap_grace_active = should_keep_grace;
     wifi_refresh_ap_timers();
     wifi_sync_onboarding_services();
 }
@@ -625,9 +614,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
 #if CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING
         if (completed_provisioning_cycle) {
-            wifi_disable_ap_fallback();
-            wifi_disable_recovery_mode();
-            wifi_begin_ap_grace_period();
+            wifi_complete_provisioning_cycle();
         }
 
         if (!recovery_mode_active &&

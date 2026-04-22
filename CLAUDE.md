@@ -101,6 +101,21 @@ idf.py flash monitor
 
 The `legacy` profile layers `sdkconfig.defaults.legacy` on top of `defconfig` — no changes to the main `sdkconfig` file needed.
 
+For BLE provisioning tests, use `./scripts/test-ble-provisioning.py`. It speaks
+the repo's custom encrypted JSON `prov-config` / `prov-status` flow over BLE,
+so it is the right test tool here instead of stock `esp_prov.py` Wi-Fi config
+commands.
+
+The BLE test script depends on ESP-IDF's `esp_prov` Python helpers plus the
+extra `protobuf` and `bleak` packages from
+`$IDF_PATH/tools/requirements/requirements.test-specific.txt`. If a local
+environment only has the default ESP-IDF Python requirements installed, run:
+
+```bash
+. $HOME/dev/sdk/esp32/esp-idf-5.5.4/export.sh
+python3 -m pip install -r $IDF_PATH/tools/requirements/requirements.test-specific.txt
+```
+
 ---
 
 ## 3. Firmware — What I've Learned
