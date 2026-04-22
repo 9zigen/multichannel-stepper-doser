@@ -10,11 +10,17 @@ Guidance for Claude Code (and future AI agents) working in this repository. Read
 
 **Architecture**:
 - **Firmware**: ESP-IDF (C/C++), CMake build system
-  - `main/` — application entry point
-  - `components/` — custom ESP-IDF components (stepper driver, scheduler, API, storage)
+  - `main/` — application entry point (`main.c`, `connect.c`, `led.c`, `stepper_task.c`)
+  - `components/` — custom ESP-IDF components:
+    - `app_settings` — NVS-backed settings store; `stepper_board_config_t` is the canonical C struct for board config
+    - `app_http_backend` — REST API handlers (`/api/board-config`, `/api/settings`, etc.)
+    - `app_provisioning` — BLE-assisted onboarding via `protocomm_ble`; disabled at compile-time with `CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING=n`
+    - `app_pumps`, `app_monitor`, `app_mqtt`, `app_time`, `app_interfaces`, `app_adc` — feature components
   - `managed_components/` — third-party components
   - `partitions.csv` — flash layout
   - `ota_server.py` — OTA update helper
+  - `scripts/build-profile.sh` — build helper for firmware profiles (see §2)
+  - `defconfig` + `sdkconfig.defaults.legacy` — base sdkconfig files for the two profiles
 - **Frontend**: React 19 + TypeScript + Vite (embedded in firmware binary)
   - `frontend/src/` — source
   - `frontend/dist/` — build output that gets embedded
@@ -76,16 +82,92 @@ If you need to run lint/format, invoke the local binary directly the same way: `
 
 ### Firmware
 
+Two build profiles are available:
+
+| Profile | BLE provisioning | Description |
+|---------|-----------------|-------------|
+| `default` | ✅ enabled | Full feature set — `protocomm_ble` onboarding, AP grace period |
+| `legacy` | ❌ disabled | AP-only onboarding; BLE stack excluded; Wi-Fi IRAM optimization re-enabled |
+
 ```bash
-idf.py build             # ESP-IDF build
-idf.py flash monitor     # flash + serial monitor
+# Build (after sourcing ESP-IDF environment)
+./scripts/build-profile.sh default          # → build/
+./scripts/build-profile.sh legacy           # → build-legacy/
+./scripts/build-profile.sh default my-dir  # custom build dir
+
+# Flash + monitor (standard)
+idf.py flash monitor
 ```
+
+The `legacy` profile layers `sdkconfig.defaults.legacy` on top of `defconfig` — no changes to the main `sdkconfig` file needed.
 
 ---
 
-## 3. Frontend — What I've Learned
+## 3. Firmware — What I've Learned
 
-### 3.1 Tailwind CSS v4 — CSS-based Config
+### 3.1 Board config C struct alignment
+
+The frontend `BoardConfigState` TypeScript type must stay in sync with `stepper_board_config_t` in `components/app_settings/include/app_settings.h`. Key field correspondences:
+
+| TypeScript field | C field | Type |
+|---|---|---|
+| `uart` | `uart` | `uint8_t` |
+| `tx_pin` / `rx_pin` | `tx_pin` / `rx_pin` | `int32_t` |
+| `motors_num` | `motors_num` | `uint8_t` |
+| `channels[]` | `channels[MAX_PUMP]` | `stepper_channel_config_t` |
+| `rtc_i2c_addr` / `eeprom_i2c_addr` | same | `uint8_t` |
+| `i2c_sda_pin` / `i2c_scl_pin` | same | `int32_t` |
+| `can_tx_pin` / `can_rx_pin` | same | `int32_t` (-1 = disabled) |
+| `adc_channels[]` | `adc_channels[MAX_BOARD_ADC_CHANNELS]` | `adc_channel_config_t` |
+| `gpio_inputs[]` | `gpio_inputs[MAX_BOARD_GPIO_INPUTS]` | `gpio_input_config_t` |
+| `gpio_outputs[]` | `gpio_outputs[MAX_BOARD_GPIO_OUTPUTS]` | `gpio_output_config_t` |
+
+Constants: `MAX_BOARD_ADC_CHANNELS = 2`, `MAX_BOARD_GPIO_INPUTS = 3`, `MAX_BOARD_GPIO_OUTPUTS = 3`.
+
+The `board_gpio_pull_t` C enum (`BOARD_GPIO_PULL_NONE=0`, `BOARD_GPIO_PULL_UP=1`, `BOARD_GPIO_PULL_DOWN=2`) matches the TypeScript `GpioPull` enum exactly.
+
+### 3.2 BLE Provisioning (`app_provisioning`)
+
+The `app_provisioning` component provides BLE-assisted Wi-Fi onboarding using ESP-IDF `protocomm_ble`. It is **only compiled in** when `CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING=y` (default profile).
+
+**BLE service UUID**: `92345101-5a91-4e9f-9b31-5e4a2c2fd27d`
+
+**Endpoints** (GATT characteristics):
+
+| Endpoint name | UUID | Purpose |
+|---|---|---|
+| `prov-session` | 0xFF51 | Security handshake (Security1) |
+| `proto-ver` | 0xFF52 | Read version/capabilities JSON |
+| `prov-config` | 0xFF53 | Write Wi-Fi credentials + services |
+| `prov-status` | 0xFF54 | Read current connection status |
+
+**`prov-config` write payload** (JSON):
+```json
+{
+  "network": { "ssid": "...", "password": "...", "ip_address": "...", "mask": "...", "gateway": "...", "dns": "..." },
+  "services": { "hostname": "...", "time_zone": "..." }
+}
+```
+
+**`prov-status` read response** (JSON): includes `ble_active`, `recovery_mode`, `fallback_mode`, `grace_mode`, `station_connected`, `station_ssid`, `station_ip_address`, `ap_ssid`, `ap_ip_address`, `ap_clients`, `hostname`, `time_zone`.
+
+**Wi-Fi state machine additions** (in `connect.c`, default profile only):
+
+| State flag | Meaning |
+|---|---|
+| `ap_fallback_active` | Fallback AP is up because STA failed — existing |
+| `recovery_mode_active` | AP raised because no STA profiles exist; BLE provisioning active |
+| `ap_grace_active` | STA just connected; AP stays up for `WIFI_AP_GRACE_TIMEOUT_MS` to allow BLE finish |
+
+**Security**: `protocomm_security1` with a PoP (Proof-of-Possession) string derived from the device MAC.
+
+**Frontend note**: There is **no frontend page** for BLE provisioning — it is a firmware-side out-of-band flow. The web UI is unreachable during provisioning (device has no IP yet). Once the device connects to Wi-Fi the web UI becomes available normally.
+
+---
+
+## 4. Frontend — What I've Learned
+
+### 4.1 Tailwind CSS v4 — CSS-based Config
 
 This project uses **Tailwind CSS v4**. There is NO `tailwind.config.js` for theme. All theme tokens live in `src/index.css` inside `:root`, `.dark`, and `@theme inline` blocks. When adding design tokens:
 
@@ -93,11 +175,11 @@ This project uses **Tailwind CSS v4**. There is NO `tailwind.config.js` for them
 - Map it inside `@theme inline` so Tailwind utilities pick it up
 - Keyframes for `--animate-*` tokens must be defined inside the `@theme inline` block (this is a v4 quirk)
 
-### 3.2 shadcn/ui Style: `radix-nova`
+### 4.2 shadcn/ui Style: `radix-nova`
 
 Component styling is defined in `components.json` with `style: "radix-nova"` and `iconLibrary: "tabler"`. The project uses both Tabler (`@tabler/icons-react`) and Lucide (`lucide-react`) icons. When adding new shadcn components, scaffold via `npx shadcn@latest add <component>` — do not hand-write primitive components.
 
-### 3.3 Design System — Read First
+### 4.3 Design System — Read First
 
 Before any UI work read `frontend/design/DESIGN_SYSTEM.md`. It documents:
 
@@ -109,7 +191,7 @@ Before any UI work read `frontend/design/DESIGN_SYSTEM.md`. It documents:
 
 Match existing patterns exactly. Do not invent new patterns without a strong reason.
 
-### 3.4 Core UI Patterns (the ones you WILL reuse)
+### 4.4 Core UI Patterns (the ones you WILL reuse)
 
 **Card wrapper** — every page uses this glassmorphic card:
 
@@ -143,17 +225,17 @@ Match existing patterns exactly. Do not invent new patterns without a strong rea
 className="border-primary/30 bg-primary/10 text-primary shadow-[0_0_12px_rgba(34,211,238,0.1)]"
 ```
 
-### 3.5 State Management
+### 4.5 State Management
 
 Global state: **Zustand** (`src/hooks/use-store.ts`). Access with `useAppStore((state) => state.xxx)` — always use a selector, never `useAppStore()` without one (avoids over-rendering).
 
 Forms: **React Hook Form + Zod** (`@hookform/resolvers/zod`). Define a `FormSchema` with zod and mirror it as a `FormData` TypeScript type.
 
-### 3.6 API Layer
+### 4.6 API Layer
 
 `src/lib/api.ts` holds fetch helpers and types. Async actions return `{ success: boolean }` style results. Wrap calls in try/catch and surface outcomes via `sonner` toasts (`toast.success`, `toast.error`).
 
-### 3.7 Realtime Status Design
+### 4.7 Realtime Status Design
 
 The device serves two different realtime patterns over WebSocket and they should stay distinct:
 
@@ -191,7 +273,7 @@ Current tracked minimum set for `status_patch`:
 
 Use `components/app_events` as the bridge between producers and websocket broadcasting. For immediate connection UX, Wi-Fi/IP/AP client transitions should publish right inside `main/connect.c` instead of waiting for the periodic monitor timer.
 
-### 3.8 Adding a new settings field end-to-end
+### 4.8 Adding a new settings field end-to-end
 
 When the firmware gains a new settings field (e.g. a new MQTT/service option), four frontend files need to change in lockstep — missing any one will fail `tsc -b`:
 
@@ -217,7 +299,7 @@ For **inline boolean flags placed on a field row** (e.g. MQTT Retain sitting alo
 
 The `flex h-8 items-center` wrapper ensures the switch vertically aligns with `h-8` inputs in the same grid row.
 
-### 3.9 Font scale preference
+### 4.9 Font scale preference
 
 Two-size system: **Default** (16 px root) and **Large** (19 px root). Stored as `"ui-font-scale"` in `localStorage`, applied as `data-font-scale="default|large"` on `document.documentElement`.
 
@@ -233,11 +315,11 @@ Because Tailwind v4 spacing and typography utilities use `rem`, setting `html { 
 
 Key files: `src/components/font-scale-provider.tsx`, `src/components/site-header.tsx` (`ButtonFontScale` component).
 
-### 3.10 Language / i18n
+### 4.10 Language / i18n
 
 **Not yet implemented.** UI strings are hardcoded English. A locale switcher is planned — build it from scratch when the time comes. Do not add any i18n library or translation infrastructure until that work is explicitly started.
 
-### 3.11 Board configuration presets
+### 4.11 Board configuration presets
 
 Preset definitions live in `src/lib/board-presets.ts`. Each `BoardPreset` has `{ id, name, description, config: BoardConfigState }`. The three Fysetc E4 v1.0 presets (1ch / 2ch / 4ch) are the only ones currently defined — add new hardware here when it is validated against physical hardware.
 
@@ -298,7 +380,7 @@ const updateSharedField = (
 
 **CAN pin inputs** — use number inputs. Empty/zero value maps to `-1` (disabled) via `parseNumericInput(v) || -1`.
 
-### 3.12 Config export / import (Backup & Restore)
+### 4.12 Config export / import (Backup & Restore)
 
 `src/lib/config-export.ts` owns all export/import logic. The page (`Settings.Backup.tsx`) is purely UI.
 
@@ -328,7 +410,7 @@ type ConfigExport = {
 
 **Import UX flow**: drop zone → `parseImportFile` → file info panel (version, date, firmware) → section checkboxes pre-ticked for available sections → "Import N sections" button → results inline (✓ / ✗ per row) → restart banner if needed.
 
-### 3.13 How forms dim disabled dependent fields
+### 4.13 How forms dim disabled dependent fields
 
 The established pattern for a boolean toggle controlling a group of inputs:
 
@@ -344,9 +426,9 @@ Both `pointer-events-none opacity-40` on the wrapper AND `disabled` on each inpu
 
 ---
 
-## 4. Code Style
+## 5. Code Style
 
-### 4.1 TypeScript
+### 5.1 TypeScript
 
 - **Strict mode is on** — the build runs `tsc -b` and fails on any type error
 - **No unused imports or variables** — they cause build failures. If you introduce a variable while iterating, remove it before handing off.
@@ -355,13 +437,13 @@ Both `pointer-events-none opacity-40` on the wrapper AND `disabled` on each inpu
 - **Hooks at the top** of the component; avoid conditional hook calls
 - **`React.useMemo`** for anything derived from props/state that would otherwise cause re-renders in lists
 
-### 4.2 Imports
+### 5.2 Imports
 
 - Use the `@/` path alias (`@/components/ui/button`, `@/lib/api`, `@/hooks/use-store`) — never relative paths like `../../`
 - Order: React first, then external libs, then `@/` aliased imports, then sibling imports
 - Include `.ts` / `.tsx` extensions on some internal imports to match existing convention (see `api.ts` imports)
 
-### 4.3 Styling
+### 5.3 Styling
 
 - **Use `cn()` from `@/lib/utils`** to merge conditional classes (it wraps `clsx` + `tailwind-merge`)
 - **Never write raw CSS** for components — only Tailwind utilities and existing CSS variables
@@ -369,13 +451,13 @@ Both `pointer-events-none opacity-40` on the wrapper AND `disabled` on each inpu
 - **Use `tabular-nums`** for all numeric displays (volumes, hours, IPs, timestamps)
 - **Prefer existing shadcn primitives** over hand-rolled HTML elements (use `<Button>`, `<Badge>`, `<Input>`, `<Toggle>`)
 
-### 4.4 Component File Conventions
+### 5.4 Component File Conventions
 
 - One component per file; default export for pages, named exports for components
 - File names: kebab-case (`pump-control-card.tsx`), component names: PascalCase
 - Co-locate tightly coupled pieces: e.g. `pump-history/` folder holds `heatmap.tsx`, `day-detail.tsx`, `utils.ts`, `use-pump-history.ts`
 
-### 4.5 Formatting
+### 5.5 Formatting
 
 Prettier + ESLint enforce style. Before committing, run:
 
@@ -385,7 +467,7 @@ pnpm lint && pnpm format:check
 
 Do **not** reformat unrelated files — keep diffs minimal.
 
-### 4.6 Comments
+### 5.6 Comments
 
 - Only add comments where logic is non-obvious
 - Do not add JSDoc to every prop; types carry the intent
@@ -393,11 +475,11 @@ Do **not** reformat unrelated files — keep diffs minimal.
 
 ---
 
-## 5. How I've Fixed Errors in This Codebase
+## 6. How I've Fixed Errors in This Codebase
 
 A log of real fixes applied during past sessions so future agents don't repeat the same mistakes.
 
-### 5.1 Mobile Grid Overflow (Home Page, 608px on 375px viewport)
+### 6.1 Mobile Grid Overflow (Home Page, 608px on 375px viewport)
 
 **Symptom**: On a 375px-wide mobile viewport, Home page grid children measured 608px each — causing horizontal overflow and a permanent horizontal scrollbar.
 
@@ -414,7 +496,7 @@ A log of real fixes applied during past sessions so future agents don't repeat t
 
 **Rule going forward**: Every direct child of a grid or flex container that contains unknown-width content needs `min-w-0`.
 
-### 5.2 Device Card Height Stretch (Permanent Vertical Scrollbar)
+### 6.2 Device Card Height Stretch (Permanent Vertical Scrollbar)
 
 **Symptom**: On the Home page, the Device Overview card stretched to 986px (exceeding 900px viewport) causing a permanent vertical scrollbar.
 
@@ -424,7 +506,7 @@ A log of real fixes applied during past sessions so future agents don't repeat t
 
 **Rule going forward**: When placing cards in grids with `row-span`, do not force `h-full` on the Card. Let content dictate height.
 
-### 5.3 Maintenance Buttons Overflowing Narrow Column
+### 6.3 Maintenance Buttons Overflowing Narrow Column
 
 **Symptom**: Side-by-side `<Button>`s inside a narrow 3-column grid cell overflowed horizontally.
 
@@ -436,7 +518,7 @@ A log of real fixes applied during past sessions so future agents don't repeat t
 </div>
 ```
 
-### 5.4 Day Detail Table Columns Cut Off on Mobile
+### 6.4 Day Detail Table Columns Cut Off on Mobile
 
 **Symptom**: Table with 4 columns (Time, Sched, Manual, Flags) was cut off on mobile because `w-full` constrained it inside a narrow parent.
 
@@ -449,7 +531,7 @@ A log of real fixes applied during past sessions so future agents don't repeat t
 
 **Rule going forward**: On mobile, show only the most critical 2 columns of any data table. Use `hidden sm:table-cell` for the rest.
 
-### 5.5 Unused Variables Causing Build Failures
+### 6.5 Unused Variables Causing Build Failures
 
 **Symptom**: `pnpm build` failed with "declared but never used" errors on `modeDetails` and `mode` variables after iterating on the Schedule form.
 
@@ -457,7 +539,7 @@ A log of real fixes applied during past sessions so future agents don't repeat t
 
 **Rule going forward**: Run `pnpm build` before handing off any UI change. Do not disable `noUnusedLocals` to dodge this.
 
-### 5.6 Dark Mode Text Selection Unreadable
+### 6.6 Dark Mode Text Selection Unreadable
 
 **Symptom**: Default `::selection` styling in dark mode mixed primary with white, producing washed-out, low-contrast highlights.
 
@@ -470,7 +552,7 @@ A log of real fixes applied during past sessions so future agents don't repeat t
 }
 ```
 
-### 5.7 Heatmap Bar Chart Too Prominent
+### 6.7 Heatmap Bar Chart Too Prominent
 
 **Symptom**: Daily volume bar chart (next to the heatmap) was visually louder than the heatmap itself, breaking hierarchy.
 
@@ -478,19 +560,19 @@ A log of real fixes applied during past sessions so future agents don't repeat t
 
 **Rule going forward**: When two data visualizations coexist on the same card, one must be visually subordinate. Dim the secondary one via lower opacity classes.
 
-### 5.8 Flag Abbreviations Overflowing Table Cells
+### 6.8 Flag Abbreviations Overflowing Table Cells
 
 **Symptom**: Flag names ("Scheduled", "Manual", "Continuous", "Calibration") overflowed the narrow Flags column.
 
 **Fix**: Render single-letter abbreviations (S, M, C, K) with a `title` attribute for the full name on hover. See `renderFlags` and `flagTitle` in `utils.ts`.
 
-### 5.9 Tailwind v4 Keyframes Not Working Outside `@theme inline`
+### 6.9 Tailwind v4 Keyframes Not Working Outside `@theme inline`
 
 **Symptom**: Added `@keyframes bar-rise` at the top level of `index.css`, but `animate-bar-rise` class didn't resolve.
 
 **Fix**: In Tailwind v4, keyframes bound to `--animate-*` tokens must live inside the `@theme inline` block alongside the `--animate-bar-rise` declaration.
 
-### 5.10 TS2739 After Adding a Field to `ServiceState`
+### 6.10 TS2739 After Adding a Field to `ServiceState`
 
 **Symptom**: Added `mqtt_discovery_topic` / `enable_mqtt_discovery` to `ServiceState` in `api.ts`. `tsc -b` immediately failed with `TS2739: Type '{ ... }' is missing the following properties from type 'ServiceState'` at `src/hooks/use-store.ts:107` (the `defaultSettings` literal).
 
@@ -501,9 +583,9 @@ A log of real fixes applied during past sessions so future agents don't repeat t
 2. `src/lib/mock-backend.ts` → `initialState.services`
 3. `src/components/<form>.tsx` → `defaultValues` + `FormSchema`
 
-See section 3.7 for the canonical order.
+See section 4.7 for the canonical order.
 
-### 5.11 Dev Server Fails to Start via `pnpm`
+### 6.11 Dev Server Fails to Start via `pnpm`
 
 **Symptom**: `preview_start` (which ran `pnpm --dir frontend dev`) crashed with `SyntaxError: Unexpected identifier` at `corepack.cjs:8499`, pointing at `#target`. Also, running `pnpm` directly from Bash exploded the same way.
 
@@ -525,7 +607,7 @@ See section 3.7 for the canonical order.
 
 ---
 
-## 6. UI Verification Workflow
+## 7. UI Verification Workflow
 
 When making UI changes, verify them before reporting done. Use the `preview_*` tools (never ask the user to check manually):
 
@@ -540,7 +622,7 @@ Test both light and dark modes if the change affects theme-sensitive styling.
 
 ---
 
-## 7. Commit & PR Conventions
+## 8. Commit & PR Conventions
 
 Recent commit message style (see `git log`):
 
@@ -560,7 +642,7 @@ Always confirm with the user before committing. Never push, force-push, or amend
 
 ---
 
-## 8. Things to Avoid
+## 9. Things to Avoid
 
 - **Don't add new UI libraries** — everything must go through shadcn/ui + Tailwind. Bundle size is sacred.
 - **Don't add runtime validators** for internal data — Zod is for user-input boundaries only (forms, file imports). Never validate API responses with Zod at runtime.
@@ -569,12 +651,12 @@ Always confirm with the user before committing. Never push, force-push, or amend
 - **Don't add backwards-compat shims** for code the user asked to remove — delete it cleanly.
 - **Don't lazy-load UI modules** — the ESP32 serves everything from flash, dynamic imports just bloat the manifest.
 - **Don't introduce non-CSS-variable colors** — always go through the theme tokens.
-- **Don't skip `min-w-0`** on grid/flex children (see 5.1).
-- **Don't skip `pnpm build`** before handing off (see 5.5).
+- **Don't skip `min-w-0`** on grid/flex children (see 6.1).
+- **Don't skip `pnpm build`** before handing off (see 6.5).
 
 ---
 
-## 9. Useful File Pointers
+## 10. Useful File Pointers
 
 | File                                              | Purpose                                   |
 |---------------------------------------------------|-------------------------------------------|
