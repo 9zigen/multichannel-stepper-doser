@@ -5,11 +5,14 @@ struct SettingsHomeView: View {
 
     var body: some View {
         StepperPage {
-            StepperCard {
-                StepperSectionLabel(text: "Configuration")
-                Text("Settings")
-                    .font(StepperFont.title)
-                    .foregroundStyle(StepperColor.foreground)
+            StepperPanel(spacing: StepperSpacing.lg, padding: 0) {
+                VStack(alignment: .leading, spacing: StepperSpacing.sm) {
+                    StepperSectionLabel(text: "Configuration")
+                    Text("Settings")
+                        .font(StepperFont.title)
+                        .foregroundStyle(StepperColor.foreground)
+                }
+                .padding(StepperLayout.panelPadding)
 
                 StepperPanel {
                     StepperSectionLabel(text: "Active Device")
@@ -89,6 +92,7 @@ struct SettingsHomeView: View {
                         .buttonStyle(StepperDestructiveButtonStyle())
                     }
                 }
+                Color.clear.frame(height: StepperSpacing.xs)
             }
         }
         .navigationTitle("Settings")

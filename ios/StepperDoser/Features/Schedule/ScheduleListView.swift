@@ -10,7 +10,7 @@ struct ScheduleListView: View {
 
     var body: some View {
         StepperPage {
-            StepperCard {
+            StepperPanel(spacing: StepperSpacing.lg, padding: 0) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: StepperSpacing.sm) {
                         StepperSectionLabel(text: "Schedules")
@@ -26,6 +26,7 @@ struct ScheduleListView: View {
                         }
                     }
                 }
+                .padding(StepperLayout.panelPadding)
 
                 if pumps.isEmpty {
                     StepperPanel {
@@ -176,6 +177,7 @@ struct ScheduleListView: View {
                         .disabled(session.isSaving || draftSchedule == selectedPump.schedule)
                     }
                 }
+                Color.clear.frame(height: StepperSpacing.xs)
             }
         }
         .navigationTitle("Schedule")

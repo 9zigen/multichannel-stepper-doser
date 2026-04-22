@@ -7,7 +7,7 @@ struct HistoryView: View {
 
     var body: some View {
         StepperPage {
-            StepperCard {
+            StepperPanel(spacing: StepperSpacing.lg, padding: 0) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: StepperSpacing.sm) {
                         StepperSectionLabel(text: "Retained Data")
@@ -23,6 +23,7 @@ struct HistoryView: View {
                         }
                     }
                 }
+                .padding(StepperLayout.panelPadding)
 
                 if let history = session.history, !history.pumps.isEmpty, let selectedPump {
                     StepperPanel {
@@ -120,6 +121,7 @@ struct HistoryView: View {
                     }
                     .buttonStyle(StepperSecondaryButtonStyle())
                 }
+                Color.clear.frame(height: StepperSpacing.xs)
             }
         }
         .navigationTitle("History")
