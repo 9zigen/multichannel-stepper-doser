@@ -1,0 +1,554 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07D1255971F460B0FB30787E /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1246609A2867CCC4A7DB25 /* KeychainTokenStore.swift */; };
+		11B4EC5B93454DE093DD21CC /* ScheduleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31669CDB77EB94D8CA122143 /* ScheduleListView.swift */; };
+		1678DCD391E99D1F48A3B240 /* StepperDoserApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978155F2AC79194897366197 /* StepperDoserApp.swift */; };
+		1DCF7961967C9A7FC2980D0B /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFAE49EADC6209FA98542AF0 /* LoginView.swift */; };
+		27DC881FB43E0260EE052081 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF34999D4F1CF60ADE638E7 /* APIError.swift */; };
+		282DE6EB0EED18BC5BBF83F4 /* DeviceEndpointStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 631B338BE2BAF69F94492038 /* DeviceEndpointStore.swift */; };
+		362C29439D0B28BA886B62D3 /* DeviceAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56A1D08C5B41108CD0AE2C8 /* DeviceAPIClient.swift */; };
+		3AC49953D90CBA757FA752CB /* StepperTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799AFF2585259FFEB3ADF67E /* StepperTokens.swift */; };
+		3E285550CA155BC1E6DB2060 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0122193CEBD517868C6F8936 /* AppSession.swift */; };
+		4134EB0B0E761E5B88A9B667 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85632A7D0BD503B5C1338A28 /* HistoryView.swift */; };
+		44364FBCA63A86BC7ED08A0C /* ConnectionSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BA1681018D453548829BFB /* ConnectionSetupView.swift */; };
+		4896EFD1FE9ABADC8FD64CDB /* BLEProvisioningManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13D400DA8E1C846F4E01E1B8 /* BLEProvisioningManager.swift */; };
+		4C749C650D246F7BCA3ECFAB /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF619782C3DAAC474F4FEFE /* OnboardingView.swift */; };
+		64466B6D6EF3F7597918A0DC /* SettingsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 201A36CB2CB8CE04CB020E0F /* SettingsHomeView.swift */; };
+		6DC38325AB0B49625083CA79 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3FC828749B55863D495E3 /* DashboardView.swift */; };
+		6E3C653ED2158A0CB885A031 /* RealtimeConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2980E503531E1D419E3F00ED /* RealtimeConnection.swift */; };
+		718DDC2F8521DE590B10277C /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6C5877FA208976CCC26529 /* AppShellView.swift */; };
+		76A417467E9D93657FD43E06 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CBD4D29119101322E23CB77 /* AppRootView.swift */; };
+		BCE5645FE7581C462B1AD2F1 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FACBB1B9B10BE40B819CCF6 /* APIModels.swift */; };
+		BFDA266ACB21B32B1944A77D /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76468A4B4A4D6FFA792D577E /* AppTab.swift */; };
+		C20C7D07C1ABFAD90250C754 /* BLEProvisioningSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D6F4E03D3296FF67799F17A /* BLEProvisioningSheetView.swift */; };
+		C62FFEB0D735F96037B75AE0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = ADD4F3AA6CA9E48ABB0BF42A /* Assets.xcassets */; };
+		E86CB30CB0D275CE9B89C10B /* BLEProvisioningModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5EB4E85C107C1DC93C4A4B /* BLEProvisioningModels.swift */; };
+		F2EB3A7DA8BBD57B9FAFB886 /* BLEProvisioningProto.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72A560EEADD9B2D2E383BD75 /* BLEProvisioningProto.swift */; };
+		F73A0BD36D94AE07347B4966 /* BLEProvisioningSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F7CD198E5B555191AD8D0F /* BLEProvisioningSecurity.swift */; };
+		F952C54F884C295216CC9095 /* TabRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A79E3927399DD4DBFE539FB5 /* TabRouter.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0122193CEBD517868C6F8936 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+		13D400DA8E1C846F4E01E1B8 /* BLEProvisioningManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningManager.swift; sourceTree = "<group>"; };
+		1FACBB1B9B10BE40B819CCF6 /* APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModels.swift; sourceTree = "<group>"; };
+		201A36CB2CB8CE04CB020E0F /* SettingsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHomeView.swift; sourceTree = "<group>"; };
+		2980E503531E1D419E3F00ED /* RealtimeConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeConnection.swift; sourceTree = "<group>"; };
+		31669CDB77EB94D8CA122143 /* ScheduleListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleListView.swift; sourceTree = "<group>"; };
+		4CBD4D29119101322E23CB77 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
+		4D5EB4E85C107C1DC93C4A4B /* BLEProvisioningModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningModels.swift; sourceTree = "<group>"; };
+		53BA1681018D453548829BFB /* ConnectionSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSetupView.swift; sourceTree = "<group>"; };
+		6066CC906EC4450782D042AC /* StepperDoser.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StepperDoser.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		631B338BE2BAF69F94492038 /* DeviceEndpointStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceEndpointStore.swift; sourceTree = "<group>"; };
+		63F7CD198E5B555191AD8D0F /* BLEProvisioningSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningSecurity.swift; sourceTree = "<group>"; };
+		6D6F4E03D3296FF67799F17A /* BLEProvisioningSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningSheetView.swift; sourceTree = "<group>"; };
+		72A560EEADD9B2D2E383BD75 /* BLEProvisioningProto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningProto.swift; sourceTree = "<group>"; };
+		76468A4B4A4D6FFA792D577E /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
+		799AFF2585259FFEB3ADF67E /* StepperTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepperTokens.swift; sourceTree = "<group>"; };
+		7E6C5877FA208976CCC26529 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
+		85632A7D0BD503B5C1338A28 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		978155F2AC79194897366197 /* StepperDoserApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepperDoserApp.swift; sourceTree = "<group>"; };
+		9C1246609A2867CCC4A7DB25 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
+		9FF619782C3DAAC474F4FEFE /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A79E3927399DD4DBFE539FB5 /* TabRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabRouter.swift; sourceTree = "<group>"; };
+		ADD4F3AA6CA9E48ABB0BF42A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AFAE49EADC6209FA98542AF0 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		B56A1D08C5B41108CD0AE2C8 /* DeviceAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAPIClient.swift; sourceTree = "<group>"; };
+		B5B32A6AD01EC681FF51B281 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		CDC3FC828749B55863D495E3 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		DDF34999D4F1CF60ADE638E7 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0C8BA1C7C30CF3F8D8C2EB89 /* History */ = {
+			isa = PBXGroup;
+			children = (
+				85632A7D0BD503B5C1338A28 /* HistoryView.swift */,
+			);
+			path = History;
+			sourceTree = "<group>";
+		};
+		137D1FB4F7C45A2793B2E68A /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				ADD4F3AA6CA9E48ABB0BF42A /* Assets.xcassets */,
+				B5B32A6AD01EC681FF51B281 /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		19D725405A3295AB9B16B3C0 /* Design */ = {
+			isa = PBXGroup;
+			children = (
+				799AFF2585259FFEB3ADF67E /* StepperTokens.swift */,
+			);
+			path = Design;
+			sourceTree = "<group>";
+		};
+		203466555C8AFBA456731909 /* StepperDoser */ = {
+			isa = PBXGroup;
+			children = (
+				978155F2AC79194897366197 /* StepperDoserApp.swift */,
+				7A887018B8CEAC42B11B50A0 /* App */,
+				896D759DDBB8F9649C2C8D31 /* Core */,
+				8166DF1CA9A244911D971B47 /* Features */,
+				137D1FB4F7C45A2793B2E68A /* Resources */,
+			);
+			path = StepperDoser;
+			sourceTree = "<group>";
+		};
+		24BE3B9E9D8CAE1F8F693655 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				201A36CB2CB8CE04CB020E0F /* SettingsHomeView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		2AE4DD9D30062F6E00EABA8D /* Realtime */ = {
+			isa = PBXGroup;
+			children = (
+				2980E503531E1D419E3F00ED /* RealtimeConnection.swift */,
+			);
+			path = Realtime;
+			sourceTree = "<group>";
+		};
+		41C93C3BFCA7F2DA926395B5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6066CC906EC4450782D042AC /* StepperDoser.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		69BA998E2349CD77A2AEE83C /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				1FACBB1B9B10BE40B819CCF6 /* APIModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		7A887018B8CEAC42B11B50A0 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				4CBD4D29119101322E23CB77 /* AppRootView.swift */,
+				7E6C5877FA208976CCC26529 /* AppShellView.swift */,
+				76468A4B4A4D6FFA792D577E /* AppTab.swift */,
+				A79E3927399DD4DBFE539FB5 /* TabRouter.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		8166DF1CA9A244911D971B47 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				C0C5348E28EC2BA2D21E6457 /* Auth */,
+				E71F0465B6FACA12498B53BD /* Connection */,
+				E0DB0F0E87F1BABC6039FD84 /* Dashboard */,
+				0C8BA1C7C30CF3F8D8C2EB89 /* History */,
+				8A86FCA28857F6B4E960AFA8 /* Onboarding */,
+				91DA4082FF6B2671854AC863 /* Schedule */,
+				24BE3B9E9D8CAE1F8F693655 /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		896D759DDBB8F9649C2C8D31 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				19D725405A3295AB9B16B3C0 /* Design */,
+				69BA998E2349CD77A2AEE83C /* Models */,
+				E86C0CE95E5D9272D1E7813B /* Networking */,
+				9E0B0F8F4112654207B96D38 /* Persistence */,
+				E4F93F93FDCF3FB6DBEA1A39 /* Provisioning */,
+				2AE4DD9D30062F6E00EABA8D /* Realtime */,
+				8B39C442947587709DDA19D5 /* Stores */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		8A86FCA28857F6B4E960AFA8 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				9FF619782C3DAAC474F4FEFE /* OnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		8B39C442947587709DDA19D5 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				0122193CEBD517868C6F8936 /* AppSession.swift */,
+			);
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		91DA4082FF6B2671854AC863 /* Schedule */ = {
+			isa = PBXGroup;
+			children = (
+				31669CDB77EB94D8CA122143 /* ScheduleListView.swift */,
+			);
+			path = Schedule;
+			sourceTree = "<group>";
+		};
+		9E0B0F8F4112654207B96D38 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				9C1246609A2867CCC4A7DB25 /* KeychainTokenStore.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		BACB95E5377D8B8571A59302 = {
+			isa = PBXGroup;
+			children = (
+				203466555C8AFBA456731909 /* StepperDoser */,
+				41C93C3BFCA7F2DA926395B5 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C0C5348E28EC2BA2D21E6457 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				AFAE49EADC6209FA98542AF0 /* LoginView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		E0DB0F0E87F1BABC6039FD84 /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				CDC3FC828749B55863D495E3 /* DashboardView.swift */,
+			);
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		E4F93F93FDCF3FB6DBEA1A39 /* Provisioning */ = {
+			isa = PBXGroup;
+			children = (
+				13D400DA8E1C846F4E01E1B8 /* BLEProvisioningManager.swift */,
+				4D5EB4E85C107C1DC93C4A4B /* BLEProvisioningModels.swift */,
+				72A560EEADD9B2D2E383BD75 /* BLEProvisioningProto.swift */,
+				63F7CD198E5B555191AD8D0F /* BLEProvisioningSecurity.swift */,
+			);
+			path = Provisioning;
+			sourceTree = "<group>";
+		};
+		E71F0465B6FACA12498B53BD /* Connection */ = {
+			isa = PBXGroup;
+			children = (
+				6D6F4E03D3296FF67799F17A /* BLEProvisioningSheetView.swift */,
+				53BA1681018D453548829BFB /* ConnectionSetupView.swift */,
+			);
+			path = Connection;
+			sourceTree = "<group>";
+		};
+		E86C0CE95E5D9272D1E7813B /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				DDF34999D4F1CF60ADE638E7 /* APIError.swift */,
+				B56A1D08C5B41108CD0AE2C8 /* DeviceAPIClient.swift */,
+				631B338BE2BAF69F94492038 /* DeviceEndpointStore.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		70D2BFF646AD43CF43939CEA /* StepperDoser */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 995B7953F2F8A08CE097A60F /* Build configuration list for PBXNativeTarget "StepperDoser" */;
+			buildPhases = (
+				BAEA22B7830D519078197C5F /* Sources */,
+				6158F1AB0A8529E6369890DE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = StepperDoser;
+			packageProductDependencies = (
+			);
+			productName = StepperDoser;
+			productReference = 6066CC906EC4450782D042AC /* StepperDoser.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		84437859B2778A8F78E71AE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					70D2BFF646AD43CF43939CEA = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 49989E7139FE2082F1E1B8AC /* Build configuration list for PBXProject "StepperDoser" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = BACB95E5377D8B8571A59302;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 41C93C3BFCA7F2DA926395B5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				70D2BFF646AD43CF43939CEA /* StepperDoser */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6158F1AB0A8529E6369890DE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C62FFEB0D735F96037B75AE0 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BAEA22B7830D519078197C5F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				27DC881FB43E0260EE052081 /* APIError.swift in Sources */,
+				BCE5645FE7581C462B1AD2F1 /* APIModels.swift in Sources */,
+				76A417467E9D93657FD43E06 /* AppRootView.swift in Sources */,
+				3E285550CA155BC1E6DB2060 /* AppSession.swift in Sources */,
+				718DDC2F8521DE590B10277C /* AppShellView.swift in Sources */,
+				BFDA266ACB21B32B1944A77D /* AppTab.swift in Sources */,
+				4896EFD1FE9ABADC8FD64CDB /* BLEProvisioningManager.swift in Sources */,
+				E86CB30CB0D275CE9B89C10B /* BLEProvisioningModels.swift in Sources */,
+				F2EB3A7DA8BBD57B9FAFB886 /* BLEProvisioningProto.swift in Sources */,
+				F73A0BD36D94AE07347B4966 /* BLEProvisioningSecurity.swift in Sources */,
+				C20C7D07C1ABFAD90250C754 /* BLEProvisioningSheetView.swift in Sources */,
+				44364FBCA63A86BC7ED08A0C /* ConnectionSetupView.swift in Sources */,
+				6DC38325AB0B49625083CA79 /* DashboardView.swift in Sources */,
+				362C29439D0B28BA886B62D3 /* DeviceAPIClient.swift in Sources */,
+				282DE6EB0EED18BC5BBF83F4 /* DeviceEndpointStore.swift in Sources */,
+				4134EB0B0E761E5B88A9B667 /* HistoryView.swift in Sources */,
+				07D1255971F460B0FB30787E /* KeychainTokenStore.swift in Sources */,
+				1DCF7961967C9A7FC2980D0B /* LoginView.swift in Sources */,
+				4C749C650D246F7BCA3ECFAB /* OnboardingView.swift in Sources */,
+				6E3C653ED2158A0CB885A031 /* RealtimeConnection.swift in Sources */,
+				11B4EC5B93454DE093DD21CC /* ScheduleListView.swift in Sources */,
+				64466B6D6EF3F7597918A0DC /* SettingsHomeView.swift in Sources */,
+				1678DCD391E99D1F48A3B240 /* StepperDoserApp.swift in Sources */,
+				3AC49953D90CBA757FA752CB /* StepperTokens.swift in Sources */,
+				F952C54F884C295216CC9095 /* TabRouter.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		3038F782A1998A3F7B1F2555 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alekseyvolkov.stepperdoser;
+				PRODUCT_NAME = StepperDoser;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		358718AE9EDE88F4846CACAA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PMX9FHACLY;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = StepperDoser/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		4A3C529AABD27BC05C4EBC78 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alekseyvolkov.stepperdoser;
+				PRODUCT_NAME = StepperDoser;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		61820397A8AE01EDACC2E900 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PMX9FHACLY;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = StepperDoser/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		49989E7139FE2082F1E1B8AC /* Build configuration list for PBXProject "StepperDoser" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4A3C529AABD27BC05C4EBC78 /* Debug */,
+				3038F782A1998A3F7B1F2555 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		995B7953F2F8A08CE097A60F /* Build configuration list for PBXNativeTarget "StepperDoser" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				358718AE9EDE88F4846CACAA /* Debug */,
+				61820397A8AE01EDACC2E900 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 84437859B2778A8F78E71AE0 /* Project object */;
+}
