@@ -108,8 +108,16 @@ struct DashboardView: View {
                 if let pumps = session.settings?.pumps, !pumps.isEmpty {
                     StepperPanel {
                         StepperSectionLabel(text: "Pump Detail")
-                        VStack(spacing: StepperSpacing.md) {
-                            ForEach(pumps) { pump in
+                        VStack(spacing: 0) {
+                            ForEach(Array(pumps.enumerated()), id: \.element.id) { index, pump in
+                                // Visual divider between pump blocks (not before the first)
+                                if index > 0 {
+                                    Rectangle()
+                                        .fill(StepperColor.border)
+                                        .frame(height: 1)
+                                        .padding(.vertical, StepperSpacing.lg)
+                                }
+
                                 VStack(alignment: .leading, spacing: StepperSpacing.md) {
                                     HStack(alignment: .top) {
                                         VStack(alignment: .leading, spacing: StepperSpacing.xs) {
@@ -160,7 +168,6 @@ struct DashboardView: View {
                                         onStop: stopPump
                                     )
                                 }
-                                .padding(.bottom, StepperSpacing.sm)
                             }
                         }
                     }

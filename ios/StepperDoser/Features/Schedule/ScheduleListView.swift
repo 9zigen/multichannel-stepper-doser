@@ -39,19 +39,17 @@ struct ScheduleListView: View {
                 } else if let selectedPump {
                     StepperPanel {
                         StepperSectionLabel(text: "Pump")
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: StepperSpacing.sm) {
-                                ForEach(pumps) { pump in
-                                    Button {
-                                        selectPump(pump.id)
-                                    } label: {
-                                        StepperBadge(
-                                            text: pump.name,
-                                            tone: pump.id == selectedPumpID ? .primary : .secondary
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
+                        HStack(spacing: StepperSpacing.xs) {
+                            ForEach(pumps) { pump in
+                                Button {
+                                    selectPump(pump.id)
+                                } label: {
+                                    StepperSelectionChip(
+                                        title: pump.name,
+                                        isSelected: pump.id == selectedPumpID
+                                    )
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -94,14 +92,14 @@ struct ScheduleListView: View {
 
                     StepperPanel {
                         StepperSectionLabel(text: "Mode")
-                        HStack(spacing: StepperSpacing.sm) {
+                        HStack(spacing: StepperSpacing.xs) {
                             ForEach([ScheduleMode.off, .periodic, .continuous], id: \.self) { mode in
                                 Button {
                                     draftSchedule.mode = mode
                                 } label: {
-                                    StepperBadge(
-                                        text: modeLabel(mode),
-                                        tone: draftSchedule.mode == mode ? .primary : .secondary
+                                    StepperSelectionChip(
+                                        title: modeLabel(mode),
+                                        isSelected: draftSchedule.mode == mode
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -131,7 +129,7 @@ struct ScheduleListView: View {
                                             Button {
                                                 toggleWeekday(item.offset)
                                             } label: {
-                                                ScheduleSelectionChip(
+                                                StepperSelectionChip(
                                                     title: item.element,
                                                     isSelected: draftSchedule.weekdays.contains(item.offset)
                                                 )
@@ -155,7 +153,7 @@ struct ScheduleListView: View {
                                             Button {
                                                 toggleHour(hour)
                                             } label: {
-                                                ScheduleSelectionChip(
+                                                StepperSelectionChip(
                                                     title: String(format: "%02d", hour),
                                                     isSelected: draftSchedule.workHours.contains(hour),
                                                     monospace: true
@@ -310,28 +308,6 @@ struct ScheduleListView: View {
     }
 }
 
-private struct ScheduleSelectionChip: View {
-    let title: String
-    let isSelected: Bool
-    var monospace = false
-
-    var body: some View {
-        Text(title)
-            .font(monospace ? StepperFont.monoSmall : StepperFont.small)
-            .foregroundStyle(isSelected ? StepperColor.primaryForeground : StepperColor.foreground)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: StepperRadius.lg, style: .continuous)
-                    .fill(isSelected ? StepperColor.primary : StepperColor.secondary.opacity(0.24))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: StepperRadius.lg, style: .continuous)
-                            .stroke(isSelected ? StepperColor.primary.opacity(0.2) : StepperColor.border, lineWidth: 1)
-                    )
-            )
-    }
-}
-
 private struct ScheduleNumberAdjuster: View {
     let label: String
     let valueLabel: String
@@ -342,20 +318,21 @@ private struct ScheduleNumberAdjuster: View {
         VStack(alignment: .leading, spacing: StepperSpacing.sm) {
             StepperSectionLabel(text: label)
             HStack(spacing: StepperSpacing.md) {
+                // No .frame(maxWidth: .infinity) on the Image — the button style
+                // already applies it, avoiding double-frame size conflicts.
                 Button(action: onDecrement) {
                     Image(systemName: "minus")
-                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(StepperSecondaryButtonStyle())
 
                 Text(valueLabel)
                     .font(StepperFont.section)
                     .foregroundStyle(StepperColor.foreground)
+                    .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
 
                 Button(action: onIncrement) {
                     Image(systemName: "plus")
-                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(StepperSecondaryButtonStyle())
             }

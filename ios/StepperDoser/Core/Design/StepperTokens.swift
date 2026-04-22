@@ -367,7 +367,9 @@ struct StepperMetricTile: View {
                     .lineLimit(2)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // maxHeight: .infinity so sibling tiles in the same LazyVGrid row
+        // always stretch to the same height regardless of content length.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .padding(StepperSpacing.lg)
         .background(
             RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
@@ -595,7 +597,9 @@ struct StepperWeeklyHeatmap: View {
                     }
                 }
                 .padding(.vertical, 2)
+                .padding(.horizontal, 1)   // prevent edge cells touching scroll clip boundary
             }
+            .scrollClipDisabled()          // allow cells to render flush without being clipped
 
             HStack(spacing: StepperSpacing.xs) {
                 Text("Less")
@@ -609,6 +613,34 @@ struct StepperWeeklyHeatmap: View {
                     .foregroundStyle(StepperColor.mutedForeground)
             }
         }
+    }
+}
+
+/// Full-width equal-size selection chip — used for pump pickers, mode selectors,
+/// weekday/hour grids. Place multiple chips in an `HStack(spacing: StepperSpacing.xs)`
+/// so they share the available width equally.
+struct StepperSelectionChip: View {
+    let title: String
+    let isSelected: Bool
+    var monospace: Bool = false
+
+    var body: some View {
+        Text(title)
+            .font(monospace ? StepperFont.monoSmall : StepperFont.small)
+            .foregroundStyle(isSelected ? StepperColor.primaryForeground : StepperColor.foreground)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: StepperRadius.lg, style: .continuous)
+                    .fill(isSelected ? StepperColor.primary : StepperColor.secondary.opacity(0.24))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: StepperRadius.lg, style: .continuous)
+                            .stroke(
+                                isSelected ? StepperColor.primary.opacity(0.2) : StepperColor.border,
+                                lineWidth: 1
+                            )
+                    )
+            )
     }
 }
 
