@@ -209,12 +209,12 @@ private struct OnboardingCredentialsEditorCard: View {
                 .foregroundStyle(StepperColor.mutedForeground)
 
             VStack(spacing: StepperSpacing.md) {
-                TextField("Username", text: $username)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                StepperTextField("Username", text: $username)
+                    .frame(minHeight: 24)
                     .stepperInputField()
 
-                SecureField("Password", text: $password)
+                StepperTextField("Password", text: $password, isSecure: true)
+                    .frame(minHeight: 24)
                     .stepperInputField()
             }
 

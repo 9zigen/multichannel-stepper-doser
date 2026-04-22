@@ -330,7 +330,7 @@ private struct ProvisioningUIKitTextField: UIViewRepresentable {
             string: title,
             attributes: [.foregroundColor: UIColor(StepperColor.mutedForeground)]
         )
-        textField.textContentType = nil
+        textField.textContentType = .none
         textField.autocorrectionType = .no
         textField.spellCheckingType = .no
         textField.autocapitalizationType = .none
@@ -350,10 +350,9 @@ private struct ProvisioningUIKitTextField: UIViewRepresentable {
         if textField.text != text {
             textField.text = text
         }
-        textField.isSecureTextEntry = secure
-        textField.textColor = UIColor(StepperColor.foreground)
-        textField.tintColor = UIColor(StepperColor.primary)
-        textField.textContentType = nil
+        if textField.isSecureTextEntry != secure {
+            textField.isSecureTextEntry = secure
+        }
     }
 
     func makeCoordinator() -> Coordinator {

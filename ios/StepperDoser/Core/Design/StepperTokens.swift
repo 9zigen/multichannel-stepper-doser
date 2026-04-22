@@ -618,6 +618,87 @@ struct StepperMiniBarPoint: Identifiable {
     let label: String
 }
 
+/// UIKit-backed text field that avoids SwiftUI re-render overhead on every
+/// keystroke. All static configuration happens once in `makeUIView`; `updateUIView`
+/// only synchronises the two properties that can actually change: the text value
+/// and the secure-entry flag. Use this instead of SwiftUI `TextField` / `SecureField`
+/// anywhere keyboard responsiveness matters.
+struct StepperTextField: UIViewRepresentable {
+    let placeholder: String
+    @Binding var text: String
+    var isSecure: Bool = false
+    var returnKeyType: UIReturnKeyType = .done
+    var onSubmit: (() -> Void)? = nil
+
+    func makeUIView(context: Context) -> UITextField {
+        let tf = UITextField()
+        tf.delegate = context.coordinator
+        tf.borderStyle = .none
+        tf.backgroundColor = .clear
+        tf.textColor = UIColor(StepperColor.foreground)
+        tf.tintColor = UIColor(StepperColor.primary)
+        tf.font = .systemFont(ofSize: 15)
+        tf.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor(StepperColor.mutedForeground)]
+        )
+        // .none disables QuickType suggestions entirely — avoids autofill popups
+        // for device credentials and network passwords.
+        tf.textContentType = .none
+        tf.autocorrectionType = .no
+        tf.spellCheckingType = .no
+        tf.autocapitalizationType = .none
+        tf.smartQuotesType = .no
+        tf.smartDashesType = .no
+        tf.smartInsertDeleteType = .no
+        tf.keyboardType = .asciiCapable
+        tf.returnKeyType = returnKeyType
+        tf.enablesReturnKeyAutomatically = false
+        tf.isSecureTextEntry = isSecure
+        tf.clearButtonMode = .never
+        tf.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // Target-action fires only on actual text edits, not cursor movement.
+        tf.addTarget(context.coordinator,
+                     action: #selector(Coordinator.textChanged(_:)),
+                     for: .editingChanged)
+        return tf
+    }
+
+    /// Only the two properties that can change after creation are updated here.
+    /// Never set static properties (colors, fonts, content type) in updateUIView —
+    /// doing so forces UIKit to reload the QuickType bar on every keystroke.
+    func updateUIView(_ tf: UITextField, context: Context) {
+        if tf.text != text {
+            tf.text = text
+        }
+        if tf.isSecureTextEntry != isSecure {
+            tf.isSecureTextEntry = isSecure
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, onSubmit: onSubmit) }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        private let text: Binding<String>
+        private let onSubmit: (() -> Void)?
+
+        init(text: Binding<String>, onSubmit: (() -> Void)?) {
+            self.text = text
+            self.onSubmit = onSubmit
+        }
+
+        @objc func textChanged(_ tf: UITextField) {
+            text.wrappedValue = tf.text ?? ""
+        }
+
+        func textFieldShouldReturn(_ tf: UITextField) -> Bool {
+            tf.resignFirstResponder()
+            onSubmit?()
+            return true
+        }
+    }
+}
+
 struct StepperMiniBarChart: View {
     let points: [StepperMiniBarPoint]
     let selectedID: Int?
