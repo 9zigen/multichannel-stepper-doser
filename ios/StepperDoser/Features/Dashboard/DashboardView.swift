@@ -9,16 +9,25 @@ struct DashboardView: View {
 
     var body: some View {
         StepperPage {
-            StepperCard(spacing: StepperSpacing.lg) {
-                // Status badges — compact top row, no title (nav bar already has "Dashboard")
-                HStack(spacing: StepperSpacing.sm) {
+            StepperPanel(spacing: StepperSpacing.lg, padding: 0) {
+                // Card header — OVERVIEW label + page title + status badges
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: StepperSpacing.sm) {
+                        StepperSectionLabel(text: "Overview")
+                        Text("Dashboard")
+                            .font(StepperFont.title)
+                            .foregroundStyle(StepperColor.foreground)
+                    }
                     Spacer()
-                    StepperBadge(
-                        text: status.stationConnected ? "Station Online" : "Station Offline",
-                        tone: status.stationConnected ? .primary : .warning
-                    )
-                    StepperBadge(text: status.wifiMode, tone: .secondary)
+                    VStack(alignment: .trailing, spacing: StepperSpacing.sm) {
+                        StepperBadge(
+                            text: status.stationConnected ? "Station Online" : "Station Offline",
+                            tone: status.stationConnected ? .primary : .warning
+                        )
+                        StepperBadge(text: status.wifiMode, tone: .secondary)
+                    }
                 }
+                .padding(StepperLayout.panelPadding)
 
                 StepperPanel {
                     StepperSectionLabel(text: "Controller")
@@ -181,6 +190,8 @@ struct DashboardView: View {
                         }
                     }
                 }
+                // Bottom breath — outer panel has padding: 0 so last section needs a gap
+                Color.clear.frame(height: StepperSpacing.xs)
             }
         }
         .navigationTitle("Dashboard")
