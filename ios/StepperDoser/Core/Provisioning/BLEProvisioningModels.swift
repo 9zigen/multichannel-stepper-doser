@@ -22,6 +22,23 @@ struct BLEProvisioningStatus: Codable, Equatable, Sendable {
     var hostname: String
     var timeZone: String
     var message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case success
+        case bleActive = "ble_active"
+        case recoveryMode = "recovery_mode"
+        case fallbackMode = "fallback_mode"
+        case graceMode = "grace_mode"
+        case stationConnected = "station_connected"
+        case stationSSID = "station_ssid"
+        case stationIPAddress = "station_ip_address"
+        case apSSID = "ap_ssid"
+        case apIPAddress = "ap_ip_address"
+        case apClients = "ap_clients"
+        case hostname
+        case timeZone = "time_zone"
+        case message
+    }
 }
 
 struct BLEProvisioningPayload: Codable, Equatable, Sendable {

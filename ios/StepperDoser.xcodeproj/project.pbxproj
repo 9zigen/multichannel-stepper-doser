@@ -13,6 +13,7 @@
 		1DCF7961967C9A7FC2980D0B /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFAE49EADC6209FA98542AF0 /* LoginView.swift */; };
 		27DC881FB43E0260EE052081 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF34999D4F1CF60ADE638E7 /* APIError.swift */; };
 		282DE6EB0EED18BC5BBF83F4 /* DeviceEndpointStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 631B338BE2BAF69F94492038 /* DeviceEndpointStore.swift */; };
+		31C470BB5A8937FD85208FD1 /* ManagedDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2EBB0365EDD49A1A6AAAC3 /* ManagedDevice.swift */; };
 		362C29439D0B28BA886B62D3 /* DeviceAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B56A1D08C5B41108CD0AE2C8 /* DeviceAPIClient.swift */; };
 		3AC49953D90CBA757FA752CB /* StepperTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799AFF2585259FFEB3ADF67E /* StepperTokens.swift */; };
 		3E285550CA155BC1E6DB2060 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0122193CEBD517868C6F8936 /* AppSession.swift */; };
@@ -20,11 +21,13 @@
 		44364FBCA63A86BC7ED08A0C /* ConnectionSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BA1681018D453548829BFB /* ConnectionSetupView.swift */; };
 		4896EFD1FE9ABADC8FD64CDB /* BLEProvisioningManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13D400DA8E1C846F4E01E1B8 /* BLEProvisioningManager.swift */; };
 		4C749C650D246F7BCA3ECFAB /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF619782C3DAAC474F4FEFE /* OnboardingView.swift */; };
+		643EA24B77F69111C6F6986B /* ManagedDeviceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A361CF3EABD3D4927856321 /* ManagedDeviceStore.swift */; };
 		64466B6D6EF3F7597918A0DC /* SettingsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 201A36CB2CB8CE04CB020E0F /* SettingsHomeView.swift */; };
 		6DC38325AB0B49625083CA79 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3FC828749B55863D495E3 /* DashboardView.swift */; };
 		6E3C653ED2158A0CB885A031 /* RealtimeConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2980E503531E1D419E3F00ED /* RealtimeConnection.swift */; };
 		718DDC2F8521DE590B10277C /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6C5877FA208976CCC26529 /* AppShellView.swift */; };
 		76A417467E9D93657FD43E06 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CBD4D29119101322E23CB77 /* AppRootView.swift */; };
+		7BC30DCB7AF925A4B0B03F37 /* DeviceManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8B4323A5981C0C226A8B25 /* DeviceManagementView.swift */; };
 		BCE5645FE7581C462B1AD2F1 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FACBB1B9B10BE40B819CCF6 /* APIModels.swift */; };
 		BFDA266ACB21B32B1944A77D /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76468A4B4A4D6FFA792D577E /* AppTab.swift */; };
 		C20C7D07C1ABFAD90250C754 /* BLEProvisioningSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D6F4E03D3296FF67799F17A /* BLEProvisioningSheetView.swift */; };
@@ -42,9 +45,11 @@
 		201A36CB2CB8CE04CB020E0F /* SettingsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHomeView.swift; sourceTree = "<group>"; };
 		2980E503531E1D419E3F00ED /* RealtimeConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeConnection.swift; sourceTree = "<group>"; };
 		31669CDB77EB94D8CA122143 /* ScheduleListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleListView.swift; sourceTree = "<group>"; };
+		4A361CF3EABD3D4927856321 /* ManagedDeviceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedDeviceStore.swift; sourceTree = "<group>"; };
 		4CBD4D29119101322E23CB77 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		4D5EB4E85C107C1DC93C4A4B /* BLEProvisioningModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningModels.swift; sourceTree = "<group>"; };
 		53BA1681018D453548829BFB /* ConnectionSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSetupView.swift; sourceTree = "<group>"; };
+		5E8B4323A5981C0C226A8B25 /* DeviceManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceManagementView.swift; sourceTree = "<group>"; };
 		6066CC906EC4450782D042AC /* StepperDoser.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StepperDoser.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		631B338BE2BAF69F94492038 /* DeviceEndpointStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceEndpointStore.swift; sourceTree = "<group>"; };
 		63F7CD198E5B555191AD8D0F /* BLEProvisioningSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEProvisioningSecurity.swift; sourceTree = "<group>"; };
@@ -58,6 +63,7 @@
 		9C1246609A2867CCC4A7DB25 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
 		9FF619782C3DAAC474F4FEFE /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		A79E3927399DD4DBFE539FB5 /* TabRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabRouter.swift; sourceTree = "<group>"; };
+		AB2EBB0365EDD49A1A6AAAC3 /* ManagedDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedDevice.swift; sourceTree = "<group>"; };
 		ADD4F3AA6CA9E48ABB0BF42A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AFAE49EADC6209FA98542AF0 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		B56A1D08C5B41108CD0AE2C8 /* DeviceAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAPIClient.swift; sourceTree = "<group>"; };
@@ -128,10 +134,19 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		4E02C922D483128C82168CC2 /* Devices */ = {
+			isa = PBXGroup;
+			children = (
+				5E8B4323A5981C0C226A8B25 /* DeviceManagementView.swift */,
+			);
+			path = Devices;
+			sourceTree = "<group>";
+		};
 		69BA998E2349CD77A2AEE83C /* Models */ = {
 			isa = PBXGroup;
 			children = (
 				1FACBB1B9B10BE40B819CCF6 /* APIModels.swift */,
+				AB2EBB0365EDD49A1A6AAAC3 /* ManagedDevice.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -153,6 +168,7 @@
 				C0C5348E28EC2BA2D21E6457 /* Auth */,
 				E71F0465B6FACA12498B53BD /* Connection */,
 				E0DB0F0E87F1BABC6039FD84 /* Dashboard */,
+				4E02C922D483128C82168CC2 /* Devices */,
 				0C8BA1C7C30CF3F8D8C2EB89 /* History */,
 				8A86FCA28857F6B4E960AFA8 /* Onboarding */,
 				91DA4082FF6B2671854AC863 /* Schedule */,
@@ -203,6 +219,7 @@
 			isa = PBXGroup;
 			children = (
 				9C1246609A2867CCC4A7DB25 /* KeychainTokenStore.swift */,
+				4A361CF3EABD3D4927856321 /* ManagedDeviceStore.swift */,
 			);
 			path = Persistence;
 			sourceTree = "<group>";
@@ -346,9 +363,12 @@
 				6DC38325AB0B49625083CA79 /* DashboardView.swift in Sources */,
 				362C29439D0B28BA886B62D3 /* DeviceAPIClient.swift in Sources */,
 				282DE6EB0EED18BC5BBF83F4 /* DeviceEndpointStore.swift in Sources */,
+				7BC30DCB7AF925A4B0B03F37 /* DeviceManagementView.swift in Sources */,
 				4134EB0B0E761E5B88A9B667 /* HistoryView.swift in Sources */,
 				07D1255971F460B0FB30787E /* KeychainTokenStore.swift in Sources */,
 				1DCF7961967C9A7FC2980D0B /* LoginView.swift in Sources */,
+				31C470BB5A8937FD85208FD1 /* ManagedDevice.swift in Sources */,
+				643EA24B77F69111C6F6986B /* ManagedDeviceStore.swift in Sources */,
 				4C749C650D246F7BCA3ECFAB /* OnboardingView.swift in Sources */,
 				6E3C653ED2158A0CB885A031 /* RealtimeConnection.swift in Sources */,
 				11B4EC5B93454DE093DD21CC /* ScheduleListView.swift in Sources */,

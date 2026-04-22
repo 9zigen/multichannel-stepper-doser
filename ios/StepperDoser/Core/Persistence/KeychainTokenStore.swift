@@ -3,10 +3,11 @@ import Security
 
 struct KeychainTokenStore {
     private let service = "com.alekseyvolkov.stepperdoser.auth"
-    private let account = "device-token"
 
-    func loadToken() -> String? {
-        var query = baseQuery
+    func loadToken(for device: ManagedDevice?) -> String? {
+        guard let device else { return nil }
+
+        var query = baseQuery(account: device.tokenAccount)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
@@ -21,19 +22,20 @@ struct KeychainTokenStore {
         return token
     }
 
-    func saveToken(_ token: String) {
-        deleteToken()
+    func saveToken(_ token: String, for device: ManagedDevice) {
+        deleteToken(for: device)
         let data = Data(token.utf8)
-        var query = baseQuery
+        var query = baseQuery(account: device.tokenAccount)
         query[kSecValueData as String] = data
         SecItemAdd(query as CFDictionary, nil)
     }
 
-    func deleteToken() {
-        SecItemDelete(baseQuery as CFDictionary)
+    func deleteToken(for device: ManagedDevice?) {
+        guard let device else { return }
+        SecItemDelete(baseQuery(account: device.tokenAccount) as CFDictionary)
     }
 
-    private var baseQuery: [String: Any] {
+    private func baseQuery(account: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

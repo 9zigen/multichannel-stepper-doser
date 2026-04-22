@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 @Observable
 final class AppSession {
-    let endpointStore: DeviceEndpointStore
+    let deviceStore: ManagedDeviceStore
     let tokenStore: KeychainTokenStore
     let apiClient: DeviceAPIClient
     let realtime: RealtimeConnection
@@ -21,20 +21,32 @@ final class AppSession {
     var suggestedLogin: AuthCredentials?
 
     init() {
-        let endpointStore = DeviceEndpointStore()
+        let deviceStore = ManagedDeviceStore()
         let tokenStore = KeychainTokenStore()
         let apiClient = DeviceAPIClient()
         let realtime = RealtimeConnection()
-        self.endpointStore = endpointStore
+        self.deviceStore = deviceStore
         self.tokenStore = tokenStore
         self.apiClient = apiClient
         self.realtime = realtime
-        self.authToken = tokenStore.loadToken()
+        self.authToken = tokenStore.loadToken(for: deviceStore.selectedDevice)
         syncAPIClient()
     }
 
-    var hasConfiguredEndpoint: Bool {
-        endpointStore.hasEndpoint
+    var devices: [ManagedDevice] {
+        deviceStore.devices
+    }
+
+    var selectedDevice: ManagedDevice? {
+        deviceStore.selectedDevice
+    }
+
+    var hasConfiguredDevices: Bool {
+        deviceStore.hasDevices
+    }
+
+    var hasSelectedDeviceEndpoint: Bool {
+        selectedDevice?.normalizedURL != nil
     }
 
     var isAuthenticated: Bool {
@@ -54,14 +66,21 @@ final class AppSession {
     func bootstrapIfNeeded() async {
         guard !hasAttemptedBootstrap else { return }
         hasAttemptedBootstrap = true
-        guard hasConfiguredEndpoint, isAuthenticated else { return }
+        guard hasSelectedDeviceEndpoint, isAuthenticated else { return }
         await refresh()
     }
 
-    func configureEndpoint(_ value: String) {
-        endpointStore.save(value)
-        syncAPIClient()
-        hasAttemptedBootstrap = false
+    func addManualDevice(endpoint: String, name: String) {
+        let trimmedEndpoint = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard DeviceEndpointStore.normalize(trimmedEndpoint) != nil else {
+            errorMessage = "Enter a valid controller hostname or IP address."
+            return
+        }
+
+        let resolvedName = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? trimmedEndpoint : name
+        let device = deviceStore.addDevice(endpoint: trimmedEndpoint, name: resolvedName, select: true)
+        activate(device: device)
+        errorMessage = nil
     }
 
     func beginProvisionedConnection(
@@ -76,12 +95,7 @@ final class AppSession {
         }
 
         authToken = nil
-        settings = nil
-        self.status = nil
-        runtime = []
-        history = nil
-        tokenStore.deleteToken()
-        realtime.disconnect()
+        clearActiveState()
 
         if let username,
            let password,
@@ -90,17 +104,41 @@ final class AppSession {
             suggestedLogin = AuthCredentials(username: username, password: password)
         }
 
-        configureEndpoint(lanIP)
+        let resolvedName = status.hostname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? lanIP : status.hostname
+        let device = deviceStore.addDevice(
+            endpoint: lanIP,
+            name: resolvedName,
+            preferredUsername: username,
+            select: true
+        )
+        activate(device: device)
         errorMessage = nil
+    }
+
+    func switchDevice(to id: UUID) async {
+        guard let device = devices.first(where: { $0.id == id }) else { return }
+        deviceStore.selectDevice(device.id)
+        activate(device: device)
+
+        if isAuthenticated {
+            await refresh()
+        }
     }
 
     func login(username: String, password: String) async -> Bool {
         syncAPIClient()
+        guard let selectedDevice else {
+            errorMessage = APIError.missingEndpoint.localizedDescription
+            return false
+        }
 
         do {
             let token = try await apiClient.login(username: username, password: password)
             authToken = token
-            tokenStore.saveToken(token)
+            tokenStore.saveToken(token, for: selectedDevice)
+            updateSelectedDevice { device in
+                device.preferredUsername = username
+            }
             syncAPIClient()
             await refresh()
             return true
@@ -112,17 +150,14 @@ final class AppSession {
 
     func logout() {
         authToken = nil
-        settings = nil
-        status = nil
-        runtime = []
-        history = nil
-        tokenStore.deleteToken()
+        clearActiveState()
+        tokenStore.deleteToken(for: selectedDevice)
+        suggestedLogin = nil
         syncAPIClient()
-        realtime.disconnect()
     }
 
     func refresh() async {
-        guard hasConfiguredEndpoint, isAuthenticated else { return }
+        guard hasSelectedDeviceEndpoint, isAuthenticated else { return }
         isBootstrapping = true
         syncAPIClient()
 
@@ -130,6 +165,7 @@ final class AppSession {
             status = try await apiClient.fetchStatus()
             settings = try await apiClient.fetchSettings()
             runtime = try await apiClient.fetchPumpRuntime()
+            syncSelectedDeviceMetadata()
             errorMessage = nil
             await refreshRealtimeIfNeeded()
         } catch APIError.unauthorized {
@@ -143,7 +179,7 @@ final class AppSession {
     }
 
     func refreshHistory() async {
-        guard hasConfiguredEndpoint, isAuthenticated else { return }
+        guard hasSelectedDeviceEndpoint, isAuthenticated else { return }
         syncAPIClient()
 
         do {
@@ -250,7 +286,7 @@ final class AppSession {
     }
 
     func refreshRealtimeIfNeeded() async {
-        guard let baseURL = endpointStore.normalizedURL,
+        guard let baseURL = selectedDevice?.normalizedURL,
               let authToken,
               !authToken.isEmpty else {
             realtime.disconnect()
@@ -273,6 +309,7 @@ final class AppSession {
             apply(statusPatch: patch)
         case .settingsUpdate(let settings):
             self.settings = settings
+            syncSelectedDeviceMetadata()
         case .systemReady:
             Task {
                 await refresh()
@@ -304,10 +341,52 @@ final class AppSession {
         current.apIpAddress = patch.apIpAddress ?? current.apIpAddress
         current.apClients = patch.apClients ?? current.apClients
         status = current
+        syncSelectedDeviceMetadata()
+    }
+
+    private func activate(device: ManagedDevice) {
+        authToken = tokenStore.loadToken(for: device)
+        clearActiveState()
+        syncAPIClient()
+        hasAttemptedBootstrap = false
+    }
+
+    private func clearActiveState() {
+        settings = nil
+        status = nil
+        runtime = []
+        history = nil
+        realtime.disconnect()
+    }
+
+    private func updateSelectedDevice(_ mutate: (inout ManagedDevice) -> Void) {
+        guard var device = selectedDevice else { return }
+        mutate(&device)
+        deviceStore.updateDevice(device)
+    }
+
+    private func syncSelectedDeviceMetadata() {
+        guard selectedDevice != nil else { return }
+
+        updateSelectedDevice { device in
+            if let settings, !settings.services.hostname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                device.name = settings.services.hostname
+                device.preferredUsername = settings.auth.username
+            }
+
+            let lanIP = status?.stationIpAddress.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let fallbackIP = status?.ipAddress.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let resolvedIP = !lanIP.isEmpty && lanIP != "0.0.0.0" ? lanIP : fallbackIP
+            if !resolvedIP.isEmpty && resolvedIP != "0.0.0.0" {
+                device.lastKnownIPAddress = resolvedIP
+            }
+
+            device.lastSeenAt = .now
+        }
     }
 
     private func syncAPIClient() {
-        apiClient.baseURL = endpointStore.normalizedURL
+        apiClient.baseURL = selectedDevice?.normalizedURL
         apiClient.authToken = authToken
     }
 }

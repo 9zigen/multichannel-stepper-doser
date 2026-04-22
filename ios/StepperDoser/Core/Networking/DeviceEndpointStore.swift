@@ -26,7 +26,7 @@ final class DeviceEndpointStore {
         defaults.set(rawValue, forKey: storageKey)
     }
 
-    static func normalize(_ value: String) -> URL? {
+    nonisolated static func normalize(_ value: String) -> URL? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return nil

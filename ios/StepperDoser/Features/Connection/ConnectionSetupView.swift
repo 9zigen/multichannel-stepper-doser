@@ -2,9 +2,19 @@ import SwiftUI
 
 struct ConnectionSetupView: View {
     @Environment(AppSession.self) private var session
+    private let automaticBLEScan: Bool
+    private let onComplete: (() -> Void)?
+
+    @State private var deviceName = ""
     @State private var endpoint = ""
     @State private var provisioning = BLEProvisioningManager()
     @State private var selectedDevice: BLEProvisioningDevice?
+    @State private var hasAutoStartedScan = false
+
+    init(automaticBLEScan: Bool = false, onComplete: (() -> Void)? = nil) {
+        self.automaticBLEScan = automaticBLEScan
+        self.onComplete = onComplete
+    }
 
     var body: some View {
         NavigationStack {
@@ -21,6 +31,11 @@ struct ConnectionSetupView: View {
                     StepperPanel {
                         StepperSectionLabel(text: "LAN Endpoint")
                         VStack(spacing: StepperSpacing.lg) {
+                            TextField("Device name", text: $deviceName)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled()
+                                .stepperInputField()
+
                             TextField("stepper-doser.local or 192.168.1.50", text: $endpoint)
                                 .keyboardType(.URL)
                                 .textInputAutocapitalization(.never)
@@ -28,7 +43,8 @@ struct ConnectionSetupView: View {
                                 .stepperInputField()
 
                             Button("Save Endpoint") {
-                                session.configureEndpoint(endpoint)
+                                session.addManualDevice(endpoint: endpoint, name: deviceName)
+                                onComplete?()
                             }
                             .buttonStyle(StepperPrimaryButtonStyle())
                             .disabled(endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -40,7 +56,7 @@ struct ConnectionSetupView: View {
                         VStack(alignment: .leading, spacing: StepperSpacing.lg) {
                             HStack(spacing: StepperSpacing.sm) {
                                 StepperBadge(text: provisioning.phase.title, tone: phaseTone)
-                                if provisioning.isScanning {
+                                if provisioning.isScanning && provisioning.phase.title != "Scanning" {
                                     StepperBadge(text: "Scanning", tone: .secondary)
                                 }
                             }
@@ -113,7 +129,14 @@ struct ConnectionSetupView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                endpoint = session.endpointStore.rawValue
+                if deviceName.isEmpty {
+                    deviceName = "Stepper Doser"
+                }
+
+                if automaticBLEScan && session.devices.isEmpty && !hasAutoStartedScan {
+                    hasAutoStartedScan = true
+                    provisioning.startScanning()
+                }
             }
             .sheet(item: $selectedDevice) { device in
                 BLEProvisioningSheetView(device: device, provisioning: provisioning) { result in
@@ -122,6 +145,7 @@ struct ConnectionSetupView: View {
                         username: result.username,
                         password: result.password
                     )
+                    onComplete?()
                 }
             }
         }

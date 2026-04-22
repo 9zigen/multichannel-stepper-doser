@@ -57,7 +57,7 @@ enum BLEProvisioningProto {
         try requireVarint(sec1Fields, field: 1, equals: Sec1Message.sessionResponse0)
         let response = try requireMessage(sec1Fields, field: 21)
         let responseFields = try parseFields(in: response)
-        let status = try requireVarint(responseFields, field: 1)
+        let status = try varint(fields: responseFields, field: 1, default: 0)
         guard status == 0 else {
             throw BLEProvisioningError.securityFailure("The controller rejected the first Security1 step.")
         }
@@ -92,7 +92,7 @@ enum BLEProvisioningProto {
         try requireVarint(sec1Fields, field: 1, equals: Sec1Message.sessionResponse1)
         let response = try requireMessage(sec1Fields, field: 23)
         let responseFields = try parseFields(in: response)
-        let status = try requireVarint(responseFields, field: 1)
+        let status = try varint(fields: responseFields, field: 1, default: 0)
         guard status == 0 else {
             throw BLEProvisioningError.securityFailure("The controller rejected the second Security1 step.")
         }
@@ -176,6 +176,16 @@ enum BLEProvisioningProto {
 
     private static func requireVarint(_ fields: [Int: FieldValue], field: Int) throws -> UInt64 {
         guard let value = fields[field], value.wireType == .varint, let varint = value.varint else {
+            throw BLEProvisioningError.invalidResponse("The controller returned malformed protobuf field \(field).")
+        }
+        return varint
+    }
+
+    private static func varint(fields: [Int: FieldValue], field: Int, default defaultValue: UInt64) throws -> UInt64 {
+        guard let value = fields[field] else {
+            return defaultValue
+        }
+        guard value.wireType == .varint, let varint = value.varint else {
             throw BLEProvisioningError.invalidResponse("The controller returned malformed protobuf field \(field).")
         }
         return varint

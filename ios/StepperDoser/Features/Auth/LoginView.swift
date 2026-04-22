@@ -20,7 +20,9 @@ struct LoginView: View {
 
                     HStack(spacing: StepperSpacing.sm) {
                         StepperBadge(text: "Local Device", tone: .secondary)
-                        StepperBadge(text: session.endpointStore.normalizedURL?.host() ?? session.endpointStore.rawValue, tone: .outline)
+                        if let selectedDevice = session.selectedDevice {
+                            StepperBadge(text: selectedDevice.displayName, tone: .outline)
+                        }
                     }
 
                     StepperPanel {
@@ -52,6 +54,8 @@ struct LoginView: View {
                 if let suggestedLogin = session.suggestedLogin {
                     username = suggestedLogin.username
                     password = suggestedLogin.password
+                } else if let preferredUsername = session.selectedDevice?.preferredUsername, !preferredUsername.isEmpty {
+                    username = preferredUsername
                 }
             }
         }

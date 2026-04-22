@@ -5,8 +5,12 @@ struct AppRootView: View {
 
     var body: some View {
         Group {
-            if !session.hasConfiguredEndpoint {
-                ConnectionSetupView()
+            if !session.hasConfiguredDevices {
+                ConnectionSetupView(automaticBLEScan: true)
+            } else if !session.hasSelectedDeviceEndpoint {
+                NavigationStack {
+                    DeviceManagementView()
+                }
             } else if !session.isAuthenticated {
                 LoginView()
             } else if session.isBootstrapping && !session.hasLoadedSettings {

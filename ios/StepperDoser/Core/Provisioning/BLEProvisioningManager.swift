@@ -1,11 +1,13 @@
 import CoreBluetooth
 import Foundation
+import os
 
 @MainActor
 @Observable
 final class BLEProvisioningManager: NSObject {
     private let serviceUUID = CBUUID(string: "7DD22F2C-4A5E-319B-9F4E-915A01513492")
     private let userDescriptionUUID = CBUUID(string: "2901")
+    private let fallbackNamePrefixes = ["DOSING", "STEPPER", "DOSER"]
     private let jsonDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -17,6 +19,7 @@ final class BLEProvisioningManager: NSObject {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return encoder
     }()
+    private let logger = Logger(subsystem: "com.alekseyvolkov.stepperdoser", category: "BLEProvisioning")
 
     var phase: BLEProvisioningPhase = .waitingForBluetooth
     var devices: [BLEProvisioningDevice] = []
@@ -29,6 +32,7 @@ final class BLEProvisioningManager: NSObject {
     private var endpointCharacteristics: [BLEProvisioningEndpoint: CBCharacteristic] = [:]
     private var activePeripheral: CBPeripheral?
     private var discoveredService: CBService?
+    private var discoveredServices: [CBService] = []
     private var discoveredCharacteristics: [CBCharacteristic] = []
 
     private var bluetoothWaiters: [CheckedContinuation<Void, Error>] = []
@@ -47,6 +51,7 @@ final class BLEProvisioningManager: NSObject {
     func startScanning() {
         guard centralManager.state == .poweredOn else {
             phase = .waitingForBluetooth
+            logger.warning("BLE scan requested while Bluetooth state is \(String(describing: self.centralManager?.state.rawValue))")
             return
         }
 
@@ -54,13 +59,15 @@ final class BLEProvisioningManager: NSObject {
         discoveredPeripherals = [:]
         isScanning = true
         phase = .scanning
-        centralManager.scanForPeripherals(withServices: [serviceUUID], options: [
+        logger.info("Starting BLE scan")
+        centralManager.scanForPeripherals(withServices: nil, options: [
             CBCentralManagerScanOptionAllowDuplicatesKey: false
         ])
     }
 
     func stopScanning() {
         guard isScanning else { return }
+        logger.info("Stopping BLE scan")
         centralManager.stopScan()
         isScanning = false
         if case .scanning = phase {
@@ -71,6 +78,7 @@ final class BLEProvisioningManager: NSObject {
     func refreshStatus(for device: BLEProvisioningDevice, pop: String) async throws -> BLEProvisioningStatus {
         try await ensurePoweredOn()
         stopScanning()
+        logger.info("Refreshing provisioning status for \(device.name, privacy: .public)")
 
         do {
             try await connectAndSecure(device: device, pop: pop)
@@ -78,8 +86,10 @@ final class BLEProvisioningManager: NSObject {
             latestStatus = status
             phase = .idle
             await disconnect()
+            logger.info("Status refresh completed for \(device.name, privacy: .public)")
             return status
         } catch {
+            logger.error("Status refresh failed for \(device.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
             await disconnect()
             throw error
         }
@@ -94,15 +104,18 @@ final class BLEProvisioningManager: NSObject {
     ) async throws -> BLEProvisioningResult {
         try await ensurePoweredOn()
         stopScanning()
+        logger.info("Starting provisioning for \(device.name, privacy: .public) with SSID \(payload.network.ssid, privacy: .public)")
 
         do {
             try await connectAndSecure(device: device, pop: pop)
             latestStatus = try await fetchStatus()
+            logger.info("Initial provisioning status loaded for \(device.name, privacy: .public)")
 
             phase = .provisioning(payload.network.ssid)
             let response = try await send(endpoint: .config, data: try secureJSON(payload))
             let immediateStatus = try decodeStatus(fromSecure: response)
             latestStatus = immediateStatus
+            logger.info("Provisioning payload accepted by controller \(device.name, privacy: .public)")
 
             var finalStatus = immediateStatus
             if !finalStatus.stationConnected {
@@ -125,10 +138,12 @@ final class BLEProvisioningManager: NSObject {
             guard finalStatus.stationConnected,
                   !finalStatus.stationIPAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 phase = .failed("Provisioning completed, but the controller never reported a LAN IP before the BLE session timed out.")
+                logger.error("Provisioning timed out waiting for LAN IP on \(device.name, privacy: .public)")
                 throw BLEProvisioningError.timeout("Provisioning finished, but the controller did not report a usable LAN IP in time.")
             }
 
             phase = .completed
+            logger.info("Provisioning completed for \(device.name, privacy: .public) at \(finalStatus.stationIPAddress, privacy: .public)")
             return BLEProvisioningResult(
                 status: finalStatus,
                 username: payload.auth?.username,
@@ -136,6 +151,7 @@ final class BLEProvisioningManager: NSObject {
             )
         } catch {
             phase = .failed(error.localizedDescription)
+            logger.error("Provisioning failed for \(device.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
             await disconnect()
             throw error
         }
@@ -143,6 +159,7 @@ final class BLEProvisioningManager: NSObject {
 
     func disconnect() async {
         if let activePeripheral {
+            logger.info("Disconnecting from \(activePeripheral.identifier.uuidString, privacy: .public)")
             centralManager.cancelPeripheralConnection(activePeripheral)
         }
 
@@ -194,16 +211,21 @@ final class BLEProvisioningManager: NSObject {
         let peripheral = try await connect(to: device)
         let security = BLEProvisioningSecuritySession(pop: pop)
         phase = .securing(device.name)
+        logger.info("Connected to \(device.name, privacy: .public), loading protocol version")
         protocolVersion = try await fetchProtocolVersion()
+        logger.info("Protocol version for \(device.name, privacy: .public): \(self.protocolVersion ?? "", privacy: .public)")
 
         let setup0 = try await send(endpoint: .session, data: security.makeSetup0Request())
+        logger.info("Security1 step 0 response received from \(device.name, privacy: .public)")
         try security.handleSetup0Response(setup0)
 
         let setup1 = try await send(endpoint: .session, data: try security.makeSetup1Request())
+        logger.info("Security1 step 1 response received from \(device.name, privacy: .public)")
         try security.handleSetup1Response(setup1)
 
         activePeripheral = peripheral
         self.securitySession = security
+        logger.info("Secure BLE session established with \(device.name, privacy: .public)")
     }
 
     private var securitySession: BLEProvisioningSecuritySession?
@@ -216,6 +238,7 @@ final class BLEProvisioningManager: NSObject {
         phase = .connecting(device.name)
         activePeripheral = peripheral
         peripheral.delegate = self
+        logger.info("Connecting to peripheral \(device.name, privacy: .public) [\(device.identifier.uuidString, privacy: .public)]")
 
         try await withCheckedThrowingContinuation { continuation in
             connectContinuation = continuation
@@ -223,21 +246,45 @@ final class BLEProvisioningManager: NSObject {
         }
 
         try await discoverProvisioningService(on: peripheral)
-        guard let service = discoveredService else {
-            throw BLEProvisioningError.serviceNotFound
+
+        if let service = discoveredService {
+            logger.info("Provisioning service discovered on \(device.name, privacy: .public): \(service.uuid.uuidString, privacy: .public)")
+
+            try await discoverCharacteristics(on: peripheral, service: service)
+            let characteristics = discoveredCharacteristics
+            logger.info("Discovered \(characteristics.count) provisioning characteristics on \(device.name, privacy: .public)")
+            endpointCharacteristics = try await resolveEndpoints(on: peripheral, characteristics: characteristics)
+            return peripheral
         }
 
-        try await discoverCharacteristics(on: peripheral, service: service)
-        let characteristics = discoveredCharacteristics
-        endpointCharacteristics = try await resolveEndpoints(on: peripheral, characteristics: characteristics)
-        return peripheral
+        let serviceList = discoveredServices.map(\.uuid.uuidString).joined(separator: ", ")
+        logger.warning("Expected provisioning UUID not found on \(device.name, privacy: .public). Probing discovered services: \(serviceList, privacy: .public)")
+
+        for service in discoveredServices {
+            do {
+                try await discoverCharacteristics(on: peripheral, service: service)
+                let characteristics = discoveredCharacteristics
+                guard !characteristics.isEmpty else { continue }
+
+                let endpoints = try await resolveEndpoints(on: peripheral, characteristics: characteristics)
+                endpointCharacteristics = endpoints
+                discoveredService = service
+                logger.info("Using fallback service \(service.uuid.uuidString, privacy: .public) for \(device.name, privacy: .public)")
+                return peripheral
+            } catch {
+                logger.debug("Service \(service.uuid.uuidString, privacy: .public) is not the provisioning service: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+
+        throw BLEProvisioningError.serviceNotFound
     }
 
     private func discoverProvisioningService(on peripheral: CBPeripheral) async throws {
         try await withCheckedThrowingContinuation { continuation in
             discoveredService = nil
+            discoveredServices = []
             serviceContinuation = continuation
-            peripheral.discoverServices([serviceUUID])
+            peripheral.discoverServices(nil)
         }
     }
 
@@ -273,7 +320,9 @@ final class BLEProvisioningManager: NSObject {
 
     private func fetchStatus() async throws -> BLEProvisioningStatus {
         let response = try await send(endpoint: .status, data: try secureJSON(Optional<String>.none))
-        return try decodeStatus(fromSecure: response)
+        let status = try decodeStatus(fromSecure: response)
+        logger.info("Provisioning status: stationConnected=\(status.stationConnected, privacy: .public) ip=\(status.stationIPAddress, privacy: .public) recovery=\(status.recoveryMode, privacy: .public)")
+        return status
     }
 
     private func secureJSON<T: Encodable>(_ value: T) throws -> Data {
@@ -303,22 +352,26 @@ final class BLEProvisioningManager: NSObject {
         guard let activePeripheral else {
             throw BLEProvisioningError.disconnected
         }
+        logger.debug("Sending \(data.count, privacy: .public) bytes to endpoint \(endpoint.rawValue, privacy: .public)")
 
         try await withCheckedThrowingContinuation { continuation in
             writeContinuations[characteristic.uuid] = continuation
             activePeripheral.writeValue(data, for: characteristic, type: .withResponse)
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        let response = try await withCheckedThrowingContinuation { continuation in
             readContinuations[characteristic.uuid] = continuation
             activePeripheral.readValue(for: characteristic)
         }
+        logger.debug("Received \(response.count, privacy: .public) bytes from endpoint \(endpoint.rawValue, privacy: .public)")
+        return response
     }
 }
 
 @MainActor
 extension BLEProvisioningManager: @preconcurrency CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        logger.info("Bluetooth state changed: \(central.state.rawValue, privacy: .public)")
         switch central.state {
         case .poweredOn:
             if case .waitingForBluetooth = phase {
@@ -347,7 +400,16 @@ extension BLEProvisioningManager: @preconcurrency CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
         let advertisementName = (advertisementData[CBAdvertisementDataLocalNameKey] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedName = (advertisementName?.isEmpty == false ? advertisementName : nil) ?? peripheral.name ?? "Stepper Doser"
+        let resolvedName = (advertisementName?.isEmpty == false ? advertisementName : nil) ?? peripheral.name ?? ""
+        let advertisedServiceUUIDs = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]) ?? []
+        let overflowServiceUUIDs = (advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID]) ?? []
+
+        guard isProvisioningCandidate(
+            name: resolvedName,
+            advertisedServiceUUIDs: advertisedServiceUUIDs + overflowServiceUUIDs
+        ) else {
+            return
+        }
 
         discoveredPeripherals[peripheral.identifier] = peripheral
         let device = BLEProvisioningDevice(
@@ -361,7 +423,13 @@ extension BLEProvisioningManager: @preconcurrency CBCentralManagerDelegate {
             devices[index] = device
         } else {
             devices.append(device)
+            logger.info("Discovered BLE candidate \(device.name, privacy: .public) RSSI \(device.rssi, privacy: .public)")
             devices.sort { lhs, rhs in
+                let lhsPreferred = isPreferredProvisioningName(lhs.name)
+                let rhsPreferred = isPreferredProvisioningName(rhs.name)
+                if lhsPreferred != rhsPreferred {
+                    return lhsPreferred && !rhsPreferred
+                }
                 if lhs.name == rhs.name {
                     return lhs.rssi > rhs.rssi
                 }
@@ -370,19 +438,40 @@ extension BLEProvisioningManager: @preconcurrency CBCentralManagerDelegate {
         }
     }
 
+    private func isProvisioningCandidate(name: String, advertisedServiceUUIDs: [CBUUID]) -> Bool {
+        if advertisedServiceUUIDs.contains(serviceUUID) {
+            return true
+        }
+
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !normalizedName.isEmpty else {
+            return false
+        }
+
+        return isPreferredProvisioningName(normalizedName)
+    }
+
+    private func isPreferredProvisioningName(_ name: String) -> Bool {
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return fallbackNamePrefixes.contains { normalizedName.hasPrefix($0) || normalizedName.contains($0) }
+    }
+
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        logger.info("Did connect peripheral \(peripheral.identifier.uuidString, privacy: .public)")
         connectContinuation?.resume()
         connectContinuation = nil
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         let resolvedError = error ?? BLEProvisioningError.disconnected
+        logger.error("Failed to connect peripheral \(peripheral.identifier.uuidString, privacy: .public): \(resolvedError.localizedDescription, privacy: .public)")
         connectContinuation?.resume(throwing: resolvedError)
         connectContinuation = nil
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         let resolvedError = error ?? BLEProvisioningError.disconnected
+        logger.error("Peripheral disconnected \(peripheral.identifier.uuidString, privacy: .public): \(resolvedError.localizedDescription, privacy: .public)")
         activePeripheral = nil
         endpointCharacteristics = [:]
         securitySession = nil
@@ -420,13 +509,14 @@ extension BLEProvisioningManager: @preconcurrency CBPeripheralDelegate {
             return
         }
 
-        guard let service = peripheral.services?.first(where: { $0.uuid == serviceUUID }) else {
-            serviceContinuation?.resume(throwing: BLEProvisioningError.serviceNotFound)
-            serviceContinuation = nil
-            return
+        discoveredServices = peripheral.services ?? []
+        discoveredService = discoveredServices.first(where: { $0.uuid == serviceUUID })
+
+        if discoveredService == nil {
+            let serviceList = discoveredServices.map(\.uuid.uuidString).joined(separator: ", ")
+            logger.warning("Provisioning UUID \(self.serviceUUID.uuidString, privacy: .public) not found in discovered services: \(serviceList, privacy: .public)")
         }
 
-        discoveredService = service
         serviceContinuation?.resume()
         serviceContinuation = nil
     }

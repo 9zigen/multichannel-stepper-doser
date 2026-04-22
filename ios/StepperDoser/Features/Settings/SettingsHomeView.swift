@@ -12,6 +12,26 @@ struct SettingsHomeView: View {
                     .foregroundStyle(StepperColor.foreground)
 
                 StepperPanel {
+                    StepperSectionLabel(text: "Active Device")
+                    VStack(spacing: StepperSpacing.md) {
+                        StepperKeyValueRow("Controller") {
+                            Text(session.selectedDevice?.displayName ?? "None")
+                        }
+                        StepperKeyValueRow("Endpoint") {
+                            Text(session.selectedDevice?.endpointLabel ?? "None")
+                        }
+
+                        NavigationLink {
+                            DeviceManagementView()
+                        } label: {
+                            Text("Manage Devices")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(StepperSecondaryButtonStyle())
+                    }
+                }
+
+                StepperPanel {
                     StepperSectionLabel(text: "Services")
                     VStack(spacing: StepperSpacing.md) {
                         StepperKeyValueRow("Hostname") { Text(settings.services.hostname) }

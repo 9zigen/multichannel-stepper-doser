@@ -22,152 +22,185 @@ struct BLEProvisioningSheetView: View {
 
     var body: some View {
         NavigationStack {
-            StepperPage {
-                StepperCard {
-                    StepperSectionLabel(text: "BLE Provisioning")
-                    Text(device.name)
-                        .font(StepperFont.title)
-                        .foregroundStyle(StepperColor.foreground)
-                    Text("Provision this controller over BLE, then the app will switch to its LAN endpoint for the normal login flow.")
-                        .font(StepperFont.small)
-                        .foregroundStyle(StepperColor.mutedForeground)
+            ZStack {
+                StepperBackground()
 
-                    HStack(spacing: StepperSpacing.sm) {
-                        StepperBadge(text: provisioning.phase.title, tone: phaseTone)
-                        StepperBadge(text: "RSSI \(device.rssi)", tone: .outline)
-                    }
-
-                    StepperPanel {
-                        StepperSectionLabel(text: "Access")
-                        VStack(spacing: StepperSpacing.lg) {
-                            SecureField("Proof of possession", text: $pop)
-                                .stepperInputField()
-
-                            Text("Use the AP password by default. If the firmware password was changed, enter the matching BLE PoP here.")
-                                .font(StepperFont.caption)
-                                .foregroundStyle(StepperColor.mutedForeground)
-                        }
-                    }
-
-                    StepperPanel {
-                        StepperSectionLabel(text: "Wi-Fi")
-                        VStack(spacing: StepperSpacing.lg) {
-                            TextField("SSID", text: $ssid)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .stepperInputField()
-
-                            SecureField("Wi-Fi password", text: $wifiPassword)
-                                .stepperInputField()
-
-                            TextField("Hostname", text: $hostname)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .stepperInputField()
-
-                            TextField("Time zone", text: $timeZone)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .stepperInputField()
-
-                            Toggle("Keep AP active after provisioning", isOn: $keepApActive)
-                                .tint(StepperColor.primary)
-                                .font(StepperFont.small)
-                                .foregroundStyle(StepperColor.foreground)
-                        }
-                    }
-
-                    StepperPanel {
-                        StepperSectionLabel(text: "Admin")
+                ScrollView {
+                    VStack(alignment: .leading, spacing: StepperSpacing.xl) {
                         VStack(alignment: .leading, spacing: StepperSpacing.lg) {
-                            Toggle("Set admin credentials during provisioning", isOn: $configureAdmin)
-                                .tint(StepperColor.primary)
-                                .font(StepperFont.small)
+                            StepperSectionLabel(text: "BLE Provisioning")
+                            Text(device.name)
+                                .font(StepperFont.title)
                                 .foregroundStyle(StepperColor.foreground)
+                            Text("Provision this controller over BLE, then the app will switch to its LAN endpoint for the normal login flow.")
+                                .font(StepperFont.small)
+                                .foregroundStyle(StepperColor.mutedForeground)
 
-                            if configureAdmin {
-                                TextField("Admin username", text: $adminUsername)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .stepperInputField()
+                            HStack(spacing: StepperSpacing.sm) {
+                                StepperBadge(text: provisioning.phase.title, tone: phaseTone)
+                                StepperBadge(text: "RSSI \(device.rssi)", tone: .outline)
+                            }
+                        }
 
-                                SecureField("Admin password", text: $adminPassword)
-                                    .stepperInputField()
+                        StepperPanel {
+                            StepperSectionLabel(text: "Access")
+                            VStack(spacing: StepperSpacing.lg) {
+                                nonCredentialSecretField(
+                                    title: "Proof of possession",
+                                    text: $pop
+                                )
 
-                                Toggle("Mark onboarding complete", isOn: $completeOnboarding)
-                                    .tint(StepperColor.primary)
-                                    .font(StepperFont.small)
-                                    .foregroundStyle(StepperColor.foreground)
-                            } else {
-                                Text("Leave this off if you only want to move the controller onto Wi-Fi and finish setup after login.")
+                                Text("Use the AP password by default. If the firmware password was changed, enter the matching BLE PoP here.")
                                     .font(StepperFont.caption)
                                     .foregroundStyle(StepperColor.mutedForeground)
                             }
                         }
-                    }
 
-                    if let protocolVersion = provisioning.protocolVersion {
                         StepperPanel {
-                            StepperSectionLabel(text: "Transport")
-                            Text(protocolVersion)
-                                .font(StepperFont.monoSmall)
-                                .foregroundStyle(StepperColor.foreground)
+                            StepperSectionLabel(text: "Wi-Fi")
+                            VStack(spacing: StepperSpacing.lg) {
+                                TextField("SSID", text: $ssid)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .textContentType(nil)
+                                    .stepperInputField()
+
+                                nonCredentialSecretField(
+                                    title: "Wi-Fi password",
+                                    text: $wifiPassword
+                                )
+
+                                TextField("Hostname", text: $hostname)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .textContentType(nil)
+                                    .stepperInputField()
+
+                                TextField("Time zone", text: $timeZone)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .textContentType(nil)
+                                    .stepperInputField()
+
+                                Toggle("Keep AP active after provisioning", isOn: $keepApActive)
+                                    .tint(StepperColor.primary)
+                                    .font(StepperFont.small)
+                                    .foregroundStyle(StepperColor.foreground)
+                            }
                         }
-                    }
 
-                    if let status = provisioning.latestStatus {
                         StepperPanel {
-                            StepperSectionLabel(text: "Device Status")
+                            StepperSectionLabel(text: "Admin")
+                            VStack(alignment: .leading, spacing: StepperSpacing.lg) {
+                                Toggle("Set admin credentials during provisioning", isOn: $configureAdmin)
+                                    .tint(StepperColor.primary)
+                                    .font(StepperFont.small)
+                                    .foregroundStyle(StepperColor.foreground)
+
+                                if configureAdmin {
+                                    TextField("Admin username", text: $adminUsername)
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                        .textContentType(.username)
+                                        .stepperInputField()
+
+                                    SecureField("Admin password", text: $adminPassword)
+                                        .textContentType(.newPassword)
+                                        .stepperInputField()
+
+                                    Toggle("Mark onboarding complete", isOn: $completeOnboarding)
+                                        .tint(StepperColor.primary)
+                                        .font(StepperFont.small)
+                                        .foregroundStyle(StepperColor.foreground)
+                                } else {
+                                    Text("Leave this off if you only want to move the controller onto Wi-Fi and finish setup after login.")
+                                        .font(StepperFont.caption)
+                                        .foregroundStyle(StepperColor.mutedForeground)
+                                }
+                            }
+                        }
+
+                        if let protocolVersion = provisioning.protocolVersion {
+                            StepperPanel {
+                                StepperSectionLabel(text: "Transport")
+                                Text(protocolVersion)
+                                    .font(StepperFont.monoSmall)
+                                    .foregroundStyle(StepperColor.foreground)
+                            }
+                        }
+
+                        if let status = provisioning.latestStatus {
+                            StepperPanel {
+                                StepperSectionLabel(text: "Device Status")
+                                VStack(spacing: StepperSpacing.md) {
+                                    HStack(spacing: StepperSpacing.sm) {
+                                        StepperBadge(text: status.recoveryMode ? "Recovery" : (status.graceMode ? "Grace" : "Normal"), tone: status.recoveryMode ? .warning : .secondary)
+                                        StepperBadge(text: status.stationConnected ? "Station Online" : "Station Offline", tone: status.stationConnected ? .primary : .outline)
+                                    }
+
+                                    StepperKeyValueRow("Hostname") {
+                                        Text(status.hostname)
+                                    }
+                                    StepperKeyValueRow("AP") {
+                                        Text(status.apSSID)
+                                    }
+                                    StepperKeyValueRow("Station") {
+                                        Text(status.stationSSID.isEmpty ? "Not joined yet" : status.stationSSID)
+                                    }
+                                    StepperKeyValueRow("LAN IP") {
+                                        Text(status.stationIPAddress)
+                                            .font(StepperFont.monoSmall)
+                                    }
+                                    StepperKeyValueRow("Time Zone") {
+                                        Text(status.timeZone)
+                                    }
+                                }
+                            }
+                        }
+
+                        if case let .failed(message) = provisioning.phase {
+                            StepperPanel {
+                                StepperSectionLabel(text: "Failure")
+                                Text(message)
+                                    .font(StepperFont.small)
+                                    .foregroundStyle(StepperColor.destructive)
+                            }
+                        }
+
+                        StepperPanel {
+                            StepperSectionLabel(text: "Actions")
                             VStack(spacing: StepperSpacing.md) {
-                                HStack(spacing: StepperSpacing.sm) {
-                                    StepperBadge(text: status.recoveryMode ? "Recovery" : (status.graceMode ? "Grace" : "Normal"), tone: status.recoveryMode ? .warning : .secondary)
-                                    StepperBadge(text: status.stationConnected ? "Station Online" : "Station Offline", tone: status.stationConnected ? .primary : .outline)
+                                Button(isLoadingStatus ? "Reading..." : "Read Current Status") {
+                                    Task {
+                                        await loadStatus()
+                                    }
                                 }
+                                .buttonStyle(StepperSecondaryButtonStyle())
+                                .disabled(isBusy || pop.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                                StepperKeyValueRow("Hostname") {
-                                    Text(status.hostname)
+                                Button(isProvisioning ? "Provisioning..." : "Provision Controller") {
+                                    Task {
+                                        await runProvisioning()
+                                    }
                                 }
-                                StepperKeyValueRow("AP") {
-                                    Text(status.apSSID)
-                                }
-                                StepperKeyValueRow("Station") {
-                                    Text(status.stationSSID.isEmpty ? "Not joined yet" : status.stationSSID)
-                                }
-                                StepperKeyValueRow("LAN IP") {
-                                    Text(status.stationIPAddress)
-                                        .font(StepperFont.monoSmall)
-                                }
-                                StepperKeyValueRow("Time Zone") {
-                                    Text(status.timeZone)
-                                }
+                                .buttonStyle(StepperPrimaryButtonStyle())
+                                .disabled(!canProvision)
                             }
                         }
                     }
-
-                    StepperPanel {
-                        StepperSectionLabel(text: "Actions")
-                        VStack(spacing: StepperSpacing.md) {
-                            Button(isLoadingStatus ? "Reading..." : "Read Current Status") {
-                                Task {
-                                    await loadStatus()
-                                }
-                            }
-                            .buttonStyle(StepperSecondaryButtonStyle())
-                            .disabled(isBusy || pop.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                            Button(isProvisioning ? "Provisioning..." : "Provision Controller") {
-                                Task {
-                                    await runProvisioning()
-                                }
-                            }
-                            .buttonStyle(StepperPrimaryButtonStyle())
-                            .disabled(!canProvision)
-                        }
-                    }
+                    .padding(.horizontal, StepperSpacing.pagePadding)
+                    .padding(.vertical, StepperSpacing.lg)
+                    .frame(maxWidth: 900)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+                .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("Provision Controller")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                provisioning.stopScanning()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
@@ -258,5 +291,16 @@ struct BLEProvisioningSheetView: View {
             ) : nil,
             app: configureAdmin && completeOnboarding ? .init(onboardingCompleted: true) : nil
         )
+    }
+
+    @ViewBuilder
+    private func nonCredentialSecretField(title: String, text: Binding<String>) -> some View {
+        TextField(title, text: text)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .textContentType(nil)
+            .keyboardType(.asciiCapable)
+            .privacySensitive()
+            .stepperInputField()
     }
 }
