@@ -9,19 +9,15 @@ struct DashboardView: View {
 
     var body: some View {
         StepperPage {
-            StepperCard {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: StepperSpacing.sm) {
-                        StepperSectionLabel(text: "Overview")
-                        Text("Dashboard")
-                            .font(StepperFont.title)
-                            .foregroundStyle(StepperColor.foreground)
-                    }
+            StepperCard(spacing: StepperSpacing.lg) {
+                // Status badges — compact top row, no title (nav bar already has "Dashboard")
+                HStack(spacing: StepperSpacing.sm) {
                     Spacer()
-                    VStack(alignment: .trailing, spacing: StepperSpacing.sm) {
-                        StepperBadge(text: status.stationConnected ? "Station Online" : "Station Offline", tone: status.stationConnected ? .primary : .warning)
-                        StepperBadge(text: status.wifiMode, tone: .secondary)
-                    }
+                    StepperBadge(
+                        text: status.stationConnected ? "Station Online" : "Station Offline",
+                        tone: status.stationConnected ? .primary : .warning
+                    )
+                    StepperBadge(text: status.wifiMode, tone: .secondary)
                 }
 
                 StepperPanel {
