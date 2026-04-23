@@ -5,8 +5,6 @@ struct ConnectionSetupView: View {
     private let automaticBLEScan: Bool
     private let onComplete: (() -> Void)?
 
-    @State private var deviceName = ""
-    @State private var endpoint = ""
     @State private var provisioning = BLEProvisioningManager()
     @State private var selectedDevice: BLEProvisioningDevice?
     @State private var hasAutoStartedScan = false
@@ -24,32 +22,16 @@ struct ConnectionSetupView: View {
                     Text("Connect Device")
                         .font(StepperFont.title)
                         .foregroundStyle(StepperColor.foreground)
-                    Text("Use a known LAN endpoint or provision brand-new hardware over BLE, then let the app switch to the controller’s reported Wi-Fi IP.")
+                    Text("Use a known LAN endpoint or provision brand-new hardware over BLE, then let the app switch to the controller's reported Wi-Fi IP.")
                         .font(StepperFont.small)
                         .foregroundStyle(StepperColor.mutedForeground)
 
-                    StepperPanel {
-                        StepperSectionLabel(text: "LAN Endpoint")
-                        VStack(spacing: StepperSpacing.lg) {
-                            TextField("Device name", text: $deviceName)
-                                .textInputAutocapitalization(.words)
-                                .autocorrectionDisabled()
-                                .stepperInputField()
-
-                            TextField("stepper-doser.local or 192.168.1.50", text: $endpoint)
-                                .keyboardType(.URL)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .stepperInputField()
-
-                            Button("Save Endpoint") {
-                                session.addManualDevice(endpoint: endpoint, name: deviceName)
-                                onComplete?()
-                            }
-                            .buttonStyle(StepperPrimaryButtonStyle())
-                            .disabled(endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                    }
+                    // Owns its own @State (deviceName / endpoint) so keystrokes
+                    // only re-render this lightweight panel, not the parent StepperCard.
+                    ConnectionLANForm(onSave: { endpoint, name in
+                        session.addManualDevice(endpoint: endpoint, name: name)
+                        onComplete?()
+                    })
 
                     StepperPanel {
                         StepperSectionLabel(text: "BLE Provisioning")
@@ -129,10 +111,6 @@ struct ConnectionSetupView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                if deviceName.isEmpty {
-                    deviceName = "Stepper Doser"
-                }
-
                 if automaticBLEScan && session.devices.isEmpty && !hasAutoStartedScan {
                     hasAutoStartedScan = true
                     provisioning.startScanning()
@@ -161,6 +139,36 @@ struct ConnectionSetupView: View {
             return .warning
         default:
             return .secondary
+        }
+    }
+}
+
+/// Owns its own @State for the text fields so keystrokes only re-render this
+/// lightweight panel — not the parent StepperCard with its expensive material.
+private struct ConnectionLANForm: View {
+    let onSave: (String, String) -> Void
+
+    @State private var deviceName = "Stepper Doser"
+    @State private var endpoint = ""
+
+    var body: some View {
+        StepperPanel {
+            StepperSectionLabel(text: "LAN Endpoint")
+            VStack(spacing: StepperSpacing.lg) {
+                StepperTextField(placeholder: "Device name", text: $deviceName)
+                    .frame(minHeight: 24)
+                    .stepperInputField()
+
+                StepperTextField(placeholder: "stepper-doser.local or 192.168.1.50", text: $endpoint)
+                    .frame(minHeight: 24)
+                    .stepperInputField()
+
+                Button("Save Endpoint") {
+                    onSave(endpoint, deviceName)
+                }
+                .buttonStyle(StepperPrimaryButtonStyle())
+                .disabled(endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
         }
     }
 }
