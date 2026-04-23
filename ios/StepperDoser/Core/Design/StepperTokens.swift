@@ -737,14 +737,18 @@ struct StepperTextField: UIViewRepresentable {
 
         var items: [UIBarButtonItem] = []
 
+        // Corner radius matching StepperSelectionChip (StepperRadius.lg = 8)
+        let chipRadius: CGFloat = 8
+
         // Quick-action preset buttons (left side)
         for (index, item) in inputAccessoryItems.enumerated() {
             var config = UIButton.Configuration.bordered()
             config.title = item.label
             config.baseForegroundColor = UIColor(StepperColor.foreground)
             config.baseBackgroundColor = UIColor(StepperColor.secondary).withAlphaComponent(0.18)
-            config.cornerStyle = .capsule
-            config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14)
+            config.cornerStyle = .fixed
+            config.background.cornerRadius = chipRadius
+            config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
             config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
                 var a = attrs
                 a.font = UIFont.systemFont(ofSize: 13, weight: .medium)
@@ -763,13 +767,14 @@ struct StepperTextField: UIViewRepresentable {
         // Flexible space pushes Done to the right
         items.append(UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil))
 
-        // Done button — styled as a filled cyan capsule
+        // Done button — filled primary colour, rounded-rect matching chip style
         var doneConfig = UIButton.Configuration.filled()
         doneConfig.title = "Done"
         doneConfig.baseBackgroundColor = UIColor(StepperColor.primary)
         doneConfig.baseForegroundColor = UIColor(StepperColor.primaryForeground)
-        doneConfig.cornerStyle = .capsule
-        doneConfig.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 20, bottom: 7, trailing: 20)
+        doneConfig.cornerStyle = .fixed
+        doneConfig.background.cornerRadius = chipRadius
+        doneConfig.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
         doneConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
             var a = attrs
             a.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
