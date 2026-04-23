@@ -26,6 +26,7 @@
 		6DC38325AB0B49625083CA79 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3FC828749B55863D495E3 /* DashboardView.swift */; };
 		6E3C653ED2158A0CB885A031 /* RealtimeConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2980E503531E1D419E3F00ED /* RealtimeConnection.swift */; };
 		718DDC2F8521DE590B10277C /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6C5877FA208976CCC26529 /* AppShellView.swift */; };
+		1A10DBC4ED7745888DF4F0BD /* RealtimeStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE4E0B0824D4BF98D89038F /* RealtimeStatusBanner.swift */; };
 		76A417467E9D93657FD43E06 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CBD4D29119101322E23CB77 /* AppRootView.swift */; };
 		7BC30DCB7AF925A4B0B03F37 /* DeviceManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8B4323A5981C0C226A8B25 /* DeviceManagementView.swift */; };
 		BCE5645FE7581C462B1AD2F1 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FACBB1B9B10BE40B819CCF6 /* APIModels.swift */; };
@@ -58,6 +59,7 @@
 		76468A4B4A4D6FFA792D577E /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
 		799AFF2585259FFEB3ADF67E /* StepperTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepperTokens.swift; sourceTree = "<group>"; };
 		7E6C5877FA208976CCC26529 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
+		2AE4E0B0824D4BF98D89038F /* RealtimeStatusBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeStatusBanner.swift; sourceTree = "<group>"; };
 		85632A7D0BD503B5C1338A28 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		978155F2AC79194897366197 /* StepperDoserApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepperDoserApp.swift; sourceTree = "<group>"; };
 		9C1246609A2867CCC4A7DB25 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
@@ -70,6 +72,7 @@
 		B5B32A6AD01EC681FF51B281 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CDC3FC828749B55863D495E3 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		DDF34999D4F1CF60ADE638E7 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
+		E2C7AB282F997F41007D0804 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = StepperDoser/Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -157,6 +160,7 @@
 				4CBD4D29119101322E23CB77 /* AppRootView.swift */,
 				7E6C5877FA208976CCC26529 /* AppShellView.swift */,
 				76468A4B4A4D6FFA792D577E /* AppTab.swift */,
+				2AE4E0B0824D4BF98D89038F /* RealtimeStatusBanner.swift */,
 				A79E3927399DD4DBFE539FB5 /* TabRouter.swift */,
 			);
 			path = App;
@@ -227,6 +231,7 @@
 		BACB95E5377D8B8571A59302 = {
 			isa = PBXGroup;
 			children = (
+				E2C7AB282F997F41007D0804 /* PrivacyInfo.xcprivacy */,
 				203466555C8AFBA456731909 /* StepperDoser */,
 				41C93C3BFCA7F2DA926395B5 /* Products */,
 			);
@@ -354,6 +359,7 @@
 				3E285550CA155BC1E6DB2060 /* AppSession.swift in Sources */,
 				718DDC2F8521DE590B10277C /* AppShellView.swift in Sources */,
 				BFDA266ACB21B32B1944A77D /* AppTab.swift in Sources */,
+				1A10DBC4ED7745888DF4F0BD /* RealtimeStatusBanner.swift in Sources */,
 				4896EFD1FE9ABADC8FD64CDB /* BLEProvisioningManager.swift in Sources */,
 				E86CB30CB0D275CE9B89C10B /* BLEProvisioningModels.swift in Sources */,
 				F2EB3A7DA8BBD57B9FAFB886 /* BLEProvisioningProto.swift in Sources */,
@@ -454,7 +460,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -540,7 +546,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = 1;
