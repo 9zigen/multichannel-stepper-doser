@@ -310,7 +310,7 @@ private struct PumpManualRunControls: View {
                 Button("Stop \(pump.name)") {
                     onStop(pump)
                 }
-                .buttonStyle(StepperPrimaryButtonStyle())
+                .buttonStyle(StepperDestructiveButtonStyle())
             } else {
                 // Preset quick-action buttons live in the keyboard accessory bar.
                 // The text field + Start button is the only row shown here.
