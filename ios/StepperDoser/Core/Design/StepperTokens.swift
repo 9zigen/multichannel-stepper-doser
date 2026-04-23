@@ -694,6 +694,25 @@ struct StepperTextField: UIViewRepresentable {
         tf.addTarget(context.coordinator,
                      action: #selector(Coordinator.textChanged(_:)),
                      for: .editingChanged)
+        // Pad-style keyboards have no return key — attach a Done toolbar so the
+        // user can dismiss the keyboard without committing an action.
+        if keyboardType == .numberPad || keyboardType == .decimalPad
+            || keyboardType == .phonePad || keyboardType == .asciiCapableNumberPad {
+            let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 100, height: 44))
+            bar.barStyle = .black
+            bar.isTranslucent = true
+            bar.items = [
+                UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+                UIBarButtonItem(
+                    title: "Done",
+                    style: .done,
+                    target: context.coordinator,
+                    action: #selector(Coordinator.doneButtonTapped(_:))
+                )
+            ]
+            bar.sizeToFit()
+            tf.inputAccessoryView = bar
+        }
         return tf
     }
 
@@ -728,6 +747,16 @@ struct StepperTextField: UIViewRepresentable {
             tf.resignFirstResponder()
             onSubmit?()
             return true
+        }
+
+        /// Tapped by the Done bar above pad-style keyboards (number pad, decimal pad, etc.)
+        @objc func doneButtonTapped(_ sender: Any) {
+            // Walk the responder chain to find and resign the active text field.
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder),
+                to: nil, from: nil, for: nil
+            )
+            onSubmit?()
         }
     }
 }
