@@ -209,11 +209,11 @@ private struct OnboardingCredentialsEditorCard: View {
                 .foregroundStyle(StepperColor.mutedForeground)
 
             VStack(spacing: StepperSpacing.md) {
-                StepperTextField("Username", text: $username)
+                StepperTextField(placeholder: "Username", text: $username)
                     .frame(minHeight: 24)
                     .stepperInputField()
 
-                StepperTextField("Password", text: $password, isSecure: true)
+                StepperTextField(placeholder: "Password", text: $password, isSecure: true)
                     .frame(minHeight: 24)
                     .stepperInputField()
             }
