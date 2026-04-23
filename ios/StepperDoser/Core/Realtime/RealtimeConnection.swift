@@ -71,6 +71,17 @@ final class RealtimeConnection {
         stopCurrentConnection(resetStatus: true)
     }
 
+    /// Force an immediate reconnect, resetting the back-off counter.
+    /// Safe to call at any time — no-op if no credentials are stored.
+    func reconnect() {
+        guard baseURL != nil, token != nil else { return }
+        attempt = 0
+        shouldReconnect = true
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        openSocket()
+    }
+
     private func normalizedRealtimeBaseURL(for url: URL) -> URL {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return url

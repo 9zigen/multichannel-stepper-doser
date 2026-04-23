@@ -304,6 +304,10 @@ final class AppSession {
         await runPump(id: id, durationSeconds: 0, speed: speed, direction: direction)
     }
 
+    func reconnectRealtime() {
+        realtime.reconnect()
+    }
+
     func restartDevice() async {
         do {
             _ = try await apiClient.restartDevice()
