@@ -737,32 +737,24 @@ struct StepperTextField: UIViewRepresentable {
 
         var items: [UIBarButtonItem] = []
 
-        // Corner radius matching StepperSelectionChip (StepperRadius.lg = 8).
-        // Use .plain() + explicit UIBackgroundConfiguration so the system doesn't
-        // inject its own visual-effect background that renders as an unwanted oval.
-        let chipRadius: CGFloat = 8
+        // UIButton.Configuration always draws its own background rendering layer on top
+        // of btn.backgroundColor, making shape control unreliable (oval artefacts).
+        // UIButton(type:.custom) with direct CALayer styling is the correct approach:
+        // the layer IS the background — no additional rendering pipeline involved.
 
         // Quick-action preset buttons (left side)
         for (index, item) in inputAccessoryItems.enumerated() {
-            var bg = UIBackgroundConfiguration.clear()
-            bg.cornerRadius = chipRadius
-            bg.backgroundColor = UIColor(StepperColor.secondary).withAlphaComponent(0.24)
-            bg.strokeColor = UIColor(StepperColor.border).withAlphaComponent(0.55)
-            bg.strokeWidth = 0.5
-
-            var config = UIButton.Configuration.plain()
-            config.title = item.label
-            config.baseForegroundColor = UIColor(StepperColor.foreground)
-            config.background = bg
-            config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
-            config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
-                var a = attrs
-                a.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-                return a
-            }
-            let btn = UIButton(configuration: config, primaryAction: UIAction { [weak coordinator] _ in
+            let btn = chipButton(
+                title: item.label,
+                foreground: UIColor(StepperColor.foreground),
+                background: UIColor(StepperColor.secondary).withAlphaComponent(0.24),
+                stroke: UIColor(StepperColor.border).withAlphaComponent(0.55),
+                hPad: 14,
+                font: .systemFont(ofSize: 13, weight: .medium)
+            )
+            btn.addAction(UIAction { [weak coordinator] _ in
                 coordinator?.executeAccessoryItem(at: index)
-            })
+            }, for: .touchUpInside)
             items.append(UIBarButtonItem(customView: btn))
             if index < inputAccessoryItems.count - 1 {
                 items.append(UIBarButtonItem(barButtonSystemItem: .fixedSpace, target: nil, action: nil)
@@ -773,29 +765,52 @@ struct StepperTextField: UIViewRepresentable {
         // Flexible space pushes Done to the right
         items.append(UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil))
 
-        // Done button — same plain + explicit background approach, filled with primary colour
-        var doneBg = UIBackgroundConfiguration.clear()
-        doneBg.cornerRadius = chipRadius
-        doneBg.backgroundColor = UIColor(StepperColor.primary)
-
-        var doneConfig = UIButton.Configuration.plain()
-        doneConfig.title = "Done"
-        doneConfig.baseForegroundColor = UIColor(StepperColor.primaryForeground)
-        doneConfig.background = doneBg
-        doneConfig.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
-        doneConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
-            var a = attrs
-            a.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-            return a
-        }
-        let doneBtn = UIButton(configuration: doneConfig, primaryAction: UIAction { [weak coordinator] _ in
+        // Done — same chip shape, filled with primary colour
+        let doneBtn = chipButton(
+            title: "Done",
+            foreground: UIColor(StepperColor.primaryForeground),
+            background: UIColor(StepperColor.primary),
+            stroke: nil,
+            hPad: 20,
+            font: .systemFont(ofSize: 14, weight: .semibold)
+        )
+        doneBtn.addAction(UIAction { [weak coordinator] _ in
             coordinator?.dismissKeyboard()
-        })
+        }, for: .touchUpInside)
         items.append(UIBarButtonItem(customView: doneBtn))
 
         bar.items = items
         bar.sizeToFit()
         return bar
+    }
+
+    // MARK: — Chip button factory
+
+    /// Creates a plain UIButton(type:.custom) whose appearance is controlled
+    /// entirely through CALayer — no UIButton.Configuration background rendering.
+    private func chipButton(title: String,
+                             foreground: UIColor,
+                             background: UIColor,
+                             stroke: UIColor?,
+                             hPad: CGFloat,
+                             font: UIFont) -> UIButton {
+        let btn = UIButton(type: .custom)
+        btn.setTitle(title, for: .normal)
+        btn.setTitleColor(foreground, for: .normal)
+        btn.titleLabel?.font = font
+        btn.backgroundColor = background
+        btn.layer.cornerRadius = 8          // StepperRadius.lg
+        btn.layer.cornerCurve = .continuous
+        btn.clipsToBounds = true
+        if let stroke {
+            btn.layer.borderWidth = 0.5
+            btn.layer.borderColor = stroke.cgColor
+        }
+        // contentEdgeInsets is deprecated in iOS 15 but remains fully functional
+        // on iOS 17 and is the only reliable padding API for UIButton(type:.custom)
+        // without a Configuration (which would reintroduce background artefacts).
+        btn.contentEdgeInsets = UIEdgeInsets(top: 8, left: hPad, bottom: 8, right: hPad)
+        return btn
     }
 
     // MARK: — Coordinator
