@@ -303,7 +303,6 @@ private struct PumpManualRunControls: View {
     let onStop: (PumpConfiguration) -> Void
 
     @State private var customSeconds = ""
-    private let presetDurations = [10, 30, 60]
 
     var body: some View {
         VStack(alignment: .leading, spacing: StepperSpacing.md) {
@@ -313,20 +312,14 @@ private struct PumpManualRunControls: View {
                 }
                 .buttonStyle(StepperPrimaryButtonStyle())
             } else {
-                HStack(spacing: StepperSpacing.sm) {
-                    ForEach(presetDurations, id: \.self) { seconds in
-                        Button(presetLabel(for: seconds)) {
-                            onRun(pump, seconds)
-                        }
-                        .buttonStyle(StepperCompactButtonStyle())
-                    }
-                }
-
+                // Preset quick-action buttons live in the keyboard accessory bar.
+                // The text field + Start button is the only row shown here.
                 HStack(spacing: StepperSpacing.sm) {
                     StepperTextField(
-                        placeholder: "Seconds",
+                        placeholder: "Custom seconds",
                         text: $customSeconds,
-                        keyboardType: .numberPad
+                        keyboardType: .numberPad,
+                        inputAccessoryItems: presetAccessoryItems
                     )
                     .frame(minHeight: 24)
                     .stepperInputField()
@@ -345,37 +338,16 @@ private struct PumpManualRunControls: View {
         }
     }
 
+    private var presetAccessoryItems: [(label: String, action: () -> Void)] {
+        [(label: "10s",   action: { onRun(pump, 10)  }),
+         (label: "30s",   action: { onRun(pump, 30)  }),
+         (label: "1 min", action: { onRun(pump, 60)  })]
+    }
+
     private var customDuration: Int? {
         let trimmed = customSeconds.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let value = Int(trimmed), value > 0 else { return nil }
         return value
     }
-
-    private func presetLabel(for seconds: Int) -> String {
-        switch seconds {
-        case 60:
-            "1 min"
-        default:
-            "\(seconds)s"
-        }
-    }
 }
 
-private struct StepperCompactButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(StepperFont.small.weight(.medium))
-            .foregroundStyle(StepperColor.foreground)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, StepperSpacing.md)
-            .padding(.vertical, StepperSpacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
-                    .fill(StepperColor.secondary.opacity(configuration.isPressed ? 0.24 : 0.14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
-                            .stroke(StepperColor.border.opacity(0.55), lineWidth: 1)
-                    )
-            )
-    }
-}

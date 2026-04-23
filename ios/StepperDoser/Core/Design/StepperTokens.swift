@@ -662,6 +662,16 @@ struct StepperTextField: UIViewRepresentable {
     var keyboardType: UIKeyboardType = .asciiCapable
     var returnKeyType: UIReturnKeyType = .done
     var onSubmit: (() -> Void)? = nil
+    /// Extra action buttons shown in the keyboard accessory bar (left side).
+    /// Each item is a (label, action) pair. Action is called after the keyboard
+    /// is dismissed, so the caller doesn't need to resign first responder.
+    var inputAccessoryItems: [(label: String, action: () -> Void)] = []
+
+    private var needsAccessoryBar: Bool {
+        let isPad = keyboardType == .numberPad || keyboardType == .decimalPad
+                 || keyboardType == .phonePad || keyboardType == .asciiCapableNumberPad
+        return isPad || !inputAccessoryItems.isEmpty
+    }
 
     func makeUIView(context: Context) -> UITextField {
         let tf = UITextField()
@@ -694,24 +704,8 @@ struct StepperTextField: UIViewRepresentable {
         tf.addTarget(context.coordinator,
                      action: #selector(Coordinator.textChanged(_:)),
                      for: .editingChanged)
-        // Pad-style keyboards have no return key — attach a Done toolbar so the
-        // user can dismiss the keyboard without committing an action.
-        if keyboardType == .numberPad || keyboardType == .decimalPad
-            || keyboardType == .phonePad || keyboardType == .asciiCapableNumberPad {
-            let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 100, height: 44))
-            bar.barStyle = .black
-            bar.isTranslucent = true
-            bar.items = [
-                UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-                UIBarButtonItem(
-                    title: "Done",
-                    style: .done,
-                    target: context.coordinator,
-                    action: #selector(Coordinator.doneButtonTapped(_:))
-                )
-            ]
-            bar.sizeToFit()
-            tf.inputAccessoryView = bar
+        if needsAccessoryBar {
+            tf.inputAccessoryView = buildAccessoryBar(coordinator: context.coordinator)
         }
         return tf
     }
@@ -726,17 +720,84 @@ struct StepperTextField: UIViewRepresentable {
         if tf.isSecureTextEntry != isSecure {
             tf.isSecureTextEntry = isSecure
         }
+        // Keep coordinator's action list in sync without rebuilding the toolbar.
+        context.coordinator.accessoryItems = inputAccessoryItems
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(text: $text, onSubmit: onSubmit) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onSubmit: onSubmit, accessoryItems: inputAccessoryItems)
+    }
+
+    // MARK: — Accessory bar construction
+
+    private func buildAccessoryBar(coordinator: Coordinator) -> UIToolbar {
+        let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 100, height: 44))
+        bar.barStyle = .black
+        bar.isTranslucent = true
+
+        var items: [UIBarButtonItem] = []
+
+        // Quick-action preset buttons (left side)
+        for (index, item) in inputAccessoryItems.enumerated() {
+            var config = UIButton.Configuration.bordered()
+            config.title = item.label
+            config.baseForegroundColor = UIColor(StepperColor.foreground)
+            config.baseBackgroundColor = UIColor(StepperColor.secondary).withAlphaComponent(0.18)
+            config.cornerStyle = .capsule
+            config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14)
+            config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
+                var a = attrs
+                a.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+                return a
+            }
+            let btn = UIButton(configuration: config, primaryAction: UIAction { [weak coordinator] _ in
+                coordinator?.executeAccessoryItem(at: index)
+            })
+            items.append(UIBarButtonItem(customView: btn))
+            if index < inputAccessoryItems.count - 1 {
+                items.append(UIBarButtonItem(barButtonSystemItem: .fixedSpace, target: nil, action: nil)
+                    .then { $0.width = 6 })
+            }
+        }
+
+        // Flexible space pushes Done to the right
+        items.append(UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil))
+
+        // Done button — styled as a filled cyan capsule
+        var doneConfig = UIButton.Configuration.filled()
+        doneConfig.title = "Done"
+        doneConfig.baseBackgroundColor = UIColor(StepperColor.primary)
+        doneConfig.baseForegroundColor = UIColor(StepperColor.primaryForeground)
+        doneConfig.cornerStyle = .capsule
+        doneConfig.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 20, bottom: 7, trailing: 20)
+        doneConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
+            var a = attrs
+            a.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+            return a
+        }
+        let doneBtn = UIButton(configuration: doneConfig, primaryAction: UIAction { [weak coordinator] _ in
+            coordinator?.dismissKeyboard()
+        })
+        items.append(UIBarButtonItem(customView: doneBtn))
+
+        bar.items = items
+        bar.sizeToFit()
+        return bar
+    }
+
+    // MARK: — Coordinator
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         private let text: Binding<String>
         private let onSubmit: (() -> Void)?
+        /// Mutable — updated by updateUIView so closures always reflect current state.
+        var accessoryItems: [(label: String, action: () -> Void)]
 
-        init(text: Binding<String>, onSubmit: (() -> Void)?) {
+        init(text: Binding<String>, onSubmit: (() -> Void)?,
+             accessoryItems: [(label: String, action: () -> Void)]) {
             self.text = text
             self.onSubmit = onSubmit
+            self.accessoryItems = accessoryItems
         }
 
         @objc func textChanged(_ tf: UITextField) {
@@ -749,15 +810,28 @@ struct StepperTextField: UIViewRepresentable {
             return true
         }
 
-        /// Tapped by the Done bar above pad-style keyboards (number pad, decimal pad, etc.)
-        @objc func doneButtonTapped(_ sender: Any) {
-            // Walk the responder chain to find and resign the active text field.
+        func dismissKeyboard() {
             UIApplication.shared.sendAction(
                 #selector(UIResponder.resignFirstResponder),
                 to: nil, from: nil, for: nil
             )
             onSubmit?()
         }
+
+        func executeAccessoryItem(at index: Int) {
+            dismissKeyboard()
+            guard index < accessoryItems.count else { return }
+            accessoryItems[index].action()
+        }
+    }
+}
+
+// MARK: — Fluent helper
+
+private extension UIBarButtonItem {
+    func then(_ configure: (UIBarButtonItem) -> Void) -> UIBarButtonItem {
+        configure(self)
+        return self
     }
 }
 
