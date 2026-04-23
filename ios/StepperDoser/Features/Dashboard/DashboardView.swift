@@ -2,7 +2,6 @@ import SwiftUI
 
 struct DashboardView: View {
     @Environment(AppSession.self) private var session
-    @State private var customRunSeconds: [Int: String] = [:]
     private let metricColumns = [
         GridItem(.flexible(), spacing: StepperSpacing.md),
         GridItem(.flexible(), spacing: StepperSpacing.md),
@@ -163,7 +162,6 @@ struct DashboardView: View {
                                     PumpManualRunControls(
                                         pump: pump,
                                         runtimeEntry: runtimeEntry(for: pump.id),
-                                        customSeconds: customSecondsBinding(for: pump.id),
                                         onRun: runPump,
                                         onStop: stopPump
                                     )
@@ -200,13 +198,6 @@ struct DashboardView: View {
 
     private func runtimeEntry(for pumpID: Int) -> PumpRuntimeEntry? {
         session.runtime.first(where: { $0.id == pumpID })
-    }
-
-    private func customSecondsBinding(for pumpID: Int) -> Binding<String> {
-        Binding(
-            get: { customRunSeconds[pumpID] ?? "" },
-            set: { customRunSeconds[pumpID] = $0 }
-        )
     }
 
     private func runPump(_ pump: PumpConfiguration, seconds: Int) {
@@ -303,13 +294,15 @@ struct DashboardView: View {
     }
 }
 
+/// Owns its own @State for the seconds field so keystrokes only re-render this
+/// lightweight view — not the parent DashboardView with all its metric tiles.
 private struct PumpManualRunControls: View {
     let pump: PumpConfiguration
     let runtimeEntry: PumpRuntimeEntry?
-    @Binding var customSeconds: String
     let onRun: (PumpConfiguration, Int) -> Void
     let onStop: (PumpConfiguration) -> Void
 
+    @State private var customSeconds = ""
     private let presetDurations = [10, 30, 60]
 
     var body: some View {
@@ -330,11 +323,13 @@ private struct PumpManualRunControls: View {
                 }
 
                 HStack(spacing: StepperSpacing.sm) {
-                    TextField("Seconds", text: $customSeconds)
-                        .keyboardType(.numberPad)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .stepperInputField()
+                    StepperTextField(
+                        placeholder: "Seconds",
+                        text: $customSeconds,
+                        keyboardType: .numberPad
+                    )
+                    .frame(minHeight: 24)
+                    .stepperInputField()
 
                     Button("Start") {
                         if let seconds = customDuration, seconds > 0 {

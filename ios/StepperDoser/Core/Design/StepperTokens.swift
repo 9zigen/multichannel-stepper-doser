@@ -659,6 +659,7 @@ struct StepperTextField: UIViewRepresentable {
     let placeholder: String
     @Binding var text: String
     var isSecure: Bool = false
+    var keyboardType: UIKeyboardType = .asciiCapable
     var returnKeyType: UIReturnKeyType = .done
     var onSubmit: (() -> Void)? = nil
 
@@ -683,7 +684,7 @@ struct StepperTextField: UIViewRepresentable {
         tf.smartQuotesType = .no
         tf.smartDashesType = .no
         tf.smartInsertDeleteType = .no
-        tf.keyboardType = .asciiCapable
+        tf.keyboardType = keyboardType
         tf.returnKeyType = returnKeyType
         tf.enablesReturnKeyAutomatically = false
         tf.isSecureTextEntry = isSecure
