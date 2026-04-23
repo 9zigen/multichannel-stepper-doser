@@ -6,32 +6,26 @@ struct SettingsHomeView: View {
     var body: some View {
         StepperPage {
             StepperPanel(spacing: StepperSpacing.lg, padding: 0) {
-                VStack(alignment: .leading, spacing: StepperSpacing.sm) {
-                    StepperSectionLabel(text: "Configuration")
-                    Text("Settings")
-                        .font(StepperFont.title)
-                        .foregroundStyle(StepperColor.foreground)
-                }
-                .padding(StepperLayout.panelPadding)
 
                 StepperPanel {
                     StepperSectionLabel(text: "Active Device")
-                    VStack(spacing: StepperSpacing.md) {
-                        StepperKeyValueRow("Controller") {
-                            Text(session.selectedDevice?.displayName ?? "None")
+                    NavigationLink(destination: DeviceManagementView()) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: StepperSpacing.xs) {
+                                Text(session.selectedDevice?.displayName ?? "None")
+                                    .font(StepperFont.section)
+                                    .foregroundStyle(StepperColor.foreground)
+                                Text(session.selectedDevice?.endpointLabel ?? "No endpoint")
+                                    .font(StepperFont.monoSmall)
+                                    .foregroundStyle(StepperColor.mutedForeground)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(StepperColor.mutedForeground)
                         }
-                        StepperKeyValueRow("Endpoint") {
-                            Text(session.selectedDevice?.endpointLabel ?? "None")
-                        }
-
-                        NavigationLink {
-                            DeviceManagementView()
-                        } label: {
-                            Text("Manage Devices")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(StepperSecondaryButtonStyle())
                     }
+                    .buttonStyle(.plain)
                 }
 
                 StepperPanel {
@@ -73,16 +67,12 @@ struct SettingsHomeView: View {
                     StepperSectionLabel(text: "Maintenance")
                     VStack(spacing: StepperSpacing.md) {
                         Button("Refresh Device State") {
-                            Task {
-                                await session.refresh()
-                            }
+                            Task { await session.refresh() }
                         }
                         .buttonStyle(StepperSecondaryButtonStyle())
 
                         Button("Restart Device") {
-                            Task {
-                                await session.restartDevice()
-                            }
+                            Task { await session.restartDevice() }
                         }
                         .buttonStyle(StepperSecondaryButtonStyle())
 
@@ -92,6 +82,7 @@ struct SettingsHomeView: View {
                         .buttonStyle(StepperDestructiveButtonStyle())
                     }
                 }
+
                 Color.clear.frame(height: StepperSpacing.xs)
             }
         }

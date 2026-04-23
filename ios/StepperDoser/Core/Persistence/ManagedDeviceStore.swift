@@ -88,6 +88,15 @@ final class ManagedDeviceStore {
         persist()
     }
 
+    func removeDevice(_ device: ManagedDevice) {
+        if selectedDeviceID == device.id {
+            selectedDeviceID = nil
+        }
+        devices.removeAll { $0.id == device.id }
+        normalizeSelection()
+        persist()
+    }
+
     func selectDevice(_ id: UUID?) {
         selectedDeviceID = id
         normalizeSelection()

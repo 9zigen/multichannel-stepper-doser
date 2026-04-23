@@ -308,6 +308,20 @@ final class AppSession {
         realtime.reconnect()
     }
 
+    func removeDevice(_ device: ManagedDevice) {
+        let wasSelected = selectedDevice?.id == device.id
+        deviceStore.removeDevice(device)
+        if wasSelected {
+            authToken = nil
+            clearActiveState()
+            syncAPIClient()
+        }
+    }
+
+    func updateDevice(_ device: ManagedDevice) {
+        deviceStore.updateDevice(device)
+    }
+
     func restartDevice() async {
         do {
             _ = try await apiClient.restartDevice()
