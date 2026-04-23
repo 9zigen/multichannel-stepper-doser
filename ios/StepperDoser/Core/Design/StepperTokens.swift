@@ -737,17 +737,23 @@ struct StepperTextField: UIViewRepresentable {
 
         var items: [UIBarButtonItem] = []
 
-        // Corner radius matching StepperSelectionChip (StepperRadius.lg = 8)
+        // Corner radius matching StepperSelectionChip (StepperRadius.lg = 8).
+        // Use .plain() + explicit UIBackgroundConfiguration so the system doesn't
+        // inject its own visual-effect background that renders as an unwanted oval.
         let chipRadius: CGFloat = 8
 
         // Quick-action preset buttons (left side)
         for (index, item) in inputAccessoryItems.enumerated() {
-            var config = UIButton.Configuration.bordered()
+            var bg = UIBackgroundConfiguration.clear()
+            bg.cornerRadius = chipRadius
+            bg.backgroundColor = UIColor(StepperColor.secondary).withAlphaComponent(0.24)
+            bg.strokeColor = UIColor(StepperColor.border).withAlphaComponent(0.55)
+            bg.strokeWidth = 0.5
+
+            var config = UIButton.Configuration.plain()
             config.title = item.label
             config.baseForegroundColor = UIColor(StepperColor.foreground)
-            config.baseBackgroundColor = UIColor(StepperColor.secondary).withAlphaComponent(0.18)
-            config.cornerStyle = .fixed
-            config.background.cornerRadius = chipRadius
+            config.background = bg
             config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
             config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
                 var a = attrs
@@ -767,13 +773,15 @@ struct StepperTextField: UIViewRepresentable {
         // Flexible space pushes Done to the right
         items.append(UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil))
 
-        // Done button — filled primary colour, rounded-rect matching chip style
-        var doneConfig = UIButton.Configuration.filled()
+        // Done button — same plain + explicit background approach, filled with primary colour
+        var doneBg = UIBackgroundConfiguration.clear()
+        doneBg.cornerRadius = chipRadius
+        doneBg.backgroundColor = UIColor(StepperColor.primary)
+
+        var doneConfig = UIButton.Configuration.plain()
         doneConfig.title = "Done"
-        doneConfig.baseBackgroundColor = UIColor(StepperColor.primary)
         doneConfig.baseForegroundColor = UIColor(StepperColor.primaryForeground)
-        doneConfig.cornerStyle = .fixed
-        doneConfig.background.cornerRadius = chipRadius
+        doneConfig.background = doneBg
         doneConfig.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
         doneConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
             var a = attrs

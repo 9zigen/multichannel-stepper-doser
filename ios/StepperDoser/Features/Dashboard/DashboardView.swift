@@ -316,7 +316,7 @@ private struct PumpManualRunControls: View {
                 // The text field + Start button is the only row shown here.
                 HStack(spacing: StepperSpacing.sm) {
                     StepperTextField(
-                        placeholder: "Custom seconds",
+                        placeholder: "Seconds",
                         text: $customSeconds,
                         keyboardType: .numberPad,
                         inputAccessoryItems: presetAccessoryItems
