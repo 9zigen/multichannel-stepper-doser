@@ -81,6 +81,8 @@ final class ManagedDeviceStore {
 
     func updateDevice(_ device: ManagedDevice) {
         guard let index = devices.firstIndex(where: { $0.id == device.id }) else { return }
+        // Skip the encode + UserDefaults write if nothing actually changed.
+        guard devices[index] != device else { return }
         devices[index] = device
         devices.sort { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
         persist()

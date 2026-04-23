@@ -371,7 +371,11 @@ final class AppSession {
         current.apIpAddress = patch.apIpAddress ?? current.apIpAddress
         current.apClients = patch.apClients ?? current.apClients
         status = current
-        syncSelectedDeviceMetadata()
+        // Do NOT call syncSelectedDeviceMetadata() here — it encodes and writes all
+        // devices to UserDefaults synchronously on the main thread. Status patches
+        // arrive every few seconds, so doing a disk write on each one blocks gestures
+        // (manifests as "System gesture gate timed out" in the device log).
+        // Metadata is synced on refresh() and login() which are infrequent operations.
     }
 
     private func apply(pumpRuntime entry: PumpRuntimeEntry) {
