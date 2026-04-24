@@ -546,6 +546,7 @@ esp_err_t options_handler(httpd_req_t *req)
 httpd_handle_t start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = 4096 + 2048;
     config.max_uri_handlers = 36;
     config.max_open_sockets = APP_HTTP_MAX_OPEN_SOCKETS;
     config.lru_purge_enable = true;
