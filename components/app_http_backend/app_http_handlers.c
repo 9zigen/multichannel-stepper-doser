@@ -1877,13 +1877,13 @@ esp_err_t auth_post_handler(httpd_req_t *req)
     auth_t *auth = get_auth_config();
 
     if (cJSON_IsString(user) && (user->valuestring != NULL)) {
-        if (strncmp(user->valuestring, auth->username, strlen(auth->username)) == 0) {
+        if (strcmp(user->valuestring, auth->username) == 0) {
             user_valid = true;
         }
     }
 
     if (cJSON_IsString(password) && (password->valuestring != NULL)) {
-        if (strncmp(password->valuestring, auth->password, strlen(auth->password)) != 0 || !user_valid) {
+        if (strcmp(password->valuestring, auth->password) != 0 || !user_valid) {
             user_valid = false;
         }
     } else {
@@ -1893,13 +1893,11 @@ esp_err_t auth_post_handler(httpd_req_t *req)
     cJSON_Delete(root);
 
     if (user_valid) {
-        generateToken(app_http_auth_token);
-        strncpy(auth->token, app_http_auth_token, sizeof(auth->token));
-        save_auth();
+        const char *token = app_http_ensure_auth_token();
 
         cJSON *json = cJSON_CreateObject();
         cJSON_AddTrueToObject(json, "success");
-        cJSON_AddItemToObject(json, "token", cJSON_CreateString(app_http_auth_token));
+        cJSON_AddItemToObject(json, "token", cJSON_CreateString(token));
 
         char *response = cJSON_Print(json);
         cJSON_Delete(json);

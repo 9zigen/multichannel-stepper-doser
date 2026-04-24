@@ -14,6 +14,7 @@
 
 extern char app_http_auth_token[65];
 
+const char *app_http_ensure_auth_token(void);
 char *app_http_success_response_json(bool success);
 esp_err_t app_http_validate_request(httpd_req_t *req);
 esp_err_t app_http_validate_ws_request(httpd_req_t *req);

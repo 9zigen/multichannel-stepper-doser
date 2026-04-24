@@ -168,7 +168,7 @@ All endpoints are relative to `http://<device-ip>`. Authenticated endpoints requ
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/auth` | Authenticate. Body: `{ "username": "...", "password": "..." }`. Returns session token. |
+| `POST` | `/api/auth` | Authenticate. Body: `{ "username": "...", "password": "..." }`. Returns the persistent device token. Repeated successful logins reuse the stored token so Web UI and iOS can stay connected at the same time. |
 | `GET` | `/api/status` | Full device status snapshot. Large — do not poll; prefer `status_patch` over WebSocket. |
 | `GET` | `/api/settings` | All user-configurable settings (networks, services, pumps, time). |
 | `POST` | `/api/settings` | Save settings. Body: full or partial settings object. Returns the updated full settings payload. |

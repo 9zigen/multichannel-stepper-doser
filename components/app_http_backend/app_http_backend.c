@@ -23,6 +23,20 @@ static httpd_handle_t server = NULL;
 
 char app_http_auth_token[65];
 
+const char *app_http_ensure_auth_token(void)
+{
+    auth_t *auth = get_auth_config();
+
+    if (auth->token[0] == '\0') {
+        generateToken(auth->token);
+        save_auth();
+        ESP_LOGI(TAG, "Generated persistent auth token");
+    }
+
+    strlcpy(app_http_auth_token, auth->token, sizeof(app_http_auth_token));
+    return app_http_auth_token;
+}
+
 typedef struct {
     int sockfd;
     int64_t last_seen_ms;
@@ -299,7 +313,7 @@ esp_err_t app_http_validate_request(httpd_req_t *req)
         char *buf = malloc(buf_len);
         if (httpd_req_get_hdr_value_str(req, "Authorization", buf, buf_len) == ESP_OK) {
             ESP_LOGD(TAG, "Found header => Authorization: %s", buf);
-            if (strncmp(app_http_auth_token, buf, strlen(app_http_auth_token)) == 0) {
+            if (strcmp(app_http_auth_token, buf) == 0) {
                 ESP_LOGD(TAG, "Authorization: success");
                 free(buf);
                 return ESP_OK;
@@ -327,7 +341,7 @@ esp_err_t app_http_validate_ws_request(httpd_req_t *req)
     if (httpd_req_get_url_query_str(req, query, query_len) == ESP_OK) {
         char token[65] = {0};
         if (httpd_query_key_value(query, "token", token, sizeof(token)) == ESP_OK) {
-            if (strncmp(app_http_auth_token, token, strlen(app_http_auth_token)) == 0) {
+            if (strcmp(app_http_auth_token, token) == 0) {
                 result = ESP_OK;
             }
         }
@@ -572,12 +586,7 @@ httpd_handle_t start_webserver(void)
         ws_clients[i].last_seen_ms = 0;
     }
 
-    auth_t *auth = get_auth_config();
-    if (!strlen(auth->token)) {
-        generateToken(app_http_auth_token);
-    } else {
-        strncpy(app_http_auth_token, auth->token, sizeof(app_http_auth_token));
-    }
+    app_http_ensure_auth_token();
 
     if (httpd_start(&server, &config) == ESP_OK) {
         app_http_ws_init_event_bridge();
