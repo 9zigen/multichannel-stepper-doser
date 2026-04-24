@@ -34,6 +34,23 @@ static bool s_today_history_dirty[MAX_PUMP];
 static uint8_t s_today_history_runtime_subticks[MAX_PUMP][APP_PUMP_HISTORY_HOURS];
 static double s_today_history_scheduled_volume_accum[MAX_PUMP][APP_PUMP_HISTORY_HOURS];
 static double s_today_history_manual_volume_accum[MAX_PUMP][APP_PUMP_HISTORY_HOURS];
+static void mark_pump_runtime_dirty(uint8_t pump_id);
+
+#define PUMP_ALERT_DRIVER_MASK (PUMP_ALERT_DRIVER_RESET | \
+                                PUMP_ALERT_DRIVER_ERROR | \
+                                PUMP_ALERT_DRIVER_UNDERVOLTAGE | \
+                                PUMP_ALERT_DRIVER_OTPW | \
+                                PUMP_ALERT_DRIVER_OT | \
+                                PUMP_ALERT_DRIVER_SHORT | \
+                                PUMP_ALERT_DRIVER_OPEN_LOAD | \
+                                PUMP_ALERT_DRIVER_UART)
+
+#define PUMP_ALERT_SAFETY_MASK (PUMP_ALERT_NO_CALIBRATION | \
+                                PUMP_ALERT_LIMIT_SINGLE_RUN_SECONDS | \
+                                PUMP_ALERT_LIMIT_SINGLE_RUN_VOLUME | \
+                                PUMP_ALERT_LIMIT_HOURLY_VOLUME | \
+                                PUMP_ALERT_LIMIT_DAILY_VOLUME | \
+                                PUMP_ALERT_LIMIT_GLOBAL_DAILY_VOLUME)
 
 #define APP_PUMP_HISTORY_NAMESPACE "pump_hist"
 #define APP_PUMP_HISTORY_KEY_LEN 16
@@ -241,6 +258,40 @@ static void history_record_activity(uint8_t pump_id, pump_history_source_t sourc
     s_today_history_dirty[pump_id] = true;
 }
 
+static double history_get_pump_hour_volume_ml(uint8_t pump_id, uint8_t hour)
+{
+    if (pump_id >= MAX_PUMP || hour >= APP_PUMP_HISTORY_HOURS) {
+        return 0.0;
+    }
+
+    return s_today_history_scheduled_volume_accum[pump_id][hour] +
+           s_today_history_manual_volume_accum[pump_id][hour];
+}
+
+static double history_get_pump_day_volume_ml(uint8_t pump_id)
+{
+    if (pump_id >= MAX_PUMP) {
+        return 0.0;
+    }
+
+    double total = 0.0;
+    for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
+        total += history_get_pump_hour_volume_ml(pump_id, hour);
+    }
+
+    return total;
+}
+
+static double history_get_total_day_volume_ml(void)
+{
+    double total = 0.0;
+    for (uint8_t pump_id = 0; pump_id < MAX_PUMP; ++pump_id) {
+        total += history_get_pump_day_volume_ml(pump_id);
+    }
+
+    return total;
+}
+
 static double clamp_positive(double value)
 {
     return value < 0.0 ? 0.0 : value;
@@ -253,14 +304,11 @@ static double pump_flow_ml_per_min(const pump_t *pump_config, float rpm)
     }
 
     if (pump_config->calibration_count == 0) {
-        if (pump_config->calibration_100ml_units == 0) {
-            return 0.0;
-        }
-        return 100.0 * (double)PUMP_TIMER_UNIT_IN_SEC / (double)pump_config->calibration_100ml_units;
+        return 0.0;
     }
 
     if (pump_config->calibration_count == 1) {
-        return pump_config->calibration[0].flow;
+        return pump_config->calibration[0].flow > 0.0f ? pump_config->calibration[0].flow : 0.0;
     }
 
     const pump_calibration_t *points = pump_config->calibration;
@@ -275,7 +323,7 @@ static double pump_flow_ml_per_min(const pump_t *pump_config, float rpm)
             double left_flow = points[i - 1].flow;
             double right_flow = points[i].flow;
             if (right_speed <= left_speed) {
-                return right_flow;
+                return right_flow > 0.0 ? right_flow : 0.0;
             }
 
             double ratio = ((double)rpm - left_speed) / (right_speed - left_speed);
@@ -284,6 +332,177 @@ static double pump_flow_ml_per_min(const pump_t *pump_config, float rpm)
     }
 
     return points[pump_config->calibration_count - 1].flow;
+}
+
+static bool pump_has_valid_calibration(const pump_t *pump_config)
+{
+    if (pump_config == NULL || pump_config->calibration_count == 0) {
+        return false;
+    }
+
+    for (uint8_t i = 0; i < pump_config->calibration_count; ++i) {
+        if (pump_config->calibration[i].speed > 0.0f &&
+            pump_config->calibration[i].flow > 0.0f) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static double projected_volume_ml(double flow_ml_per_min, int32_t time_seconds)
+{
+    if (flow_ml_per_min <= 0.0 || time_seconds <= 0) {
+        return 0.0;
+    }
+
+    return (flow_ml_per_min * (double)time_seconds) / 60.0;
+}
+
+static void set_pump_alert_flags(uint8_t pump_id, uint32_t mask, bool enabled)
+{
+    if (pump_id >= MAX_PUMP || mask == 0) {
+        return;
+    }
+
+    uint32_t before = pumps[pump_id].alert_flags;
+    if (enabled) {
+        pumps[pump_id].alert_flags |= mask;
+    } else {
+        pumps[pump_id].alert_flags &= ~mask;
+    }
+
+    if (before != pumps[pump_id].alert_flags) {
+        mark_pump_runtime_dirty(pump_id);
+    }
+}
+
+static void clear_pump_runtime_safety_alerts(uint8_t pump_id)
+{
+    set_pump_alert_flags(pump_id, PUMP_ALERT_SAFETY_MASK, false);
+}
+
+static uint32_t current_runtime_limit_flags(uint8_t pump_id)
+{
+    if (pump_id >= MAX_PUMP) {
+        return PUMP_ALERT_NONE;
+    }
+
+    pump_t *pump_config = get_pump_config(pump_id);
+    services_t *services = get_service_config();
+    uint32_t flags = PUMP_ALERT_NONE;
+
+    if (pump_config->safety.max_single_run_seconds > 0 &&
+        pumps[pump_id].state != PUMP_CAL) {
+        uint32_t elapsed_seconds = pumps[pump_id].run_ticks / PUMP_TIMER_UNIT_IN_SEC;
+        if (elapsed_seconds >= pump_config->safety.max_single_run_seconds) {
+            flags |= PUMP_ALERT_LIMIT_SINGLE_RUN_SECONDS;
+        }
+    }
+
+    if (pump_config->safety.max_single_run_ml > 0 &&
+        pumps[pump_id].volume >= (double)pump_config->safety.max_single_run_ml) {
+        flags |= PUMP_ALERT_LIMIT_SINGLE_RUN_VOLUME;
+    }
+
+    const uint8_t hour = current_local_hour();
+    if (pump_config->safety.max_hourly_ml > 0 &&
+        history_get_pump_hour_volume_ml(pump_id, hour) >= (double)pump_config->safety.max_hourly_ml) {
+        flags |= PUMP_ALERT_LIMIT_HOURLY_VOLUME;
+    }
+
+    if (pump_config->safety.max_daily_ml > 0 &&
+        history_get_pump_day_volume_ml(pump_id) >= (double)pump_config->safety.max_daily_ml) {
+        flags |= PUMP_ALERT_LIMIT_DAILY_VOLUME;
+    }
+
+    if (services->max_total_daily_ml > 0 &&
+        history_get_total_day_volume_ml() >= (double)services->max_total_daily_ml) {
+        flags |= PUMP_ALERT_LIMIT_GLOBAL_DAILY_VOLUME;
+    }
+
+    return flags;
+}
+
+static esp_err_t validate_run_request(uint8_t pump_id, float rpm, int32_t time_seconds, bool require_calibration,
+                                      char *error, size_t error_size)
+{
+    if (error != NULL && error_size > 0) {
+        error[0] = '\0';
+    }
+
+    if (pump_id >= MAX_PUMP || rpm <= 0.0f || time_seconds <= 0) {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "Invalid pump run request");
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    pump_t *pump_config = get_pump_config(pump_id);
+    services_t *services = get_service_config();
+    const bool needs_flow = require_calibration ||
+                            pump_config->safety.max_single_run_ml > 0 ||
+                            pump_config->safety.max_hourly_ml > 0 ||
+                            pump_config->safety.max_daily_ml > 0 ||
+                            services->max_total_daily_ml > 0;
+    const bool has_calibration = pump_has_valid_calibration(pump_config);
+    const double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
+
+    if (needs_flow && (!has_calibration || flow_ml_per_min <= 0.0)) {
+        set_pump_alert_flags(pump_id, PUMP_ALERT_NO_CALIBRATION, true);
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "Pump calibration is required for this operation");
+        }
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    const double projected_ml = projected_volume_ml(flow_ml_per_min, time_seconds);
+    const uint8_t hour = current_local_hour();
+    if (pump_config->safety.max_single_run_seconds > 0 &&
+        (uint32_t)time_seconds > pump_config->safety.max_single_run_seconds) {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "Run exceeds max_single_run_seconds");
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (pump_config->safety.max_single_run_ml > 0 &&
+        projected_ml > (double)pump_config->safety.max_single_run_ml) {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "Run exceeds max_single_run_ml");
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (pump_config->safety.max_hourly_ml > 0 &&
+        history_get_pump_hour_volume_ml(pump_id, hour) + projected_ml >
+            (double)pump_config->safety.max_hourly_ml) {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "Run exceeds max_hourly_ml");
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (pump_config->safety.max_daily_ml > 0 &&
+        history_get_pump_day_volume_ml(pump_id) + projected_ml >
+            (double)pump_config->safety.max_daily_ml) {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "Run exceeds max_daily_ml");
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (services->max_total_daily_ml > 0 &&
+        history_get_total_day_volume_ml() + projected_ml >
+            (double)services->max_total_daily_ml) {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "Run exceeds max_total_daily_ml");
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    clear_pump_runtime_safety_alerts(pump_id);
+    return ESP_OK;
 }
 
 static esp_err_t start_pump(uint8_t pump_id, float speed, bool direction)
@@ -328,6 +547,8 @@ static void dispatch_pump_runtime_event(uint8_t pump_id)
         .rpm = pumps[pump_id].rpm,
         .direction = pumps[pump_id].direction,
         .state = pumps[pump_id].state,
+        .alert_flags = pumps[pump_id].alert_flags,
+        .driver_status = pumps[pump_id].driver_status,
     };
 
     app_events_dispatch_system(PUMP_RUNTIME_DATA, &event, sizeof(event));
@@ -364,6 +585,7 @@ static void run_timer_callback(void *arg)
         pump_t *pump_config = get_pump_config(pump_id);
 
         if (pumps[pump_id].state == PUMP_ON && pumps[pump_id].time > 0) {
+            pumps[pump_id].run_ticks++;
             pumps[pump_id].volume += pumps[pump_id].flow_per_unit;
             pumps[pump_id].time--;
             pump_config->tank_current_vol = clamp_positive(pump_config->tank_current_vol - pumps[pump_id].flow_per_unit);
@@ -371,20 +593,43 @@ static void run_timer_callback(void *arg)
             history_record_activity(pump_id, pumps[pump_id].history_source, pumps[pump_id].flow_per_unit, true);
             tank_volume_changed = 1;
 
+            uint32_t limit_flags = current_runtime_limit_flags(pump_id);
+            if (limit_flags != PUMP_ALERT_NONE) {
+                pumps[pump_id].state = PUMP_OFF;
+                pumps[pump_id].time = 0;
+                pumps[pump_id].run_ticks = 0;
+                pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
+                set_pump_alert_flags(pump_id, limit_flags, true);
+                stop_pump(pump_id);
+            }
+
             if (pumps[pump_id].time == 0) {
                 pumps[pump_id].state = PUMP_OFF;
+                pumps[pump_id].run_ticks = 0;
                 pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
                 stop_pump(pump_id);
             }
             mark_pump_runtime_dirty(pump_id);
         } else if (pumps[pump_id].state == PUMP_CONTINUOUS) {
+            pumps[pump_id].run_ticks++;
             pumps[pump_id].volume += pumps[pump_id].flow_per_unit;
             pump_config->tank_current_vol = clamp_positive(pump_config->tank_current_vol - pumps[pump_id].flow_per_unit);
             pump_config->running_hours += 1.0f / (float)(PUMP_TIMER_UNIT_IN_SEC * 3600.0f);
             history_record_activity(pump_id, pumps[pump_id].history_source, pumps[pump_id].flow_per_unit, true);
             tank_volume_changed = 1;
+
+            uint32_t limit_flags = current_runtime_limit_flags(pump_id);
+            if (limit_flags != PUMP_ALERT_NONE) {
+                pumps[pump_id].state = PUMP_OFF;
+                pumps[pump_id].time = 0;
+                pumps[pump_id].run_ticks = 0;
+                pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
+                set_pump_alert_flags(pump_id, limit_flags, true);
+                stop_pump(pump_id);
+            }
             mark_pump_runtime_dirty(pump_id);
         } else if (pumps[pump_id].state == PUMP_CAL) {
+            pumps[pump_id].run_ticks++;
             pumps[pump_id].time++;
             history_record_activity(pump_id, pumps[pump_id].history_source, 0.0, true);
             mark_pump_runtime_dirty(pump_id);
@@ -433,6 +678,7 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
     for (uint8_t pump_id = 0; pump_id < MAX_PUMP; ++pump_id) {
         if (pumps[pump_id].state == PUMP_CONTINUOUS && !continuous_mode[pump_id]) {
             pumps[pump_id].state = PUMP_OFF;
+            pumps[pump_id].run_ticks = 0;
             pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
             stop_pump(pump_id);
             mark_pump_runtime_dirty(pump_id);
@@ -452,9 +698,11 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
                     (double)PUMP_TIMER_UNIT_IN_SEC / 60.0;
                 pumps[schedule->pump_id].rpm = schedule->speed;
                 pumps[schedule->pump_id].direction = get_pump_config(schedule->pump_id)->direction;
+                pumps[schedule->pump_id].run_ticks = 0;
                 pumps[schedule->pump_id].volume = 0;
                 pumps[schedule->pump_id].history_source = PUMP_HISTORY_SOURCE_CONTINUOUS;
                 pumps[schedule->pump_id].state = PUMP_CONTINUOUS;
+                clear_pump_runtime_safety_alerts(schedule->pump_id);
                 if (start_pump(schedule->pump_id, schedule->speed, pumps[schedule->pump_id].direction) != ESP_OK) {
                     pumps[schedule->pump_id].state = PUMP_OFF;
                     pumps[schedule->pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
@@ -491,6 +739,18 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
 
             ESP_LOGD(TAG, "schedule:%d speed:%02f, workH:%f, Dvol:%lu, Hvol:%f",
                      schedule->pump_id, schedule->speed, total_work_hours, schedule->day_volume, volume);
+
+            char schedule_error[96];
+            esp_err_t validation = app_pumps_validate_periodic_schedule(schedule->pump_id, schedule->speed,
+                                                                        schedule->day_volume,
+                                                                        schedule_error,
+                                                                        sizeof(schedule_error));
+            if (validation != ESP_OK) {
+                ESP_LOGW(TAG, "Skipping scheduled run for pump %u: %s",
+                         (unsigned)schedule->pump_id,
+                         schedule_error[0] != '\0' ? schedule_error : esp_err_to_name(validation));
+                continue;
+            }
 
             run_pump_on_volume(schedule->pump_id, volume, schedule->speed);
 
@@ -530,6 +790,96 @@ const pumps_status_t *get_pumps_runtime_status(void)
     return pumps;
 }
 
+double app_pumps_estimate_flow_ml_per_min(uint8_t pump_id, float rpm)
+{
+    if (pump_id >= MAX_PUMP) {
+        return 0.0;
+    }
+
+    return pump_flow_ml_per_min(get_pump_config(pump_id), rpm);
+}
+
+bool app_pumps_has_calibration(uint8_t pump_id)
+{
+    if (pump_id >= MAX_PUMP) {
+        return false;
+    }
+
+    return pump_has_valid_calibration(get_pump_config(pump_id));
+}
+
+esp_err_t app_pumps_validate_periodic_schedule(uint8_t pump_id, float rpm, uint32_t day_volume_ml,
+                                               char *error, size_t error_size)
+{
+    if (day_volume_ml == 0) {
+        if (error != NULL && error_size > 0) {
+            error[0] = '\0';
+        }
+        return ESP_OK;
+    }
+
+    if (!app_pumps_has_calibration(pump_id) || app_pumps_estimate_flow_ml_per_min(pump_id, rpm) <= 0.0) {
+        set_pump_alert_flags(pump_id, PUMP_ALERT_NO_CALIBRATION, true);
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "Periodic dosing requires calibration data");
+        }
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    clear_pump_runtime_safety_alerts(pump_id);
+    return ESP_OK;
+}
+
+esp_err_t app_pumps_validate_manual_run(uint8_t pump_id, float rpm, int32_t time_seconds,
+                                        char *error, size_t error_size)
+{
+    return validate_run_request(pump_id, rpm, time_seconds, false, error, error_size);
+}
+
+void app_pumps_set_driver_status(uint8_t pump_id, const pump_driver_status_t *status)
+{
+    if (pump_id >= MAX_PUMP || status == NULL) {
+        return;
+    }
+
+    if (memcmp(&pumps[pump_id].driver_status, status, sizeof(*status)) != 0) {
+        pumps[pump_id].driver_status = *status;
+        mark_pump_runtime_dirty(pump_id);
+    }
+
+    uint32_t driver_flags = PUMP_ALERT_NONE;
+    if (!status->uart_ready) {
+        driver_flags |= PUMP_ALERT_DRIVER_UART;
+    }
+    if (status->reset) {
+        driver_flags |= PUMP_ALERT_DRIVER_RESET;
+    }
+    if (status->driver_error) {
+        driver_flags |= PUMP_ALERT_DRIVER_ERROR;
+    }
+    if (status->undervoltage) {
+        driver_flags |= PUMP_ALERT_DRIVER_UNDERVOLTAGE;
+    }
+    if (status->otpw) {
+        driver_flags |= PUMP_ALERT_DRIVER_OTPW;
+    }
+    if (status->ot) {
+        driver_flags |= PUMP_ALERT_DRIVER_OT;
+    }
+    if (status->s2ga || status->s2gb || status->s2vsa || status->s2vsb) {
+        driver_flags |= PUMP_ALERT_DRIVER_SHORT;
+    }
+    if (status->ola || status->olb) {
+        driver_flags |= PUMP_ALERT_DRIVER_OPEN_LOAD;
+    }
+
+    uint32_t before = pumps[pump_id].alert_flags;
+    pumps[pump_id].alert_flags = (pumps[pump_id].alert_flags & ~PUMP_ALERT_DRIVER_MASK) | driver_flags;
+    if (before != pumps[pump_id].alert_flags) {
+        mark_pump_runtime_dirty(pump_id);
+    }
+}
+
 void run_pump_with_timeout(uint8_t pump_id, uint32_t timeout_ms, uint8_t speed)
 {
     if (pump_id >= MAX_PUMP || speed == 0) {
@@ -544,7 +894,9 @@ void run_pump_with_timeout(uint8_t pump_id, uint32_t timeout_ms, uint8_t speed)
         return;
     }
 
+    clear_pump_runtime_safety_alerts(pump_id);
     pumps[pump_id].time = (uint32_t)llround(((double)timeout_ms / 1000.0) * PUMP_TIMER_UNIT_IN_SEC);
+    pumps[pump_id].run_ticks = 0;
     if (pumps[pump_id].time == 0) {
         pumps[pump_id].time = 1;
     }
@@ -572,10 +924,12 @@ void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm)
     pump_t *pump_config = get_pump_config(pump_id);
     double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
     if (flow_ml_per_min <= 0.0) {
+        set_pump_alert_flags(pump_id, PUMP_ALERT_NO_CALIBRATION, true);
         ESP_LOGE(TAG, "pump calibration not set for pump %u at %.2f speed", (unsigned)pump_id, rpm);
         return;
     }
 
+    clear_pump_runtime_safety_alerts(pump_id);
     double run_time_seconds = (volume_ml / flow_ml_per_min) * 60.0;
     uint32_t run_units = (uint32_t)llround(run_time_seconds * PUMP_TIMER_UNIT_IN_SEC);
     if (run_units == 0) {
@@ -583,6 +937,7 @@ void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm)
     }
 
     pumps[pump_id].time = run_units;
+    pumps[pump_id].run_ticks = 0;
     pumps[pump_id].flow_per_unit = flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0;
     pumps[pump_id].volume = 0;
     pumps[pump_id].rpm = rpm;
@@ -615,6 +970,7 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
         stop_pump(pump_id);
         pumps[pump_id].state = PUMP_OFF;
         pumps[pump_id].time = 0;
+        pumps[pump_id].run_ticks = 0;
         pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
         mark_pump_runtime_dirty(pump_id);
         return ESP_OK;
@@ -624,10 +980,20 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
         return ESP_ERR_INVALID_ARG;
     }
 
+    char error[96];
+    esp_err_t validation = validate_run_request(pump_id, rpm, time_minutes * 60, false, error, sizeof(error));
+    if (validation != ESP_OK) {
+        ESP_LOGW(TAG, "Rejected manual run for pump %u: %s",
+                 (unsigned)pump_id,
+                 error[0] != '\0' ? error : esp_err_to_name(validation));
+        return validation;
+    }
+
     pump_t *pump_config = get_pump_config(pump_id);
     double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
 
     pumps[pump_id].time = (uint32_t)time_minutes * 60U * PUMP_TIMER_UNIT_IN_SEC;
+    pumps[pump_id].run_ticks = 0;
     pumps[pump_id].flow_per_unit =
         flow_ml_per_min > 0.0 ? flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0 : 0.0;
     pumps[pump_id].volume = 0;
@@ -657,6 +1023,7 @@ esp_err_t run_pump_manual_seconds(uint8_t pump_id, float rpm, bool direction, in
         stop_pump(pump_id);
         pumps[pump_id].state = PUMP_OFF;
         pumps[pump_id].time = 0;
+        pumps[pump_id].run_ticks = 0;
         pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
         mark_pump_runtime_dirty(pump_id);
         return ESP_OK;
@@ -666,10 +1033,20 @@ esp_err_t run_pump_manual_seconds(uint8_t pump_id, float rpm, bool direction, in
         return ESP_ERR_INVALID_ARG;
     }
 
+    char error[96];
+    esp_err_t validation = validate_run_request(pump_id, rpm, time_seconds, false, error, sizeof(error));
+    if (validation != ESP_OK) {
+        ESP_LOGW(TAG, "Rejected manual run for pump %u: %s",
+                 (unsigned)pump_id,
+                 error[0] != '\0' ? error : esp_err_to_name(validation));
+        return validation;
+    }
+
     pump_t *pump_config = get_pump_config(pump_id);
     double flow_ml_per_min = pump_flow_ml_per_min(pump_config, rpm);
 
     pumps[pump_id].time = (uint32_t)time_seconds * PUMP_TIMER_UNIT_IN_SEC;
+    pumps[pump_id].run_ticks = 0;
     pumps[pump_id].flow_per_unit =
         flow_ml_per_min > 0.0 ? flow_ml_per_min / (double)PUMP_TIMER_UNIT_IN_SEC / 60.0 : 0.0;
     pumps[pump_id].volume = 0;
@@ -697,11 +1074,13 @@ void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direct
     if (is_start) {
         pumps[pump_id].state = PUMP_CAL;
         pumps[pump_id].time = 0;
+        pumps[pump_id].run_ticks = 0;
         pumps[pump_id].flow_per_unit = 0;
         pumps[pump_id].volume = 0;
         pumps[pump_id].rpm = rpm;
         pumps[pump_id].direction = direction;
         pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_CALIBRATION;
+        clear_pump_runtime_safety_alerts(pump_id);
         if (start_pump(pump_id, rpm, direction) != ESP_OK) {
             pumps[pump_id].state = PUMP_OFF;
             pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
@@ -709,6 +1088,7 @@ void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direct
         mark_pump_runtime_dirty(pump_id);
     } else {
         pumps[pump_id].state = PUMP_OFF;
+        pumps[pump_id].run_ticks = 0;
         pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
         stop_pump(pump_id);
         mark_pump_runtime_dirty(pump_id);
@@ -734,6 +1114,7 @@ int init_pumps(void)
 
     for (int i = 0; i < MAX_PUMP; ++i) {
         pumps[i].time = 0;
+        pumps[i].run_ticks = 0;
         pumps[i].volume = 0;
         pumps[i].flow_per_unit = 0;
         pumps[i].rpm = 0;

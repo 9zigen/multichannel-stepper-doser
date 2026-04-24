@@ -49,6 +49,113 @@ static uint32_t calibration_to_100ml_units(const pump_t *pump)
     return (uint32_t)((100.0f / pump->calibration[0].flow) * 60.0f);
 }
 
+static uint32_t json_nonnegative_u32(cJSON *item, uint32_t fallback)
+{
+    if (!cJSON_IsNumber(item) || item->valuedouble < 0.0) {
+        return fallback;
+    }
+
+    return (uint32_t)item->valuedouble;
+}
+
+static bool pump_calibration_points_valid(const pump_t *pump_config, char *error, size_t error_size)
+{
+    if (pump_config == NULL) {
+        snprintf(error, error_size, "Pump config is missing");
+        return false;
+    }
+
+    float last_speed = -1.0f;
+    for (uint8_t i = 0; i < pump_config->calibration_count; ++i) {
+        const pump_calibration_t *point = &pump_config->calibration[i];
+        if (point->speed <= 0.0f || point->flow <= 0.0f) {
+            snprintf(error, error_size, "Pump %u calibration point %u must have positive speed and flow",
+                     (unsigned)pump_config->id,
+                     (unsigned)i);
+            return false;
+        }
+
+        if (point->speed <= last_speed) {
+            snprintf(error, error_size, "Pump %u calibration speeds must be strictly increasing",
+                     (unsigned)pump_config->id);
+            return false;
+        }
+
+        last_speed = point->speed;
+    }
+
+    return true;
+}
+
+static double schedule_single_dose_ml(const schedule_t *schedule_config)
+{
+    if (schedule_config == NULL || schedule_config->mode != SCHEDULE_MODE_PERIODIC ||
+        schedule_config->day_volume == 0) {
+        return 0.0;
+    }
+
+    uint8_t slots = 0;
+    for (uint8_t hour = 0; hour < 24; ++hour) {
+        if (schedule_config->work_hours & (1UL << hour)) {
+            slots++;
+        }
+    }
+
+    if (slots == 0) {
+        return 0.0;
+    }
+
+    return (double)schedule_config->day_volume / (double)slots;
+}
+
+static esp_err_t validate_pump_payload(const pump_t *pump_config, const schedule_t *schedule_config,
+                                       char *error, size_t error_size)
+{
+    if (pump_config == NULL || schedule_config == NULL) {
+        snprintf(error, error_size, "Pump payload is incomplete");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!pump_calibration_points_valid(pump_config, error, error_size)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (schedule_config->mode == SCHEDULE_MODE_PERIODIC && schedule_config->active) {
+        esp_err_t periodic_validation = app_pumps_validate_periodic_schedule(pump_config->id,
+                                                                             schedule_config->speed,
+                                                                             schedule_config->day_volume,
+                                                                             error,
+                                                                             error_size);
+        if (periodic_validation != ESP_OK) {
+            return periodic_validation;
+        }
+
+        const double single_dose_ml = schedule_single_dose_ml(schedule_config);
+        if (pump_config->safety.max_single_run_ml > 0 &&
+            single_dose_ml > (double)pump_config->safety.max_single_run_ml) {
+            snprintf(error, error_size, "Pump %u schedule dose exceeds max_single_run_ml",
+                     (unsigned)pump_config->id);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (pump_config->safety.max_hourly_ml > 0 &&
+            single_dose_ml > (double)pump_config->safety.max_hourly_ml) {
+            snprintf(error, error_size, "Pump %u schedule dose exceeds max_hourly_ml",
+                     (unsigned)pump_config->id);
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (pump_config->safety.max_daily_ml > 0 &&
+            schedule_config->day_volume > pump_config->safety.max_daily_ml) {
+            snprintf(error, error_size, "Pump %u schedule volume exceeds max_daily_ml",
+                     (unsigned)pump_config->id);
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    return ESP_OK;
+}
+
 static esp_err_t websocket_send_json(httpd_req_t *req, const char *payload)
 {
     return app_http_ws_send_json_to_client(req->handle, httpd_req_to_sockfd(req), payload);
@@ -1057,6 +1164,19 @@ esp_err_t run_post_handler(httpd_req_t *req)
                  pump_id, rpm, dir, (long)time_minutes, (long)duration_seconds);
 
         if (duration_seconds >= 0) {
+            char validation_error[96];
+            esp_err_t validation = duration_seconds > 0
+                                       ? app_pumps_validate_manual_run(pump_id, rpm, duration_seconds,
+                                                                       validation_error,
+                                                                       sizeof(validation_error))
+                                       : ESP_OK;
+            if (validation != ESP_OK) {
+                cJSON_Delete(root);
+                free(buf);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                    validation_error[0] != '\0' ? validation_error : "Invalid pump run request");
+                return ESP_FAIL;
+            }
             if (run_pump_manual_seconds(pump_id, rpm, dir, duration_seconds) != ESP_OK) {
                 cJSON_Delete(root);
                 free(buf);
@@ -1065,7 +1185,24 @@ esp_err_t run_post_handler(httpd_req_t *req)
             }
         } else if (time_minutes < 0) {
             run_pump_calibration(pump_id, true, rpm, dir);
-        } else if (run_pump_manual(pump_id, rpm, dir, time_minutes) != ESP_OK) {
+        } else {
+            char validation_error[96];
+            esp_err_t validation = time_minutes > 0
+                                       ? app_pumps_validate_manual_run(pump_id, rpm, time_minutes * 60,
+                                                                       validation_error,
+                                                                       sizeof(validation_error))
+                                       : ESP_OK;
+            if (validation != ESP_OK) {
+                cJSON_Delete(root);
+                free(buf);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                    validation_error[0] != '\0' ? validation_error : "Invalid pump run request");
+                return ESP_FAIL;
+            }
+        }
+
+        if (time_minutes >= 0 && duration_seconds < 0 &&
+            run_pump_manual(pump_id, rpm, dir, time_minutes) != ESP_OK) {
             cJSON_Delete(root);
             free(buf);
             httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pump run request");
@@ -1267,6 +1404,15 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
     cJSON *pump_channels = cJSON_GetObjectItem(root, "pumps");
     if (cJSON_IsArray(pump_channels)) {
+        pump_t pump_backup[MAX_PUMP];
+        schedule_t schedule_backup[MAX_SCHEDULE];
+        for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+            pump_backup[i] = *get_pump_config(i);
+        }
+        for (uint8_t i = 0; i < MAX_SCHEDULE; ++i) {
+            schedule_backup[i] = *get_schedule_config(i);
+        }
+
         cJSON *pump_item;
         cJSON_ArrayForEach(pump_item, pump_channels) {
             cJSON *id = cJSON_GetObjectItem(pump_item, "id");
@@ -1281,6 +1427,23 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             cJSON *calibration = cJSON_GetObjectItem(pump_item, "calibration");
             cJSON *schedule = cJSON_GetObjectItem(pump_item, "schedule");
             cJSON *aging = cJSON_GetObjectItem(pump_item, "aging");
+            cJSON *max_single_run_ml = cJSON_GetObjectItem(pump_item, "max_single_run_ml");
+            cJSON *max_single_run_seconds = cJSON_GetObjectItem(pump_item, "max_single_run_seconds");
+            cJSON *max_hourly_ml = cJSON_GetObjectItem(pump_item, "max_hourly_ml");
+            cJSON *max_daily_ml = cJSON_GetObjectItem(pump_item, "max_daily_ml");
+
+            if (!cJSON_IsNumber(id) || id->valueint < 0 || id->valueint >= MAX_PUMP) {
+                for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+                    *get_pump_config(i) = pump_backup[i];
+                }
+                for (uint8_t i = 0; i < MAX_SCHEDULE; ++i) {
+                    *get_schedule_config(i) = schedule_backup[i];
+                }
+                cJSON_Delete(root);
+                free(buf);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid pump id");
+                return ESP_FAIL;
+            }
 
             pump_t *pump_config = get_pump_config(id->valueint);
             schedule_t *schedule_config = get_schedule_config(id->valueint);
@@ -1296,6 +1459,10 @@ esp_err_t settings_post_handler(httpd_req_t *req)
             pump_config->tank_concentration_active = tank_concentration_active->valueint;
             pump_config->tank_current_vol = tank_current_volume->valuedouble;
             pump_config->state = cJSON_IsTrue(enabled);
+            pump_config->safety.max_single_run_ml = json_nonnegative_u32(max_single_run_ml, 0);
+            pump_config->safety.max_single_run_seconds = json_nonnegative_u32(max_single_run_seconds, 0);
+            pump_config->safety.max_hourly_ml = json_nonnegative_u32(max_hourly_ml, 0);
+            pump_config->safety.max_daily_ml = json_nonnegative_u32(max_daily_ml, 0);
 
             if (cJSON_IsObject(aging)) {
                 cJSON *warning_hours = cJSON_GetObjectItem(aging, "warning_hours");
@@ -1358,6 +1525,23 @@ esp_err_t settings_post_handler(httpd_req_t *req)
                 schedule_config->time = cJSON_IsNumber(time) ? time->valueint : 0;
                 schedule_config->day_volume = cJSON_IsNumber(volume) ? volume->valueint : 0;
                 schedule_config->active = schedule_config->mode != SCHEDULE_MODE_OFF;
+            }
+
+            char validation_error[128];
+            esp_err_t validation = validate_pump_payload(pump_config, schedule_config,
+                                                         validation_error, sizeof(validation_error));
+            if (validation != ESP_OK) {
+                for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+                    *get_pump_config(i) = pump_backup[i];
+                }
+                for (uint8_t i = 0; i < MAX_SCHEDULE; ++i) {
+                    *get_schedule_config(i) = schedule_backup[i];
+                }
+                cJSON_Delete(root);
+                free(buf);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                    validation_error[0] != '\0' ? validation_error : "Invalid pump payload");
+                return ESP_FAIL;
             }
         }
 
@@ -1562,6 +1746,9 @@ esp_err_t settings_post_handler(httpd_req_t *req)
                     mqtt_discovery_status_topic->valuestring,
                     sizeof(service_config->mqtt_discovery_status_topic));
         }
+
+        cJSON *max_total_daily_ml = cJSON_GetObjectItem(services, "max_total_daily_ml");
+        service_config->max_total_daily_ml = json_nonnegative_u32(max_total_daily_ml, 0);
 
         cJSON *enable_ntp = cJSON_GetObjectItem(services, "enable_ntp");
         service_config->enable_ntp = cJSON_IsTrue(enable_ntp);

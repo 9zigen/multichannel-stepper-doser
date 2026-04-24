@@ -92,6 +92,26 @@ export type PumpAgingState = {
   replace_hours: number;
 };
 
+export type PumpDriverState = {
+  uart_ready: boolean;
+  reset: boolean;
+  driver_error: boolean;
+  undervoltage: boolean;
+  otpw: boolean;
+  ot: boolean;
+  s2ga: boolean;
+  s2gb: boolean;
+  s2vsa: boolean;
+  s2vsb: boolean;
+  ola: boolean;
+  olb: boolean;
+  thermal_level: number;
+  cs_actual: number;
+  stealth: boolean;
+  standstill: boolean;
+  version: number;
+};
+
 export enum SCHEDULE_MODE {
   OFF = 0,
   PERIODIC = 1,
@@ -117,6 +137,10 @@ export type PumpState = {
   tank_current_vol: number;
   tank_concentration_total: number /* runtime data */;
   tank_concentration_active: number;
+  max_single_run_ml?: number;
+  max_single_run_seconds?: number;
+  max_hourly_ml?: number;
+  max_daily_ml?: number;
   schedule: ScheduleState;
   calibration: PumpCalibrationState[];
 };
@@ -137,6 +161,7 @@ export type ServiceState = {
   mqtt_retain: boolean;
   mqtt_discovery_topic: string;
   mqtt_discovery_status_topic: string;
+  max_total_daily_ml?: number;
   enable_ntp: boolean;
   enable_mqtt: boolean;
   enable_mqtt_discovery: boolean;
@@ -241,6 +266,8 @@ export type PumpRuntimeEntry = {
   remaining_ticks: number;
   remaining_seconds: number;
   volume_ml: number;
+  alert_flags?: number;
+  driver?: PumpDriverState;
 };
 
 export type PumpHistoryHour = {

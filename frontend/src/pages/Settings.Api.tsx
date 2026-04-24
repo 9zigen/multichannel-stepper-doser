@@ -23,13 +23,14 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
         title: 'REST API',
         icon: Webhook,
         badge: 'HTTP JSON',
-        keywords: 'rest api http json endpoints status settings run calibration pumps runtime upload restart factory reset post get bearer token authorization',
+        keywords:
+          'rest api http json endpoints status settings run calibration pumps runtime history upload restart factory reset auth board config post get bearer token authorization safety limits calibration validation',
         content: (
           <>
             <div className="mb-3">
               <div className="mb-1 text-xs font-medium text-muted-foreground">Endpoints</div>
               <Code>
-                {'GET  /api/status\nGET  /api/settings\nPOST /api/settings\nGET  /api/board-config\nPOST /api/board-config\nPOST /api/run\nPOST /api/calibration\nGET  /api/pumps/runtime\nPOST /api/device/restart\nPOST /api/device/factory-reset\nPOST /upload'}
+                {'POST /api/auth\nGET  /api/status\nGET  /api/settings\nPOST /api/settings\nGET  /api/board-config\nPOST /api/board-config\nPOST /api/run\nPOST /api/calibration\nGET  /api/pumps/runtime\nGET  /api/pumps/history\nPOST /api/pumps/history/backup\nPOST /api/device/restart\nPOST /api/device/factory-reset\nPOST /upload'}
               </Code>
             </div>
             <div>
@@ -41,6 +42,24 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
                 Settings and board-config POST endpoints respond with the updated resource body, so the UI can commit the
                 saved state without waiting for a websocket snapshot.
               </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Pump settings can include per-pump safety limits:
+                {' '}
+                <span className="font-mono text-foreground">max_single_run_ml</span>
+                ,
+                {' '}
+                <span className="font-mono text-foreground">max_single_run_seconds</span>
+                ,
+                {' '}
+                <span className="font-mono text-foreground">max_hourly_ml</span>
+                ,
+                {' '}
+                <span className="font-mono text-foreground">max_daily_ml</span>
+                . Services can include
+                {' '}
+                <span className="font-mono text-foreground">max_total_daily_ml</span>
+                . The firmware rejects invalid runs and schedule saves with HTTP 400 if limits would be exceeded or calibration is required but missing.
+              </p>
             </div>
           </>
         ),
@@ -51,7 +70,7 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
         icon: Cable,
         badge: 'Realtime',
         keywords:
-          'websocket ws realtime ping pong pump runtime system_ready shutting_down restart lifecycle push event connection heartbeat live status patch delta connectivity mqtt ntp',
+          'websocket ws realtime ping pong pump runtime system_ready shutting_down restart lifecycle push event connection heartbeat live status patch delta connectivity mqtt ntp tmc2209 alerts driver health',
         content: (
           <>
             <div className="mb-3">
@@ -86,8 +105,12 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
             <div>
               <div className="mb-1 text-xs font-medium text-muted-foreground">Pump runtime event</div>
               <Code>
-                {'{"type":"pump_runtime","pump":{"id":0,\n "active":true,"state":"timed","speed":1,\n "direction":true,"remaining_seconds":60,\n "volume_ml":1.2}}'}
+                {'{"type":"pump_runtime","pump":{"id":0,\n "active":true,"state":"timed","speed":1,\n "direction":true,"remaining_seconds":60,\n "volume_ml":1.2,"alert_flags":0,\n "driver":{"uart_ready":true,"otpw":false,\n "driver_error":false,"thermal_level":0}}}'}
               </Code>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Runtime events now carry firmware-side safety alert flags and UART-derived TMC2209 health. This is the
+                preferred path for live dosing state instead of full settings snapshots.
+              </p>
             </div>
           </>
         ),

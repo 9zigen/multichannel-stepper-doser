@@ -146,18 +146,38 @@ Both the frontend and iOS app consume the same HTTP REST API and WebSocket proto
 
 ### 4.1 REST Endpoints
 
-All endpoints are relative to `http://<device-ip>`. Authenticated endpoints require the session token from `POST /api/login` as a cookie or `Authorization` header (implementation-specific — check `app_http_backend`).
+All endpoints are relative to `http://<device-ip>`. Authenticated endpoints require the session token from `POST /api/auth` as a cookie or `Authorization` header (implementation-specific — check `app_http_backend`).
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/login` | Authenticate. Body: `{ "password": "..." }`. Returns session token. |
+| `POST` | `/api/auth` | Authenticate. Body: `{ "username": "...", "password": "..." }`. Returns session token. |
 | `GET` | `/api/status` | Full device status snapshot. Large — do not poll; prefer `status_patch` over WebSocket. |
-| `GET` | `/api/settings` | All user-configurable settings (networks, services, board config, pumps). |
-| `POST` | `/api/settings` | Save settings. Body: full or partial settings object. |
+| `GET` | `/api/settings` | All user-configurable settings (networks, services, pumps, time). |
+| `POST` | `/api/settings` | Save settings. Body: full or partial settings object. Returns the updated full settings payload. |
+| `GET` | `/api/board-config` | Current board-level hardware configuration. |
+| `POST` | `/api/board-config` | Save board configuration. Returns the updated saved board config. |
 | `GET` | `/api/pumps/runtime` | Current runtime state for all pump channels. |
 | `GET` | `/api/pumps/history` | Historical dosing log (daily aggregates). |
-| `POST` | `/api/pumps/run` | Trigger a manual pump run. Body: `{ "id": N, "volume_ml": F }` or duration-based. |
+| `POST` | `/api/pumps/history/backup` | Flush retained pump history to persistent storage. |
+| `POST` | `/api/run` | Trigger a manual pump run. Duration-based body such as `{ "id": 0, "speed": 1, "direction": true, "time_seconds": 10 }`. |
+| `POST` | `/api/calibration` | Start or stop pump calibration runs. |
 | `POST` | `/api/device/restart` | Restart the device. Body: `{}`. |
+| `POST` | `/api/device/factory-reset` | Erase persisted configuration and restart. |
+
+### 4.1.1 Pump Safety And Calibration Fields
+
+`GET /api/settings` pump items may include:
+
+- `max_single_run_ml`
+- `max_single_run_seconds`
+- `max_hourly_ml`
+- `max_daily_ml`
+
+`GET /api/settings` services may include:
+
+- `max_total_daily_ml`
+
+Safety limits are enforced in firmware for manual runs and during active runtime. Periodic schedules requiring dosing volume must have valid calibration points. If calibration is missing or a limit would be exceeded, the firmware rejects the request with `400 Bad Request`.
 
 ### 4.2 WebSocket Protocol
 
@@ -170,8 +190,7 @@ The device sends JSON messages. Each message has a `type` field:
 | `welcome` | server → client | Sent on connection. Contains device info. |
 | `pong` | server → client | Response to a `ping` from the client. |
 | `status_patch` | server → client | Partial status update — only changed fields under `status`. Merge into local state, do not replace. |
-| `pump_runtime` | server → client | Pump activity event (running, stopped, volume dispensed). |
-| `settings_update` | server → client | Signals that settings changed on the device. Client should re-fetch `GET /api/settings`. |
+| `pump_runtime` | server → client | Pump activity event (running, stopped, dispensed volume, alert flags, driver health). |
 | `system_ready` | server → client | Device finished booting / reconnected. |
 | `shutting_down` | server → client | Device is about to restart. |
 
@@ -180,6 +199,15 @@ The device sends JSON messages. Each message has a `type` field:
 `up_time`, `local_time`, `local_date`, `free_heap`, `vcc`, `wifi_mode`, `ip_address`, `station_connected`, `station_ssid`, `station_ip_address`, `ap_ssid`, `ap_ip_address`, `ap_clients`, `board_temperature`, `wifi_disconnects`, `time_valid`, `time_warning`, `mqtt_service`, `ntp_service`
 
 **Design rule**: Do not push the full `GET /api/status` response over WebSocket on every monitor tick. Too large for the ESP32 and most fields are unchanged. Detect changed fields in firmware, emit only those, merge on the client.
+
+**`pump_runtime` tracked fields** — runtime snapshots include:
+
+- `id`, `active`, `state`, `speed`, `direction`
+- `remaining_ticks`, `remaining_seconds`, `volume_ml`
+- `alert_flags`
+- `driver`
+
+`driver` currently exposes UART-derived TMC2209 health fields such as `uart_ready`, `reset`, `driver_error`, `undervoltage`, `otpw`, `ot`, short/open-load bits, `thermal_level`, `cs_actual`, `stealth`, `standstill`, and `version`.
 
 ---
 
@@ -205,4 +233,4 @@ Always confirm with the user before committing. Never push, force-push, or amend
 
 ---
 
-*Last updated: iOS native app (SwiftUI, @Observable, StepperTokens design system, haptics, RealtimeConnection WebSocket); shared API reference extracted to root CLAUDE.md; BLE provisioning (default firmware profile); Board Configuration presets (Fysetc E4 v1.0 — 1/2/4ch) + extended peripheral fields; Backup & Restore page; font scale selector; language/i18n deferred.*
+*Last updated: iOS native app (SwiftUI, @Observable, StepperTokens design system, haptics, RealtimeConnection WebSocket); shared API reference extracted to root CLAUDE.md; BLE provisioning (default firmware profile); Board Configuration presets (Fysetc E4 v1.0 — 1/2/4ch) + extended peripheral fields; Backup & Restore page; font scale selector; pump safety limits; multi-point calibration validation; TMC2209 UART health in pump runtime payloads; language/i18n deferred.*

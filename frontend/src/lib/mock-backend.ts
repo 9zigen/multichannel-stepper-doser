@@ -45,6 +45,26 @@ type MockPumpRuntimeState = {
   duration_seconds: number;
 };
 
+const defaultDriverState: PumpRuntimeEntry['driver'] = {
+  uart_ready: true,
+  reset: false,
+  driver_error: false,
+  undervoltage: false,
+  otpw: false,
+  ot: false,
+  s2ga: false,
+  s2gb: false,
+  s2vsa: false,
+  s2vsb: false,
+  ola: false,
+  olb: false,
+  thermal_level: 0,
+  cs_actual: 16,
+  stealth: true,
+  standstill: true,
+  version: 0x21,
+};
+
 const SCHEDULE_MODE = {
   OFF: 0,
   PERIODIC: 1,
@@ -71,6 +91,7 @@ const initialState: MockState = {
     mqtt_retain: false,
     mqtt_discovery_topic: 'homeassistant',
     mqtt_discovery_status_topic: 'homeassistant/status',
+    max_total_daily_ml: 0,
     enable_ntp: false,
     enable_mqtt: false,
     enable_mqtt_discovery: true,
@@ -154,6 +175,10 @@ const initialState: MockState = {
       tank_current_vol: 900,
       tank_concentration_total: 800,
       tank_concentration_active: 100,
+      max_single_run_ml: 0,
+      max_single_run_seconds: 0,
+      max_hourly_ml: 0,
+      max_daily_ml: 0,
       schedule: {
         mode: SCHEDULE_MODE.OFF,
         work_hours: [5, 8, 20, 21],
@@ -183,6 +208,10 @@ const initialState: MockState = {
       tank_current_vol: 900,
       tank_concentration_total: 800,
       tank_concentration_active: 800,
+      max_single_run_ml: 0,
+      max_single_run_seconds: 0,
+      max_hourly_ml: 0,
+      max_daily_ml: 0,
       schedule: {
         mode: SCHEDULE_MODE.OFF,
         work_hours: [5, 8, 20, 21],
@@ -212,6 +241,10 @@ const initialState: MockState = {
       tank_current_vol: 632,
       tank_concentration_total: 800,
       tank_concentration_active: 800,
+      max_single_run_ml: 0,
+      max_single_run_seconds: 0,
+      max_hourly_ml: 0,
+      max_daily_ml: 0,
       schedule: {
         mode: SCHEDULE_MODE.OFF,
         work_hours: [5, 8, 20, 21],
@@ -241,6 +274,10 @@ const initialState: MockState = {
       tank_current_vol: 900,
       tank_concentration_total: 800,
       tank_concentration_active: 1800,
+      max_single_run_ml: 0,
+      max_single_run_seconds: 0,
+      max_hourly_ml: 0,
+      max_daily_ml: 0,
       schedule: {
         mode: SCHEDULE_MODE.OFF,
         work_hours: [5, 8, 20, 21],
@@ -595,6 +632,8 @@ function getPumpRuntimeEntries(): PumpRuntimeEntry[] {
         remaining_ticks: 0,
         remaining_seconds: 0,
         volume_ml: 0,
+        alert_flags: 0,
+        driver: defaultDriverState,
       };
     }
 
@@ -610,6 +649,8 @@ function getPumpRuntimeEntries(): PumpRuntimeEntry[] {
       remaining_ticks: runtime.state === 'timed' ? remainingSeconds * 100 : 0,
       remaining_seconds: runtime.state === 'timed' ? remainingSeconds : 0,
       volume_ml: 0,
+      alert_flags: 0,
+      driver: defaultDriverState,
     };
   });
 }

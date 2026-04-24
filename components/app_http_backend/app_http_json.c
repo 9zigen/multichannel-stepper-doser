@@ -201,6 +201,29 @@ static const char *pump_state_to_string(pump_state_t state)
     }
 }
 
+static cJSON *pump_driver_status_to_json(const pump_driver_status_t *driver_status)
+{
+    cJSON *driver = cJSON_CreateObject();
+    cJSON_AddBoolToObject(driver, "uart_ready", driver_status->uart_ready);
+    cJSON_AddBoolToObject(driver, "reset", driver_status->reset);
+    cJSON_AddBoolToObject(driver, "driver_error", driver_status->driver_error);
+    cJSON_AddBoolToObject(driver, "undervoltage", driver_status->undervoltage);
+    cJSON_AddBoolToObject(driver, "otpw", driver_status->otpw);
+    cJSON_AddBoolToObject(driver, "ot", driver_status->ot);
+    cJSON_AddBoolToObject(driver, "s2ga", driver_status->s2ga);
+    cJSON_AddBoolToObject(driver, "s2gb", driver_status->s2gb);
+    cJSON_AddBoolToObject(driver, "s2vsa", driver_status->s2vsa);
+    cJSON_AddBoolToObject(driver, "s2vsb", driver_status->s2vsb);
+    cJSON_AddBoolToObject(driver, "ola", driver_status->ola);
+    cJSON_AddBoolToObject(driver, "olb", driver_status->olb);
+    cJSON_AddNumberToObject(driver, "thermal_level", driver_status->thermal_level);
+    cJSON_AddNumberToObject(driver, "cs_actual", driver_status->cs_actual);
+    cJSON_AddBoolToObject(driver, "stealth", driver_status->stealth);
+    cJSON_AddBoolToObject(driver, "standstill", driver_status->standstill);
+    cJSON_AddNumberToObject(driver, "version", driver_status->version);
+    return driver;
+}
+
 char *get_pumps_runtime_json(void)
 {
     char *string = NULL;
@@ -220,6 +243,8 @@ char *get_pumps_runtime_json(void)
         cJSON_AddItemToObject(item, "remaining_seconds",
                               cJSON_CreateNumber((double)pump->time / (double)PUMP_TIMER_UNIT_IN_SEC));
         cJSON_AddItemToObject(item, "volume_ml", cJSON_CreateNumber(pump->volume));
+        cJSON_AddItemToObject(item, "alert_flags", cJSON_CreateNumber((double)pump->alert_flags));
+        cJSON_AddItemToObject(item, "driver", pump_driver_status_to_json(&pump->driver_status));
         cJSON_AddItemToArray(runtime, item);
     }
 
@@ -379,6 +404,10 @@ char *get_settings_json(void)
         cJSON_AddItemToObject(pump_item, "tank_concentration_total", cJSON_CreateNumber((double)pump_config->tank_concentration_total));
         cJSON_AddItemToObject(pump_item, "tank_concentration_active", cJSON_CreateNumber((double)pump_config->tank_concentration_active));
         cJSON_AddItemToObject(pump_item, "tank_current_vol", cJSON_CreateNumber(pump_config->tank_current_vol));
+        cJSON_AddItemToObject(pump_item, "max_single_run_ml", cJSON_CreateNumber((double)pump_config->safety.max_single_run_ml));
+        cJSON_AddItemToObject(pump_item, "max_single_run_seconds", cJSON_CreateNumber((double)pump_config->safety.max_single_run_seconds));
+        cJSON_AddItemToObject(pump_item, "max_hourly_ml", cJSON_CreateNumber((double)pump_config->safety.max_hourly_ml));
+        cJSON_AddItemToObject(pump_item, "max_daily_ml", cJSON_CreateNumber((double)pump_config->safety.max_daily_ml));
 
         cJSON *aging_item = cJSON_CreateObject();
         cJSON_AddItemToObject(aging_item, "warning_hours", cJSON_CreateNumber(pump_config->aging.warning_hours));
@@ -506,6 +535,8 @@ char *get_settings_json(void)
                           cJSON_CreateString(service_config->mqtt_discovery_topic));
     cJSON_AddItemToObject(services, "mqtt_discovery_status_topic",
                           cJSON_CreateString(service_config->mqtt_discovery_status_topic));
+    cJSON_AddItemToObject(services, "max_total_daily_ml",
+                          cJSON_CreateNumber((double)service_config->max_total_daily_ml));
     cJSON_AddItemToObject(services, "enable_ntp", cJSON_CreateBool(service_config->enable_ntp));
     cJSON_AddItemToObject(services, "enable_mqtt", cJSON_CreateBool(service_config->enable_mqtt));
     cJSON_AddItemToObject(services, "enable_mqtt_discovery",

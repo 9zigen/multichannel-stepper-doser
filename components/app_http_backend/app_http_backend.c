@@ -71,6 +71,29 @@ static const char *app_http_ws_pump_state_to_string(pump_state_t state)
     }
 }
 
+static cJSON *app_http_ws_driver_status_json(const pump_driver_status_t *driver_status)
+{
+    cJSON *driver = cJSON_CreateObject();
+    cJSON_AddBoolToObject(driver, "uart_ready", driver_status->uart_ready);
+    cJSON_AddBoolToObject(driver, "reset", driver_status->reset);
+    cJSON_AddBoolToObject(driver, "driver_error", driver_status->driver_error);
+    cJSON_AddBoolToObject(driver, "undervoltage", driver_status->undervoltage);
+    cJSON_AddBoolToObject(driver, "otpw", driver_status->otpw);
+    cJSON_AddBoolToObject(driver, "ot", driver_status->ot);
+    cJSON_AddBoolToObject(driver, "s2ga", driver_status->s2ga);
+    cJSON_AddBoolToObject(driver, "s2gb", driver_status->s2gb);
+    cJSON_AddBoolToObject(driver, "s2vsa", driver_status->s2vsa);
+    cJSON_AddBoolToObject(driver, "s2vsb", driver_status->s2vsb);
+    cJSON_AddBoolToObject(driver, "ola", driver_status->ola);
+    cJSON_AddBoolToObject(driver, "olb", driver_status->olb);
+    cJSON_AddNumberToObject(driver, "thermal_level", driver_status->thermal_level);
+    cJSON_AddNumberToObject(driver, "cs_actual", driver_status->cs_actual);
+    cJSON_AddBoolToObject(driver, "stealth", driver_status->stealth);
+    cJSON_AddBoolToObject(driver, "standstill", driver_status->standstill);
+    cJSON_AddNumberToObject(driver, "version", driver_status->version);
+    return driver;
+}
+
 static bool app_http_is_spa_route(const char *uri)
 {
     if (uri == NULL || uri[0] != '/') {
@@ -110,6 +133,8 @@ static void app_http_ws_pump_runtime_event_handler(void* arg, esp_event_base_t e
     cJSON_AddItemToObject(pump, "remaining_seconds",
                           cJSON_CreateNumber((double)pump_event->time / (double)PUMP_TIMER_UNIT_IN_SEC));
     cJSON_AddItemToObject(pump, "volume_ml", cJSON_CreateNumber(pump_event->volume));
+    cJSON_AddItemToObject(pump, "alert_flags", cJSON_CreateNumber((double)pump_event->alert_flags));
+    cJSON_AddItemToObject(pump, "driver", app_http_ws_driver_status_json(&pump_event->driver_status));
     cJSON_AddItemToObject(root, "pump", pump);
 
     char *payload = cJSON_PrintUnformatted(root);

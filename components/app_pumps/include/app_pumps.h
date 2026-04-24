@@ -51,14 +51,55 @@ typedef enum {
     PUMP_CAL
 } pump_state_t;
 
+typedef enum {
+    PUMP_ALERT_NONE = 0,
+    PUMP_ALERT_NO_CALIBRATION = 1U << 0,
+    PUMP_ALERT_LIMIT_SINGLE_RUN_SECONDS = 1U << 1,
+    PUMP_ALERT_LIMIT_SINGLE_RUN_VOLUME = 1U << 2,
+    PUMP_ALERT_LIMIT_HOURLY_VOLUME = 1U << 3,
+    PUMP_ALERT_LIMIT_DAILY_VOLUME = 1U << 4,
+    PUMP_ALERT_LIMIT_GLOBAL_DAILY_VOLUME = 1U << 5,
+    PUMP_ALERT_DRIVER_RESET = 1U << 6,
+    PUMP_ALERT_DRIVER_ERROR = 1U << 7,
+    PUMP_ALERT_DRIVER_UNDERVOLTAGE = 1U << 8,
+    PUMP_ALERT_DRIVER_OTPW = 1U << 9,
+    PUMP_ALERT_DRIVER_OT = 1U << 10,
+    PUMP_ALERT_DRIVER_SHORT = 1U << 11,
+    PUMP_ALERT_DRIVER_OPEN_LOAD = 1U << 12,
+    PUMP_ALERT_DRIVER_UART = 1U << 13,
+} pump_alert_flag_t;
+
+typedef struct {
+    bool uart_ready;
+    bool reset;
+    bool driver_error;
+    bool undervoltage;
+    bool otpw;
+    bool ot;
+    bool s2ga;
+    bool s2gb;
+    bool s2vsa;
+    bool s2vsb;
+    bool ola;
+    bool olb;
+    uint8_t thermal_level;
+    uint8_t cs_actual;
+    bool stealth;
+    bool standstill;
+    uint8_t version;
+} pump_driver_status_t;
+
 typedef struct {
     uint32_t time;
+    uint32_t run_ticks;
     double volume;
     double flow_per_unit;
     float rpm;
     bool direction;
     pump_state_t state;
     pump_history_source_t history_source;
+    uint32_t alert_flags;
+    pump_driver_status_t driver_status;
 } pumps_status_t;
 
 typedef struct {
@@ -69,6 +110,8 @@ typedef struct {
     float rpm;
     bool direction;
     pump_state_t state;
+    uint32_t alert_flags;
+    pump_driver_status_t driver_status;
 } pump_runtime_event_t;
 
 typedef struct {
@@ -94,6 +137,13 @@ void run_pump_on_volume(uint8_t pump_id, double volume_ml, float rpm);
 esp_err_t run_pump_manual_seconds(uint8_t pump_id, float rpm, bool direction, int32_t time_seconds);
 esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t time_minutes);
 void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direction);
+double app_pumps_estimate_flow_ml_per_min(uint8_t pump_id, float rpm);
+bool app_pumps_has_calibration(uint8_t pump_id);
+esp_err_t app_pumps_validate_periodic_schedule(uint8_t pump_id, float rpm, uint32_t day_volume_ml,
+                                               char *error, size_t error_size);
+esp_err_t app_pumps_validate_manual_run(uint8_t pump_id, float rpm, int32_t time_seconds,
+                                        char *error, size_t error_size);
+void app_pumps_set_driver_status(uint8_t pump_id, const pump_driver_status_t *status);
 
 int init_pumps(void);
 void backup_eeprom_tank_status(void);

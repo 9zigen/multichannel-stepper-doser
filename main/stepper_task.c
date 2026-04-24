@@ -16,6 +16,7 @@ static const char *TAG = "stepper_task";
 static QueueHandle_t control_queue;
 static tms2209_t stepper_cfg;
 static bool stepper_cfg_ready = false;
+static pump_driver_status_t driver_status_cache[MAX_PUMP];
 
 typedef enum {
     STEPPER_COMMAND_CONTROL = 0,
@@ -103,6 +104,64 @@ static float clamp_rpm_for_microsteps(float rpm, uint32_t micro_steps)
     return rpm;
 }
 
+static uint8_t thermal_level_from_drv_status(const tmc2209_drv_status_reg_t *drv_status)
+{
+    if (drv_status == NULL) {
+        return 0;
+    }
+
+    if (drv_status->t157) return 4;
+    if (drv_status->t150) return 3;
+    if (drv_status->t143) return 2;
+    if (drv_status->t120) return 1;
+    return 0;
+}
+
+static void clear_driver_status_cache(void)
+{
+    memset(driver_status_cache, 0, sizeof(driver_status_cache));
+    for (uint8_t i = 0; i < MAX_PUMP; ++i) {
+        app_pumps_set_driver_status(i, &driver_status_cache[i]);
+    }
+}
+
+static void poll_driver_health(void)
+{
+    if (!stepper_cfg_ready) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < stepper_cfg.motors_num; ++i) {
+        pump_driver_status_t status = {0};
+        tmc2209_ioin_reg_t ioin = tmc2209_get_ioin(stepper_cfg, i);
+        tmc2209_gstat_reg_t gstat = tmc2209_get_gstat(&stepper_cfg, i);
+        tmc2209_drv_status_reg_t drv_status = tmc2209_get_drv_status(&stepper_cfg, i);
+
+        status.version = ioin.version;
+        status.uart_ready = ioin.version != 0;
+        status.reset = gstat.reset;
+        status.driver_error = gstat.drv_err;
+        status.undervoltage = gstat.uv_cp;
+        status.otpw = drv_status.otpw;
+        status.ot = drv_status.ot;
+        status.s2ga = drv_status.s2ga;
+        status.s2gb = drv_status.s2gb;
+        status.s2vsa = drv_status.s2vsa;
+        status.s2vsb = drv_status.s2vsb;
+        status.ola = drv_status.ola;
+        status.olb = drv_status.olb;
+        status.thermal_level = thermal_level_from_drv_status(&drv_status);
+        status.cs_actual = drv_status.cs_actual;
+        status.stealth = drv_status.stealth;
+        status.standstill = drv_status.stst;
+
+        if (memcmp(&driver_status_cache[i], &status, sizeof(status)) != 0) {
+            driver_status_cache[i] = status;
+            app_pumps_set_driver_status(i, &status);
+        }
+    }
+}
+
 static void stepper_deinit_current_config(void)
 {
     if (!stepper_cfg_ready) {
@@ -117,6 +176,7 @@ static void stepper_deinit_current_config(void)
     TMC2209_deinit(&stepper_cfg);
     memset(&stepper_cfg, 0, sizeof(stepper_cfg));
     stepper_cfg_ready = false;
+    clear_driver_status_cache();
 }
 
 static esp_err_t stepper_apply_board_config(void)
@@ -169,6 +229,7 @@ static esp_err_t stepper_apply_board_config(void)
              (long)board_config->tx_pin,
              (long)board_config->rx_pin,
              (unsigned)stepper_cfg.motors_num);
+    poll_driver_health();
     return ESP_OK;
 }
 
@@ -245,6 +306,16 @@ esp_err_t stepper_task_reload_config(void)
     return xQueueSend(control_queue, &message, pdMS_TO_TICKS(1000)) == pdTRUE ? ESP_OK : ESP_FAIL;
 }
 
+bool stepper_task_get_driver_status(uint8_t id, pump_driver_status_t *out_status)
+{
+    if (id >= MAX_PUMP || out_status == NULL) {
+        return false;
+    }
+
+    *out_status = driver_status_cache[id];
+    return stepper_cfg_ready && id < stepper_cfg.motors_num;
+}
+
 void stepper_task(void *pvParameter)
 {
     (void)pvParameter;
@@ -260,7 +331,7 @@ void stepper_task(void *pvParameter)
     stepper_command_t command;
 
     while (1) {
-        if (xQueueReceive(control_queue, &command, portMAX_DELAY) == pdTRUE) {
+        if (xQueueReceive(control_queue, &command, pdMS_TO_TICKS(1000)) == pdTRUE) {
             if (command.type == STEPPER_COMMAND_RELOAD_CONFIG) {
                 ESP_LOGI(TAG, "Reloading stepper board config");
                 ESP_ERROR_CHECK(stepper_apply_board_config());
@@ -282,6 +353,8 @@ void stepper_task(void *pvParameter)
                               control_packet.direction,
                               control_packet.duration_ms);
             }
+        } else {
+            poll_driver_health();
         }
     }
 }

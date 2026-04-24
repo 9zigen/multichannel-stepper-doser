@@ -176,3 +176,5 @@ tmc2209_otp_read_reg_t tmc2209_get_otp(tms2209_t cfg, uint8_t motor_num);
 tmc2209_ioin_reg_t tmc2209_get_ioin(tms2209_t cfg, uint8_t motor_num);
 
 tmc2209_chopconf_reg_t tmc2209_get_chopconf(tms2209_t *cfg, uint8_t motor_num);
+
+tmc2209_drv_status_reg_t tmc2209_get_drv_status(tms2209_t *cfg, uint8_t motor_num);

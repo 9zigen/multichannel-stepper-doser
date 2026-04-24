@@ -130,6 +130,7 @@ const defaultSettings: SettingsState = {
     mqtt_retain: false,
     mqtt_discovery_topic: 'homeassistant',
     mqtt_discovery_status_topic: 'homeassistant/status',
+    max_total_daily_ml: 0,
     enable_ntp: false,
     enable_mqtt: false,
     enable_mqtt_discovery: true,

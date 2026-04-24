@@ -51,6 +51,7 @@ typedef struct {
     uint32_t tank_concentration_active;
     double tank_current_vol;
     bool state;
+    pump_safety_limits_t safety;
 } pump_storage_t;
 
 static esp_err_t app_settings_get_blob(const char *key, void *data, size_t *data_len);
@@ -138,6 +139,11 @@ static bool normalize_service_config(void)
         changed = true;
     }
 
+    if (service.max_total_daily_ml > 1000000U) {
+        service.max_total_daily_ml = 0;
+        changed = true;
+    }
+
     return changed;
 }
 
@@ -171,6 +177,7 @@ static void app_settings_apply_default_pump(uint8_t pump_id)
     pump[pump_id].state = true;
     pump[pump_id].aging.warning_hours = 200;
     pump[pump_id].aging.replace_hours = 250;
+    memset(&pump[pump_id].safety, 0, sizeof(pump[pump_id].safety));
     strlcpy(pump[pump_id].name, default_names[pump_id], sizeof(pump[pump_id].name));
 }
 
@@ -187,6 +194,7 @@ static void app_settings_pump_to_storage(const pump_t *src, pump_storage_t *dst)
     dst->tank_concentration_active = src->tank_concentration_active;
     dst->tank_current_vol = src->tank_current_vol;
     dst->state = src->state;
+    dst->safety = src->safety;
 }
 
 static void app_settings_storage_to_pump(const pump_storage_t *src, pump_t *dst)
@@ -203,6 +211,7 @@ static void app_settings_storage_to_pump(const pump_storage_t *src, pump_t *dst)
     dst->tank_concentration_active = src->tank_concentration_active;
     dst->tank_current_vol = src->tank_current_vol;
     dst->state = src->state;
+    dst->safety = src->safety;
 }
 
 static esp_err_t app_settings_load_single_pump(uint8_t pump_id)
@@ -590,6 +599,7 @@ void set_default_service()
     service.enable_mqtt = false;
     service.mqtt_qos = 0;
     service.mqtt_retain = 0;
+    service.max_total_daily_ml = 0;
     strlcpy(service.mqtt_discovery_topic, "homeassistant", sizeof(service.mqtt_discovery_topic));
     strlcpy(service.mqtt_discovery_status_topic,
             "homeassistant/status",

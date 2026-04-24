@@ -63,6 +63,13 @@ typedef struct {
 } pump_aging_config_t;
 
 typedef struct {
+    uint32_t max_single_run_ml;
+    uint32_t max_single_run_seconds;
+    uint32_t max_hourly_ml;
+    uint32_t max_daily_ml;
+} pump_safety_limits_t;
+
+typedef struct {
     uint8_t id;                           // Network ID for UI
     uint8_t type;                         // network_type_t
     bool is_dirty;                        // UI-only dirty marker
@@ -100,6 +107,7 @@ typedef struct {
     uint8_t mqtt_retain;                  // MQTT Retain
     char mqtt_discovery_topic[MAX_NETWORK_STR_LEN];
     char mqtt_discovery_status_topic[MAX_NETWORK_STR_LEN];
+    uint32_t max_total_daily_ml;          // Global daily dose cap across all pumps
     bool enable_ntp;                      // Enable NTP Service
     bool enable_mqtt;                     // Enable MQTT Service
     bool enable_mqtt_discovery;           // Enable Home Assistant discovery
@@ -119,6 +127,7 @@ typedef struct {
     double tank_current_vol;              // Tank Current Volume in ml
     bool state;                           // Enable/Disable pump
     pump_aging_config_t aging;            // Service thresholds in hours
+    pump_safety_limits_t safety;          // Safety limits for runtime and dosing
 } pump_t;
 
 typedef struct {

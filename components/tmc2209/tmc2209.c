@@ -958,6 +958,13 @@ tmc2209_ifcnt_reg_t tmc2209_get_ifcnt(tms2209_t *cfg, uint8_t motor_num)
     return reg;
 }
 
+tmc2209_ioin_reg_t tmc2209_get_ioin(tms2209_t cfg, uint8_t motor_num)
+{
+    tmc2209_ioin_reg_t reg;
+    reg.value = read_datagram(&cfg, motor_num, IOIN);
+    return reg;
+}
+
 /**
  * Set NODECONF register value
  * @param cfg
@@ -979,6 +986,13 @@ tmc2209_chopconf_reg_t tmc2209_get_chopconf(tms2209_t *cfg, uint8_t motor_num)
 {
     tmc2209_chopconf_reg_t reg;
     reg.value = read_datagram(cfg, motor_num, CHOPCONF);
+    return reg;
+}
+
+tmc2209_drv_status_reg_t tmc2209_get_drv_status(tms2209_t *cfg, uint8_t motor_num)
+{
+    tmc2209_drv_status_reg_t reg;
+    reg.value = read_datagram(cfg, motor_num, DRV_STATUS);
     return reg;
 }
 

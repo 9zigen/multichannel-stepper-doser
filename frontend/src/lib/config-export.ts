@@ -29,6 +29,10 @@ export type ConfigExportPump = {
   aging: PumpAgingState;
   tank_full_vol: number;
   tank_concentration_active: number;
+  max_single_run_ml: number;
+  max_single_run_seconds: number;
+  max_hourly_ml: number;
+  max_daily_ml: number;
   schedule: ScheduleState;
   calibration: PumpCalibrationState[];
 };
@@ -133,6 +137,10 @@ const exportPumpSchema = z.object({
   aging: pumpAgingSchema,
   tank_full_vol: z.number(),
   tank_concentration_active: z.number(),
+  max_single_run_ml: z.number().optional(),
+  max_single_run_seconds: z.number().optional(),
+  max_hourly_ml: z.number().optional(),
+  max_daily_ml: z.number().optional(),
   schedule: scheduleStateSchema,
   calibration: z.array(calibrationSchema),
 });
@@ -192,6 +200,10 @@ export function buildExport(
     aging: pump.aging,
     tank_full_vol: pump.tank_full_vol,
     tank_concentration_active: pump.tank_concentration_active,
+    max_single_run_ml: pump.max_single_run_ml ?? 0,
+    max_single_run_seconds: pump.max_single_run_seconds ?? 0,
+    max_hourly_ml: pump.max_hourly_ml ?? 0,
+    max_daily_ml: pump.max_daily_ml ?? 0,
     schedule: pump.schedule,
     calibration: pump.calibration,
   }));
