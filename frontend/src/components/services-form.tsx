@@ -76,15 +76,8 @@ type ServicesPageProps = {
 
 const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElement => {
   const updateServices = useAppStore((state: AppStoreState) => state.updateServices);
-
-  const {
-    control,
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    resolver: zodResolver(FormSchema),
-    defaultValues: {
+  const formDefaults = React.useMemo<FormData>(
+    () => ({
       hostname: services.hostname,
       ntp_server: services.ntp_server,
       time_zone: services.time_zone || 'UTC',
@@ -101,8 +94,24 @@ const ServicesForm = ({ services, success }: ServicesPageProps): React.ReactElem
       enable_mqtt: services.enable_mqtt,
       enable_mqtt_discovery: services.enable_mqtt_discovery,
       ota_url: services.ota_url,
-    },
+    }),
+    [services],
+  );
+
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
+    resolver: zodResolver(FormSchema),
+    defaultValues: formDefaults,
   });
+
+  React.useEffect(() => {
+    reset(formDefaults);
+  }, [formDefaults, reset]);
 
   const enableNtp = useWatch({ control, name: 'enable_ntp' });
   const enableMqtt = useWatch({ control, name: 'enable_mqtt' });
