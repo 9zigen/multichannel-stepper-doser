@@ -101,7 +101,25 @@ Constants: `MAX_BOARD_ADC_CHANNELS = 2`, `MAX_BOARD_GPIO_INPUTS = 3`, `MAX_BOARD
 
 The `board_gpio_pull_t` C enum (`BOARD_GPIO_PULL_NONE=0`, `BOARD_GPIO_PULL_UP=1`, `BOARD_GPIO_PULL_DOWN=2`) must match both the TypeScript `GpioPull` enum and the Swift equivalent exactly.
 
-### 3.2 BLE Provisioning (`app_provisioning`)
+### 3.2 Time Subsystem (`app_time`)
+
+`app_time` owns the device clock, RTC fallback, NTP synchronization, and the `time_valid` signal used to pause periodic schedules when the date is unsafe.
+
+Boot order is intentionally conservative:
+
+1. Apply the configured timezone.
+2. Try to seed the system clock from MCP7940 RTC if the chip is present.
+3. If NTP is enabled, wait for Wi-Fi and refresh the clock from SNTP.
+4. Write successful NTP time back to RTC so the next boot has a local time source.
+5. Leave `time_valid=false` when neither RTC nor NTP provides a sane date (`year >= 2024`).
+
+The component uses a small internal state model for readability and logs transitions:
+
+`not_started` → `rtc_check` → `rtc_valid` / `degraded` → `waiting_wifi` → `sntp_syncing` → `valid` / `degraded`
+
+Keep this as a lightweight lifecycle aid rather than a broad dispatcher unless the time subsystem gains more independent events. Startup NTP waits synchronously so RTC can be seeded before schedules run; runtime settings changes start a short background task so HTTP/event handling is not blocked.
+
+### 3.3 BLE Provisioning (`app_provisioning`)
 
 The `app_provisioning` component provides BLE-assisted Wi-Fi onboarding using ESP-IDF `protocomm_ble`. Only compiled in when `CONFIG_CONTROLLER_ENABLE_BLE_PROVISIONING=y` (default profile).
 
@@ -233,4 +251,4 @@ Always confirm with the user before committing. Never push, force-push, or amend
 
 ---
 
-*Last updated: iOS native app (SwiftUI, @Observable, StepperTokens design system, haptics, RealtimeConnection WebSocket); shared API reference extracted to root CLAUDE.md; BLE provisioning (default firmware profile); Board Configuration presets (Fysetc E4 v1.0 — 1/2/4ch) + extended peripheral fields; Backup & Restore page; font scale selector; pump safety limits; multi-point calibration validation; TMC2209 UART health in pump runtime payloads; language/i18n deferred.*
+*Last updated: iOS native app (SwiftUI, @Observable, StepperTokens design system, haptics, RealtimeConnection WebSocket); shared API reference extracted to root CLAUDE.md; BLE provisioning (default firmware profile); Board Configuration presets (Fysetc E4 v1.0 — 1/2/4ch) + extended peripheral fields; Backup & Restore page; font scale selector; pump safety limits; multi-point calibration validation; TMC2209 UART health in pump runtime payloads; app_time RTC/NTP lifecycle state notes; language/i18n deferred.*

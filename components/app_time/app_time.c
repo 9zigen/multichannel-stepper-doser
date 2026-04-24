@@ -24,10 +24,21 @@
 
 static const char *TAG = "RTC";
 
+typedef enum {
+    APP_TIME_STATE_NOT_STARTED = 0,
+    APP_TIME_STATE_RTC_CHECK,
+    APP_TIME_STATE_RTC_VALID,
+    APP_TIME_STATE_WAITING_WIFI,
+    APP_TIME_STATE_SNTP_SYNCING,
+    APP_TIME_STATE_VALID,
+    APP_TIME_STATE_DEGRADED,
+} app_time_state_t;
+
 static uint8_t ntp_sync = 0;
 static const char *rtc_backend = "System clock";
 static bool rtc_fallback = true;
 static bool time_valid = false;
+static app_time_state_t time_state = APP_TIME_STATE_NOT_STARTED;
 static esp_event_handler_instance_t services_updated_event_ctx;
 static bool services_event_registered = false;
 static TaskHandle_t ntp_wait_task_handle = NULL;
@@ -108,6 +119,8 @@ static const app_time_zone_entry_t APP_TIME_ZONES[] = {
     {"Etc/GMT-14", "GMT-14"},
 };
 
+static const char *app_time_state_name(app_time_state_t state);
+static void app_time_set_state(app_time_state_t state);
 static void initialize_sntp(services_t *config);
 static void app_time_reconfigure_services(const services_t *services, bool restart_sntp);
 static void app_time_finalize_ntp_sync(void);
@@ -117,6 +130,39 @@ static void app_time_cancel_ntp_wait_task(void);
 static void app_time_start_ntp_wait_task(void);
 static void app_time_apply_ntp_settings(const services_t *services, bool async_wait);
 static void app_time_wait_for_sync_task(void *arg);
+static void app_time_sync_ntp_at_startup(void);
+
+static const char *app_time_state_name(app_time_state_t state)
+{
+    switch (state) {
+        case APP_TIME_STATE_NOT_STARTED:
+            return "not_started";
+        case APP_TIME_STATE_RTC_CHECK:
+            return "rtc_check";
+        case APP_TIME_STATE_RTC_VALID:
+            return "rtc_valid";
+        case APP_TIME_STATE_WAITING_WIFI:
+            return "waiting_wifi";
+        case APP_TIME_STATE_SNTP_SYNCING:
+            return "sntp_syncing";
+        case APP_TIME_STATE_VALID:
+            return "valid";
+        case APP_TIME_STATE_DEGRADED:
+            return "degraded";
+        default:
+            return "unknown";
+    }
+}
+
+static void app_time_set_state(app_time_state_t state)
+{
+    if (time_state == state) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Time state: %s -> %s", app_time_state_name(time_state), app_time_state_name(state));
+    time_state = state;
+}
 
 static const char *app_time_lookup_tz(const char *time_zone_name)
 {
@@ -150,6 +196,7 @@ static void app_time_refresh_validity_from_system_clock(void)
     time(&now);
     localtime_r(&now, &timeinfo);
     time_valid = app_time_is_datetime_valid(&timeinfo);
+    app_time_set_state(time_valid ? APP_TIME_STATE_VALID : APP_TIME_STATE_DEGRADED);
 }
 
 static void app_time_apply_timezone(const services_t *services)
@@ -192,6 +239,7 @@ static void app_time_apply_ntp_settings(const services_t *services, bool async_w
 
     if (app_time_ntp_enabled(services)) {
         initialize_sntp((services_t *)services);
+        /* Runtime settings changes must not block the HTTP handler/event loop. */
         if (async_wait) {
             app_time_start_ntp_wait_task();
         }
@@ -212,8 +260,6 @@ static void app_time_reconfigure_services(const services_t *services, bool resta
 
     if (restart_sntp) {
         app_time_apply_ntp_settings(services, true);
-    } else {
-        app_time_refresh_validity_from_system_clock();
     }
 }
 
@@ -265,6 +311,7 @@ static void app_time_finalize_ntp_sync(void)
     localtime_r(&now, &timeinfo);
     time_valid = app_time_is_datetime_valid(&timeinfo);
     ntp_sync = time_valid ? 1 : ntp_sync;
+    app_time_set_state(time_valid ? APP_TIME_STATE_VALID : APP_TIME_STATE_DEGRADED);
 
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
     ESP_LOGI(TAG, "The NTP date/time is: %s", strftime_buf);
@@ -305,6 +352,8 @@ static void app_time_cancel_ntp_wait_task(void)
 
 static bool app_time_wait_for_wifi(uint32_t timeout_ms)
 {
+    app_time_set_state(APP_TIME_STATE_WAITING_WIFI);
+
     EventBits_t bits = xEventGroupWaitBits(
         wifi_event_group,
         WIFI_CONNECTED_BIT,
@@ -319,6 +368,7 @@ static bool app_time_wait_for_sntp_sync(uint32_t timeout_ms)
 {
     const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(timeout_ms);
 
+    app_time_set_state(APP_TIME_STATE_SNTP_SYNCING);
     ESP_LOGI(TAG, "Waiting up to %lu ms for SNTP sync", (unsigned long)timeout_ms);
 
     while (xTaskGetTickCount() < deadline) {
@@ -359,6 +409,10 @@ static void app_time_wait_for_sync_task(void *arg)
 {
     (void)arg;
 
+    /*
+     * This task is created only for runtime NTP changes. Startup uses the same
+     * wait/finalize helpers synchronously so boot can seed RTC before schedules run.
+     */
     if (!app_time_ntp_enabled(get_service_config())) {
         ntp_wait_task_handle = NULL;
         vTaskDelete(NULL);
@@ -380,7 +434,7 @@ static void app_time_wait_for_sync_task(void *arg)
     vTaskDelete(NULL);
 }
 
-static void obtain_time(void)
+static void app_time_sync_ntp_at_startup(void)
 {
     services_t *services = get_service_config();
 
@@ -409,9 +463,16 @@ void init_clock(void)
 
     services_t *services = get_service_config();
     time_valid = false;
+    app_time_set_state(APP_TIME_STATE_RTC_CHECK);
     app_time_register_services_handler();
     app_time_reconfigure_services(services, false);
 
+    /*
+     * Boot priority:
+     * 1. Restore the system clock from RTC when the chip is present.
+     * 2. If NTP is enabled, refresh that clock from the network.
+     * 3. Keep schedules paused when neither source can provide a sane date.
+     */
     datetime_t datetime = {0};
     bool i2c_available = i2c_is_supported() && i2c_is_initialized();
     bool rtc_chip_available = i2c_available && (mcp7940_probe() == ESP_OK);
@@ -435,8 +496,10 @@ void init_clock(void)
 
         if (!app_time_is_datetime_valid(&timeinfo)) {
             ESP_LOGW(TAG, "RTC time is not valid yet.");
+            app_time_set_state(APP_TIME_STATE_DEGRADED);
         } else {
             time_valid = true;
+            app_time_set_state(APP_TIME_STATE_RTC_VALID);
         }
 
         rtc_backend = "MCP7940 RTC";
@@ -453,7 +516,7 @@ void init_clock(void)
 
     if (services->enable_ntp) {
         ESP_LOGI(TAG, "Connecting to WiFi and getting time over NTP.");
-        obtain_time();
+        app_time_sync_ntp_at_startup();
     } else {
         ESP_LOGI(TAG, "NTP Disabled. Will use local available time source.");
     }
@@ -461,6 +524,7 @@ void init_clock(void)
     time(&now);
     localtime_r(&now, &timeinfo);
     time_valid = app_time_is_datetime_valid(&timeinfo);
+    app_time_set_state(time_valid ? APP_TIME_STATE_VALID : APP_TIME_STATE_DEGRADED);
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
     ESP_LOGI(TAG, "The Local date/time is: %s", strftime_buf);
 }
