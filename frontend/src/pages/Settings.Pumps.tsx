@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Cog, Droplets, FlaskConical, Gauge } from 'lucide-react';
+import { Cog, Droplets, FlaskConical, Gauge, ShieldCheck } from 'lucide-react';
 
 import { PumpState } from '@/lib/api.ts';
 import { useAppStore } from '@/hooks/use-store.ts';
@@ -11,6 +11,15 @@ import { Badge } from '@/components/ui/badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.tsx';
 import { cn } from '@/lib/utils';
+
+function countSafetyLimits(pump: PumpState): number {
+  return [
+    pump.max_single_run_ml,
+    pump.max_single_run_seconds,
+    pump.max_hourly_ml,
+    pump.max_daily_ml,
+  ].filter((value) => (value ?? 0) > 0).length;
+}
 
 const PumpsPage: React.FC = (): React.ReactElement => {
   const isMobile = useIsMobile();
@@ -60,6 +69,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                 const percentage =
                   pump.tank_full_vol > 0 ? Math.round((pump.tank_current_vol / pump.tank_full_vol) * 100) : 0;
                 const lowInventory = percentage <= 25;
+                const safetyLimits = countSafetyLimits(pump);
 
                 return (
                   <div
@@ -74,6 +84,12 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                         <Badge variant={pump.state ? 'default' : 'outline'} className="text-xs">
                           {pump.state ? 'On' : 'Off'}
                         </Badge>
+                        {safetyLimits > 0 && (
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            <ShieldCheck className="size-3" />
+                            {safetyLimits}
+                          </Badge>
+                        )}
                       </div>
                       <Button
                         variant="ghost"
@@ -110,7 +126,7 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-4 gap-2 text-xs">
                       <div className="flex flex-col items-center gap-0.5 rounded-md bg-background/50 px-2 py-1.5">
                         <Gauge className="size-3 text-muted-foreground" />
                         <span className="font-medium">{pump.direction ? 'CW' : 'CCW'}</span>
@@ -122,6 +138,10 @@ const PumpsPage: React.FC = (): React.ReactElement => {
                       <div className="flex flex-col items-center gap-0.5 rounded-md bg-background/50 px-2 py-1.5">
                         <span className="text-muted-foreground">conc.</span>
                         <span className="font-medium tabular-nums">{pump.tank_concentration_active.toFixed(0)}</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-0.5 rounded-md bg-background/50 px-2 py-1.5">
+                        <ShieldCheck className="size-3 text-muted-foreground" />
+                        <span className="font-medium tabular-nums">{safetyLimits}</span>
                       </div>
                     </div>
                   </div>

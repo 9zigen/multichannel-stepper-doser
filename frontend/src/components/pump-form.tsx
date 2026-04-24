@@ -14,7 +14,8 @@ import { PumpCalibrationState, PumpState, ScheduleState } from '@/lib/api.ts';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { toast } from 'sonner';
 import PumpCalibration from '@/components/pump-calibration.tsx';
-import { Check, FlaskConical, LoaderCircle, Square } from 'lucide-react';
+import { CalibrationQualityChart } from '@/components/calibration-quality-chart.tsx';
+import { Check, FlaskConical, LoaderCircle, ShieldCheck, Square } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx';
 import { usePumpRuntime } from '@/components/pump-runtime-provider.tsx';
 
@@ -28,6 +29,10 @@ type FormData = {
   tank_current_vol: number;
   tank_concentration_total: number;
   tank_concentration_active: number;
+  max_single_run_ml: number;
+  max_single_run_seconds: number;
+  max_hourly_ml: number;
+  max_daily_ml: number;
   schedule: ScheduleState;
   calibration: PumpCalibrationState[];
 };
@@ -42,6 +47,10 @@ const FormSchema = z.object({
   tank_current_vol: z.number(),
   tank_concentration_total: z.number(),
   tank_concentration_active: z.number(),
+  max_single_run_ml: z.number().min(0, 'Must be 0 or greater'),
+  max_single_run_seconds: z.number().min(0, 'Must be 0 or greater'),
+  max_hourly_ml: z.number().min(0, 'Must be 0 or greater'),
+  max_daily_ml: z.number().min(0, 'Must be 0 or greater'),
   calibration: z.array(z.object({ speed: z.number(), flow: z.number() })),
   schedule: z.object({
     mode: z.union([z.literal(0), z.literal(1), z.literal(2)]),
@@ -69,6 +78,10 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
     tank_current_vol,
     tank_concentration_total,
     tank_concentration_active,
+    max_single_run_ml = 0,
+    max_single_run_seconds = 0,
+    max_hourly_ml = 0,
+    max_daily_ml = 0,
     schedule,
     calibration,
   } = pump;
@@ -97,6 +110,10 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
       tank_current_vol: tank_current_vol,
       tank_concentration_total: tank_concentration_total,
       tank_concentration_active: tank_concentration_active,
+      max_single_run_ml: max_single_run_ml,
+      max_single_run_seconds: max_single_run_seconds,
+      max_hourly_ml: max_hourly_ml,
+      max_daily_ml: max_daily_ml,
       schedule: schedule,
       calibration: calibration,
     },
@@ -223,6 +240,38 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
                 {errors.tank_concentration_active && <p className="text-xs text-destructive">{errors.tank_concentration_active.message}</p>}
               </div>
             </div>
+
+            <div className="mb-4 rounded-md border border-border/40 bg-secondary/10 p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="size-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Safety limits</span>
+                </div>
+                <span className="text-xs text-muted-foreground">0 disables</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="max-single-run-ml" className="text-xs text-muted-foreground">Single dose ml</Label>
+                  <Input id="max-single-run-ml" type="number" min={0} step={1} className="h-8 text-sm tabular-nums" {...register('max_single_run_ml', { valueAsNumber: true })} />
+                  {errors.max_single_run_ml && <p className="text-xs text-destructive">{errors.max_single_run_ml.message}</p>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="max-single-run-seconds" className="text-xs text-muted-foreground">Runtime sec</Label>
+                  <Input id="max-single-run-seconds" type="number" min={0} step={1} className="h-8 text-sm tabular-nums" {...register('max_single_run_seconds', { valueAsNumber: true })} />
+                  {errors.max_single_run_seconds && <p className="text-xs text-destructive">{errors.max_single_run_seconds.message}</p>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="max-hourly-ml" className="text-xs text-muted-foreground">Hourly ml</Label>
+                  <Input id="max-hourly-ml" type="number" min={0} step={1} className="h-8 text-sm tabular-nums" {...register('max_hourly_ml', { valueAsNumber: true })} />
+                  {errors.max_hourly_ml && <p className="text-xs text-destructive">{errors.max_hourly_ml.message}</p>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="max-daily-ml" className="text-xs text-muted-foreground">Daily ml</Label>
+                  <Input id="max-daily-ml" type="number" min={0} step={1} className="h-8 text-sm tabular-nums" {...register('max_daily_ml', { valueAsNumber: true })} />
+                  {errors.max_daily_ml && <p className="text-xs text-destructive">{errors.max_daily_ml.message}</p>}
+                </div>
+              </div>
+            </div>
           </form>
 
           <div className="flex flex-col xl:w-[50%]">
@@ -252,7 +301,8 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
                 </AlertDescription>
               </Alert>
             ) : null}
-            <PumpCalibration pump={pump} success={(cal) => addCalibration(cal)} />
+            <CalibrationQualityChart points={pumpCalibrations} />
+            <PumpCalibration pump={{ ...pump, calibration: pumpCalibrations }} success={(cal) => addCalibration(cal)} />
             {errors.calibration && (
               <p role="alert" className="text-xs text-destructive">
                 {errors.calibration?.message}

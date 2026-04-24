@@ -34,6 +34,12 @@
   }
 }
 
+@layer components {
+  .calibration-line-draw {
+    animation: var(--animate-calibration-line-draw);
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #36454f;
@@ -209,6 +215,7 @@
   --animate-collapsible-up: collapsible-up 0.15s ease-in;
   --animate-fade-in-up: fade-in-up 0.3s ease-out both;
   --animate-bar-rise: bar-rise 0.4s ease-out both;
+  --animate-calibration-line-draw: calibration-line-draw 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
 
   @keyframes collapsible-down {
     from {
@@ -250,6 +257,19 @@
     }
     to {
       transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes calibration-line-draw {
+    from {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      opacity: 0.2;
+    }
+    to {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 0;
       opacity: 1;
     }
   }

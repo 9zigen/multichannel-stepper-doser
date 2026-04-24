@@ -15,7 +15,7 @@ export interface PumpFormProps {
   success?: (cal: PumpCalibrationState) => void;
 }
 
-const PumpCalibration = ({ pump }: PumpFormProps): React.ReactElement => {
+const PumpCalibration = ({ pump, success }: PumpFormProps): React.ReactElement => {
   const { id, direction, calibration } = pump;
   const updatePumps = useAppStore((state: AppStoreState) => state.updatePump);
   const { runtime, calibrationSessions, beginCalibrationSession, stopCalibrationSession, clearCalibrationSession } =
@@ -157,13 +157,18 @@ const PumpCalibration = ({ pump }: PumpFormProps): React.ReactElement => {
 
   const finishCalibration = async () => {
     if (stage === STAGE.STOP) {
-      await updatePumps(
-        {
-          ...pump,
-          calibration: [...pump.calibration, { speed, flow }],
-        },
-        false
-      );
+      const calibrationPoint = { speed, flow };
+      if (success) {
+        success(calibrationPoint);
+      } else {
+        await updatePumps(
+          {
+            ...pump,
+            calibration: [...pump.calibration, calibrationPoint],
+          },
+          false
+        );
+      }
       clearCalibrationSession(id);
       setStage(STAGE.FINISHED);
     }

@@ -33,6 +33,10 @@ function normalizePump(pump: PumpState): PumpState {
   return {
     ...pump,
     tank_current_vol: roundToHundredths(pump.tank_current_vol),
+    max_single_run_ml: pump.max_single_run_ml ?? 0,
+    max_single_run_seconds: pump.max_single_run_seconds ?? 0,
+    max_hourly_ml: pump.max_hourly_ml ?? 0,
+    max_daily_ml: pump.max_daily_ml ?? 0,
   };
 }
 
