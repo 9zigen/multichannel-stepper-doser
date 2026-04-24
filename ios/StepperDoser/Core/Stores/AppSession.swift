@@ -1,4 +1,29 @@
 import Foundation
+import SwiftUI
+
+// MARK: — Theme preference
+
+enum AppTheme: String, CaseIterable {
+    case system, light, dark
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light:  return "Light"
+        case .dark:   return "Dark"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
+    }
+}
+
+// MARK: — App session
 
 @MainActor
 @Observable
@@ -9,6 +34,9 @@ final class AppSession {
     let realtime: RealtimeConnection
 
     var selectedTab: AppTab = .dashboard
+    var theme: AppTheme {
+        didSet { UserDefaults.standard.set(theme.rawValue, forKey: "app_theme") }
+    }
     var authToken: String?
     var settings: SettingsResponse?
     var status: StatusSnapshot?
@@ -30,6 +58,8 @@ final class AppSession {
         self.apiClient = apiClient
         self.realtime = realtime
         self.authToken = tokenStore.loadToken(for: deviceStore.selectedDevice)
+        let storedTheme = UserDefaults.standard.string(forKey: "app_theme") ?? ""
+        self.theme = AppTheme(rawValue: storedTheme) ?? .system
         syncAPIClient()
     }
 

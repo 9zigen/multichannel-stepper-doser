@@ -1,41 +1,96 @@
 import SwiftUI
 
+// MARK: — Hex colour helpers
+
 extension Color {
     init(hex: UInt32, opacity: Double = 1) {
-        let red = Double((hex >> 16) & 0xFF) / 255
-        let green = Double((hex >> 8) & 0xFF) / 255
-        let blue = Double(hex & 0xFF) / 255
+        let red   = Double((hex >> 16) & 0xFF) / 255
+        let green = Double((hex >> 8)  & 0xFF) / 255
+        let blue  = Double( hex        & 0xFF) / 255
         self.init(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
     }
 }
 
-enum StepperColor {
-    static let background = Color(hex: 0x0b0e11)
-    static let foreground = Color(hex: 0xe2e8f0)
-    static let card = Color(hex: 0x131820)
-    static let popover = Color(hex: 0x161b22)
-    static let primary = Color(hex: 0x22d3ee)
-    static let primaryForeground = Color(hex: 0x0b0e11)
-    static let secondary = Color(hex: 0x1e293b)
-    static let secondaryForeground = Color(hex: 0xe2e8f0)
-    static let muted = Color(hex: 0x1e293b)
-    static let mutedForeground = Color(hex: 0x64748b)
-    static let accent = Color(hex: 0x06b6d4)
-    static let destructive = Color(hex: 0xef4444)
-    static let warning = Color(hex: 0xf59e0b)
-    static let border = Color.white.opacity(0.08)
-    static let input = Color.white.opacity(0.12)
-    static let ring = Color(hex: 0x22d3ee)
-    static let sidebar = Color(hex: 0x0f1318)
+extension UIColor {
+    convenience init(hex: UInt32, alpha: CGFloat = 1) {
+        let r = CGFloat((hex >> 16) & 0xFF) / 255
+        let g = CGFloat((hex >> 8)  & 0xFF) / 255
+        let b = CGFloat( hex        & 0xFF) / 255
+        self.init(red: r, green: g, blue: b, alpha: alpha)
+    }
 
+    /// Returns a dynamic UIColor that switches between `dark` and `light` hex
+    /// values based on the active UIUserInterfaceStyle trait.
+    static func adaptive(dark: UInt32, light: UInt32) -> UIColor {
+        UIColor { $0.userInterfaceStyle == .dark
+            ? UIColor(hex: dark)
+            : UIColor(hex: light) }
+    }
+}
+
+// MARK: — Design tokens
+
+enum StepperColor {
+    // MARK: Surfaces
+    /// Page / screen background
+    static let background      = Color(uiColor: .adaptive(dark: 0x0b0e11, light: 0xf0f4f8))
+    /// Primary text
+    static let foreground      = Color(uiColor: .adaptive(dark: 0xe2e8f0, light: 0x0f172a))
+    /// Card surface
+    static let card            = Color(uiColor: .adaptive(dark: 0x131820, light: 0xffffff))
+    /// Popover / metric tile surface
+    static let popover         = Color(uiColor: .adaptive(dark: 0x161b22, light: 0xf8fafc))
+    /// Secondary fill — panels, chips, secondary buttons
+    static let secondary       = Color(uiColor: .adaptive(dark: 0x1e293b, light: 0xdde6f0))
+    static let secondaryForeground = Color(uiColor: .adaptive(dark: 0xe2e8f0, light: 0x0f172a))
+    static let muted           = Color(uiColor: .adaptive(dark: 0x1e293b, light: 0xdde6f0))
+    /// Subdued / placeholder text
+    static let mutedForeground = Color(uiColor: .adaptive(dark: 0x64748b, light: 0x64748b))
+    /// Tab bar / side rail surface
+    static let sidebar         = Color(uiColor: .adaptive(dark: 0x0f1318, light: 0xf1f5f9))
+
+    // MARK: Brand
+    /// Cyan accent — buttons, selected states, badges, chart primary
+    static let primary         = Color(uiColor: .adaptive(dark: 0x22d3ee, light: 0x0891b2))
+    /// Text on primary-coloured backgrounds
+    static let primaryForeground = Color(uiColor: .adaptive(dark: 0x0b0e11, light: 0xffffff))
+    static let accent          = Color(uiColor: .adaptive(dark: 0x06b6d4, light: 0x0891b2))
+    static let ring            = Color(uiColor: .adaptive(dark: 0x22d3ee, light: 0x0891b2))
+
+    // MARK: Semantic
+    static let destructive     = Color(uiColor: .adaptive(dark: 0xef4444, light: 0xdc2626))
+    static let warning         = Color(uiColor: .adaptive(dark: 0xf59e0b, light: 0xd97706))
+
+    // MARK: Chrome
+    /// Subtle separator / outline — dark: white@8%, light: slate@10%
+    static let border = Color(uiColor: UIColor { t in
+        t.userInterfaceStyle == .dark
+            ? UIColor.white.withAlphaComponent(0.08)
+            : UIColor(hex: 0x0f172a).withAlphaComponent(0.10)
+    })
+    /// Input field stroke — dark: white@12%, light: slate@8%
+    static let input = Color(uiColor: UIColor { t in
+        t.userInterfaceStyle == .dark
+            ? UIColor.white.withAlphaComponent(0.12)
+            : UIColor(hex: 0x0f172a).withAlphaComponent(0.08)
+    })
+    /// Card drop-shadow — heavy in dark, light in light mode
+    static let cardShadow = Color(uiColor: UIColor { t in
+        t.userInterfaceStyle == .dark
+            ? UIColor.black.withAlphaComponent(0.50)
+            : UIColor.black.withAlphaComponent(0.10)
+    })
+
+    // MARK: Charts (same in both modes — all bright enough to read on any bg)
     static let chart1 = Color(hex: 0x22d3ee)
     static let chart2 = Color(hex: 0x10b981)
     static let chart3 = Color(hex: 0xf59e0b)
     static let chart4 = Color(hex: 0x8b5cf6)
     static let chart5 = Color(hex: 0x64748b)
 
-    static let dataLow = Color(hex: 0xa7f3d0, opacity: 0.50)
-    static let dataMid = Color(hex: 0x6ee7b7, opacity: 0.65)
+    // MARK: Data intensity (heatmap / bar chart)
+    static let dataLow  = Color(hex: 0xa7f3d0, opacity: 0.50)
+    static let dataMid  = Color(hex: 0x6ee7b7, opacity: 0.65)
     static let dataHigh = Color(hex: 0x34d399, opacity: 0.80)
     static let dataPeak = Color(hex: 0x10b981, opacity: 0.95)
 }
@@ -67,6 +122,17 @@ enum StepperLayout {
     static let panelPadding: CGFloat = StepperSpacing.lg
     static let inputHorizontalPadding: CGFloat = StepperSpacing.lg
     static let inputVerticalPadding: CGFloat = 10
+}
+
+// MARK: — Haptic feedback
+
+@MainActor
+enum StepperHaptic {
+    static func selection() { UISelectionFeedbackGenerator().selectionChanged() }
+    static func light()     { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+    static func medium()    { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+    static func warning()   { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+    static func success()   { UINotificationFeedbackGenerator().notificationOccurred(.success) }
 }
 
 enum StepperFont {
@@ -183,7 +249,7 @@ struct StepperCard<Content: View>: View {
                         .stroke(StepperColor.border.opacity(0.5), lineWidth: 1)
                 )
         )
-        .shadow(color: Color.black.opacity(0.50), radius: 16, x: 0, y: 10)
+        .shadow(color: StepperColor.cardShadow, radius: 16, x: 0, y: 10)
     }
 }
 
@@ -446,6 +512,9 @@ struct StepperPrimaryButtonStyle: ButtonStyle {
             )
             .scaleEffect(configuration.isPressed ? 0.99 : 1)
             .shadow(color: StepperColor.primary.opacity(0.12), radius: 12)
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed { StepperHaptic.medium() }
+            }
     }
 }
 
@@ -465,6 +534,9 @@ struct StepperSecondaryButtonStyle: ButtonStyle {
                             .stroke(StepperColor.border.opacity(0.8), lineWidth: 1)
                     )
             )
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed { StepperHaptic.light() }
+            }
     }
 }
 
@@ -484,6 +556,32 @@ struct StepperDestructiveButtonStyle: ButtonStyle {
                             .stroke(StepperColor.destructive.opacity(0.30), lineWidth: 1)
                     )
             )
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed { StepperHaptic.warning() }
+            }
+    }
+}
+
+/// Minimal ghost button — no fill, just a faint border.
+/// Used for low-emphasis secondary actions (Skip, Done Editing, etc.)
+struct StepperGhostButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(StepperFont.body.weight(.medium))
+            .foregroundStyle(StepperColor.foreground)
+            .padding(.horizontal, StepperSpacing.md)
+            .padding(.vertical, StepperSpacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
+                    .fill(StepperColor.secondary.opacity(configuration.isPressed ? 0.18 : 0.10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
+                            .stroke(StepperColor.border.opacity(0.35), lineWidth: 1)
+                    )
+            )
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed { StepperHaptic.light() }
+            }
     }
 }
 
@@ -661,6 +759,7 @@ struct StepperTextField: UIViewRepresentable {
     var isSecure: Bool = false
     var keyboardType: UIKeyboardType = .asciiCapable
     var returnKeyType: UIReturnKeyType = .done
+    var textAlignment: NSTextAlignment = .natural
     var onSubmit: (() -> Void)? = nil
     /// Extra action buttons shown in the keyboard accessory bar (left side).
     /// Each item is a (label, action) pair. Action is called after the keyboard
@@ -696,6 +795,7 @@ struct StepperTextField: UIViewRepresentable {
         tf.smartInsertDeleteType = .no
         tf.keyboardType = keyboardType
         tf.returnKeyType = returnKeyType
+        tf.textAlignment = textAlignment
         tf.enablesReturnKeyAutomatically = false
         tf.isSecureTextEntry = isSecure
         tf.clearButtonMode = .never
@@ -732,7 +832,7 @@ struct StepperTextField: UIViewRepresentable {
 
     private func buildAccessoryBar(coordinator: Coordinator) -> UIToolbar {
         let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 100, height: 44))
-        bar.barStyle = .black
+        bar.barStyle = .default   // adapts automatically to light / dark trait
         bar.isTranslucent = true
 
         var items: [UIBarButtonItem] = []

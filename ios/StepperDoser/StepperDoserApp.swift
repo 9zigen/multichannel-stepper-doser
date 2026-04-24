@@ -8,7 +8,7 @@ struct StepperDoserApp: App {
         WindowGroup {
             AppRootView()
                 .environment(session)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(session.theme.colorScheme)
                 .tint(StepperColor.primary)
         }
     }

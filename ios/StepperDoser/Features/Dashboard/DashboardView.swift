@@ -171,17 +171,6 @@ struct DashboardView: View {
                     }
                 }
 
-                StepperPanel {
-                    StepperSectionLabel(text: "Quick Actions")
-                    VStack(spacing: StepperSpacing.md) {
-                        Button("Refresh") {
-                            Task {
-                                await session.refresh()
-                            }
-                        }
-                        .buttonStyle(StepperSecondaryButtonStyle())
-                    }
-                }
                 // Bottom breath — outer panel has padding: 0 so last section needs a gap
                 Color.clear.frame(height: StepperSpacing.xs)
             }

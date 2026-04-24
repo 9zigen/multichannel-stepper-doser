@@ -5,48 +5,68 @@ struct LoginView: View {
     @State private var isSubmitting = false
 
     var body: some View {
-        NavigationStack {
-            StepperPage {
-                StepperCard {
-                    StepperSectionLabel(text: "Authentication")
-                    Text("Sign In")
-                        .font(StepperFont.title)
-                        .foregroundStyle(StepperColor.foreground)
-                    Text("Authenticate against the device API before loading settings and realtime status.")
-                        .font(StepperFont.small)
-                        .foregroundStyle(StepperColor.mutedForeground)
+        GeometryReader { geo in
+            ZStack {
+                StepperBackground()
 
-                    HStack(spacing: StepperSpacing.sm) {
-                        StepperBadge(text: "Local Device", tone: .secondary)
-                        if let selectedDevice = session.selectedDevice {
-                            StepperBadge(text: selectedDevice.displayName, tone: .outline)
-                        }
-                    }
+                ScrollView {
+                    VStack(spacing: StepperSpacing.xxl) {
+                        // Device identity block
+                        VStack(spacing: StepperSpacing.lg) {
+                            ZStack {
+                                Circle()
+                                    .fill(StepperColor.secondary.opacity(0.25))
+                                    .frame(width: 68, height: 68)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(StepperColor.primary.opacity(0.30), lineWidth: 1)
+                                    )
+                                Image(systemName: "server.rack")
+                                    .font(.system(size: 24, weight: .medium))
+                                    .foregroundStyle(StepperColor.primary)
+                            }
 
-                    // Credentials form is a separate view so its @State (username /
-                    // password) doesn't trigger re-renders of the outer StepperCard
-                    // (ultraThinMaterial + shadow radius:16) on every keystroke.
-                    LoginCredentialsForm(
-                        suggestedLogin: session.suggestedLogin,
-                        preferredUsername: session.selectedDevice?.preferredUsername,
-                        isSubmitting: isSubmitting,
-                        onLogin: { username, password in
-                            Task {
-                                isSubmitting = true
-                                defer { isSubmitting = false }
-                                _ = await session.login(username: username, password: password)
+                            VStack(spacing: StepperSpacing.xs) {
+                                Text(session.selectedDevice?.displayName ?? "Controller")
+                                    .font(StepperFont.title)
+                                    .foregroundStyle(StepperColor.foreground)
+                                    .multilineTextAlignment(.center)
+                                Text(session.selectedDevice?.endpointLabel ?? "")
+                                    .font(StepperFont.monoSmall)
+                                    .foregroundStyle(StepperColor.mutedForeground)
                             }
                         }
-                    )
+
+                        // Credentials form — separate child view so its @State doesn't
+                        // re-render the background gradient on every keystroke.
+                        LoginCredentialsForm(
+                            suggestedLogin: session.suggestedLogin,
+                            preferredUsername: session.selectedDevice?.preferredUsername,
+                            isSubmitting: isSubmitting,
+                            onLogin: { username, password in
+                                Task {
+                                    isSubmitting = true
+                                    defer { isSubmitting = false }
+                                    _ = await session.login(username: username, password: password)
+                                }
+                            }
+                        )
+                    }
+                    .padding(.horizontal, StepperSpacing.pagePadding)
+                    .frame(maxWidth: 420)
+                    .frame(maxWidth: .infinity)
+                    // Ensure the VStack fills the screen height so the ZStack centers it
+                    .frame(minHeight: geo.size.height)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
-            .navigationBarTitleDisplayMode(.inline)
         }
+        .ignoresSafeArea()
     }
 }
 
 /// Owns its own @State for the text fields so keystrokes only re-render this
-/// lightweight view — not the parent StepperCard with its expensive material.
+/// lightweight view — not the parent that owns the gradient background.
 private struct LoginCredentialsForm: View {
     let suggestedLogin: AuthCredentials?
     let preferredUsername: String?
@@ -57,24 +77,26 @@ private struct LoginCredentialsForm: View {
     @State private var password = ""
 
     var body: some View {
-        StepperPanel {
-            StepperSectionLabel(text: "Credentials")
-            VStack(spacing: StepperSpacing.lg) {
-                StepperTextField(placeholder: "Username", text: $username)
-                    .frame(minHeight: 24)
-                    .stepperInputField()
+        VStack(spacing: StepperSpacing.lg) {
+            StepperPanel {
+                StepperSectionLabel(text: "Credentials")
+                VStack(spacing: StepperSpacing.lg) {
+                    StepperTextField(placeholder: "Username", text: $username)
+                        .frame(minHeight: 24)
+                        .stepperInputField()
 
-                StepperTextField(placeholder: "Password", text: $password, isSecure: true)
-                    .frame(minHeight: 24)
-                    .stepperInputField()
+                    StepperTextField(placeholder: "Password", text: $password, isSecure: true)
+                        .frame(minHeight: 24)
+                        .stepperInputField()
+                }
             }
-        }
 
-        Button(isSubmitting ? "Signing In..." : "Sign In") {
-            onLogin(username, password)
+            Button(isSubmitting ? "Signing In…" : "Sign In") {
+                onLogin(username, password)
+            }
+            .buttonStyle(StepperPrimaryButtonStyle())
+            .disabled(isSubmitting || username.isEmpty || password.isEmpty)
         }
-        .buttonStyle(StepperPrimaryButtonStyle())
-        .disabled(isSubmitting || username.isEmpty || password.isEmpty)
         .onAppear {
             if let suggestedLogin {
                 username = suggestedLogin.username

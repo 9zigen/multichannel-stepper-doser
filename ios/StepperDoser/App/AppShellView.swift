@@ -35,7 +35,6 @@ struct AppShellView: View {
         .animation(.easeInOut(duration: 0.25), value: showBanner)
         .toolbarBackground(StepperColor.sidebar, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
-        .toolbarColorScheme(.dark, for: .tabBar)
         .task {
             await session.refreshRealtimeIfNeeded()
         }

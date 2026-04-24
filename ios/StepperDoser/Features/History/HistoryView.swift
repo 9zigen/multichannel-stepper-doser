@@ -123,6 +123,10 @@ struct HistoryView: View {
             }
         }
         .navigationTitle("History")
+        .refreshable {
+            await session.refreshHistory()
+            syncSelection()
+        }
         .task {
             if session.history == nil {
                 await session.refreshHistory()

@@ -304,20 +304,3 @@ private struct OnboardingControllerSummaryCard: View {
     }
 }
 
-private struct StepperGhostButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(StepperFont.body.weight(.medium))
-            .foregroundStyle(StepperColor.foreground)
-            .padding(.horizontal, StepperSpacing.md)
-            .padding(.vertical, StepperSpacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
-                    .fill(StepperColor.secondary.opacity(configuration.isPressed ? 0.18 : 0.10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: StepperRadius.xl, style: .continuous)
-                            .stroke(StepperColor.border.opacity(0.35), lineWidth: 1)
-                    )
-            )
-    }
-}

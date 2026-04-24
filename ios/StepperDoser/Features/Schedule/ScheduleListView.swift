@@ -109,17 +109,21 @@ struct ScheduleListView: View {
                         VStack(spacing: StepperSpacing.md) {
                             ScheduleNumberAdjuster(
                                 label: "Speed",
-                                valueLabel: "\(formatNumber(draftSchedule.speed)) rpm",
-                                onDecrement: { draftSchedule.speed = max(0.1, draftSchedule.speed - 0.5) },
-                                onIncrement: { draftSchedule.speed = min(400, draftSchedule.speed + 0.5) }
+                                unit: "rpm",
+                                value: $draftSchedule.speed,
+                                minValue: 0.1,
+                                maxValue: 400,
+                                step: 0.5
                             )
 
                             if draftSchedule.mode == .periodic {
                                 ScheduleNumberAdjuster(
                                     label: "Daily Volume",
-                                    valueLabel: "\(formatNumber(draftSchedule.volume)) ml",
-                                    onDecrement: { draftSchedule.volume = max(0.1, draftSchedule.volume - 0.5) },
-                                    onIncrement: { draftSchedule.volume = min(5000, draftSchedule.volume + 0.5) }
+                                    unit: "ml",
+                                    value: $draftSchedule.volume,
+                                    minValue: 0.1,
+                                    maxValue: 5000,
+                                    step: 0.5
                                 )
 
                                 VStack(alignment: .leading, spacing: StepperSpacing.sm) {
@@ -179,6 +183,10 @@ struct ScheduleListView: View {
             }
         }
         .navigationTitle("Schedule")
+        .refreshable {
+            await session.refresh()
+            syncSelection()
+        }
         .task {
             syncSelection()
         }
@@ -308,34 +316,81 @@ struct ScheduleListView: View {
     }
 }
 
+/// Stepper adjuster with direct text-field input for fast value entry.
+/// +/− buttons offer fine ±step nudging; typing a value and tapping Done commits it.
 private struct ScheduleNumberAdjuster: View {
     let label: String
-    let valueLabel: String
-    let onDecrement: () -> Void
-    let onIncrement: () -> Void
+    let unit: String
+    @Binding var value: Double
+    let minValue: Double
+    let maxValue: Double
+    let step: Double
+
+    @State private var rawText: String
+
+    init(label: String, unit: String, value: Binding<Double>,
+         minValue: Double, maxValue: Double, step: Double) {
+        self.label = label
+        self.unit = unit
+        self._value = value
+        self.minValue = minValue
+        self.maxValue = maxValue
+        self.step = step
+        self._rawText = State(initialValue: Self.format(value.wrappedValue))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: StepperSpacing.sm) {
-            StepperSectionLabel(text: label)
-            HStack(spacing: StepperSpacing.md) {
-                // No .frame(maxWidth: .infinity) on the Image — the button style
-                // already applies it, avoiding double-frame size conflicts.
-                Button(action: onDecrement) {
+            HStack(alignment: .firstTextBaseline) {
+                StepperSectionLabel(text: label)
+                Spacer()
+                Text(unit)
+                    .font(StepperFont.micro)
+                    .foregroundStyle(StepperColor.mutedForeground)
+                    .kerning(0.5)
+            }
+            HStack(spacing: StepperSpacing.sm) {
+                Button { nudge(-step) } label: {
                     Image(systemName: "minus")
+                        .font(.system(size: 14, weight: .semibold))
                 }
                 .buttonStyle(StepperSecondaryButtonStyle())
+                .frame(maxWidth: 52)
 
-                Text(valueLabel)
-                    .font(StepperFont.section)
-                    .foregroundStyle(StepperColor.foreground)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
+                StepperTextField(
+                    placeholder: "0",
+                    text: $rawText,
+                    keyboardType: .decimalPad,
+                    textAlignment: .center,
+                    onSubmit: commit
+                )
+                .frame(minHeight: 24)
+                .stepperInputField()
 
-                Button(action: onIncrement) {
+                Button { nudge(step) } label: {
                     Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
                 }
                 .buttonStyle(StepperSecondaryButtonStyle())
+                .frame(maxWidth: 52)
             }
         }
+        .onChange(of: value) { _, v in rawText = Self.format(v) }
+    }
+
+    private func nudge(_ delta: Double) {
+        let rounded = ((value + delta) * 10).rounded() / 10
+        value = min(maxValue, max(minValue, rounded))
+    }
+
+    private func commit() {
+        let normalised = rawText.replacingOccurrences(of: ",", with: ".")
+        let parsed = Double(normalised) ?? value
+        value = min(maxValue, max(minValue, parsed))
+        rawText = Self.format(value)
+    }
+
+    private static func format(_ v: Double) -> String {
+        v.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(v)) : String(format: "%.1f", v)
     }
 }
