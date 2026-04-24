@@ -117,6 +117,7 @@ char *get_status_json(void)
             cJSON_AddTrueToObject(mqtt_status, "connected");
             break;
     }
+    cJSON_AddStringToObject(mqtt_status, "last_error", get_mqtt_last_error());
     cJSON_AddItemToObject(status, "mqtt_service", mqtt_status);
 
     cJSON *ntp_status = cJSON_CreateObject();

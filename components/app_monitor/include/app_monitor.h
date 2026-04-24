@@ -69,6 +69,7 @@ typedef struct {
     char time_warning[96];
     bool mqtt_enabled;
     bool mqtt_connected;
+    char mqtt_last_error[96];
     bool ntp_enabled;
     bool ntp_sync;
 } app_status_event_t;

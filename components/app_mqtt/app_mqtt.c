@@ -69,12 +69,38 @@ static QueueHandle_t s_command_queue;
 static bool s_mqtt_enabled;
 static bool s_mqtt_connected;
 static bool s_discovery_published;
+static char s_mqtt_last_error[96];
 static char s_broker_uri[96];
 static char s_availability_topic[96];
 static mqtt_runtime_config_t s_runtime_config;
 static bool s_runtime_config_valid;
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
+
+static const char *mqtt_connect_return_code_to_string(esp_mqtt_connect_return_code_t code)
+{
+    switch (code) {
+        case MQTT_CONNECTION_ACCEPTED:
+            return "accepted";
+        case MQTT_CONNECTION_REFUSE_PROTOCOL:
+            return "wrong protocol version";
+        case MQTT_CONNECTION_REFUSE_ID_REJECTED:
+            return "client ID rejected";
+        case MQTT_CONNECTION_REFUSE_SERVER_UNAVAILABLE:
+            return "server unavailable";
+        case MQTT_CONNECTION_REFUSE_BAD_USERNAME:
+            return "bad username or password";
+        case MQTT_CONNECTION_REFUSE_NOT_AUTHORIZED:
+            return "not authorized";
+        default:
+            return "unknown";
+    }
+}
+
+static void mqtt_set_last_error(const char *message)
+{
+    strlcpy(s_mqtt_last_error, message != NULL ? message : "", sizeof(s_mqtt_last_error));
+}
 
 static const char *pump_state_to_string(pump_state_t state)
 {
@@ -422,6 +448,7 @@ static void mqtt_stop_client(void)
     s_mqtt_enabled = false;
     s_mqtt_connected = false;
     s_discovery_published = false;
+    mqtt_set_last_error("");
     s_broker_uri[0] = '\0';
     s_availability_topic[0] = '\0';
 }
@@ -652,6 +679,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "MQTT connected");
             s_mqtt_connected = true;
             s_discovery_published = false;
+            mqtt_set_last_error("");
             app_events_dispatch_system(MQTT_CONNECTED, NULL, 0);
             subscribe_topics();
             publish_availability("online");
@@ -676,6 +704,25 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             break;
         case MQTT_EVENT_ERROR:
             ESP_LOGW(TAG, "MQTT error event");
+            if (event != NULL && event->error_handle != NULL) {
+                if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+                    char message[96];
+                    snprintf(message, sizeof(message),
+                             "Connection refused: %s",
+                             mqtt_connect_return_code_to_string(event->error_handle->connect_return_code));
+                    mqtt_set_last_error(message);
+                } else if (event->error_handle->esp_transport_sock_errno != 0) {
+                    char message[96];
+                    snprintf(message, sizeof(message),
+                             "Transport error: errno %d",
+                             event->error_handle->esp_transport_sock_errno);
+                    mqtt_set_last_error(message);
+                } else {
+                    mqtt_set_last_error("MQTT connection failed");
+                }
+            } else {
+                mqtt_set_last_error("MQTT connection failed");
+            }
             break;
         default:
             break;
@@ -786,6 +833,7 @@ void app_mqtt_task(void *pvParameters)
     s_mqtt_connected = false;
     s_discovery_published = false;
     s_runtime_config_valid = false;
+    mqtt_set_last_error("");
 
     s_status_timer = xTimerCreate("mqtt_status_timer",
                                   pdMS_TO_TICKS(30000),
@@ -823,4 +871,9 @@ mqtt_service_status_t get_mqtt_status(void)
     }
 
     return MQTT_DISABLED;
+}
+
+const char *get_mqtt_last_error(void)
+{
+    return s_mqtt_last_error;
 }

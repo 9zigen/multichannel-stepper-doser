@@ -1,13 +1,17 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.tsx';
-import { Clock3, Globe2, RadioTower, RefreshCcw } from 'lucide-react';
+import { AlertCircle, Clock3, Globe2, RadioTower, RefreshCcw } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx';
 
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import ServicesForm from '@/components/services-form';
 
 const ServicesPage: React.FC = (): React.ReactElement => {
   const serviceState = useAppStore((state: AppStoreState) => state.settings.services);
+  const status = useAppStore((state: AppStoreState) => state.status);
+  const mqttError = status.mqtt_service.last_error?.trim() ?? '';
+  const showMqttError = serviceState.enable_mqtt && !status.mqtt_service.connected && mqttError.length > 0;
 
   return (
     <div className="flex flex-col gap-4 py-2 md:py-3">
@@ -39,6 +43,17 @@ const ServicesPage: React.FC = (): React.ReactElement => {
             </div>
           </CardHeader>
           <CardContent>
+            {showMqttError ? (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="size-4" />
+                <AlertTitle>MQTT authentication failed</AlertTitle>
+                <AlertDescription>
+                  {mqttError}
+                  {' '}
+                  Check the broker host, username, and password in MQTT Telemetry.
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <ServicesForm services={serviceState} />
           </CardContent>
         </Card>

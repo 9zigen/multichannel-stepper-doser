@@ -12,3 +12,4 @@ typedef enum {
 
 void app_mqtt_task(void *pvParameters);
 mqtt_service_status_t get_mqtt_status(void);
+const char *get_mqtt_last_error(void);

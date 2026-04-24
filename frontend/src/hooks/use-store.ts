@@ -105,7 +105,7 @@ const defaultStatus: StatusState = {
   ap_ip_address: '',
   ap_mac_address: '',
   ap_clients: 0,
-  mqtt_service: { enabled: false, connected: false },
+  mqtt_service: { enabled: false, connected: false, last_error: '' },
   ntp_service: { enabled: true, sync: true },
   firmware_version: '',
   firmware_date: '',

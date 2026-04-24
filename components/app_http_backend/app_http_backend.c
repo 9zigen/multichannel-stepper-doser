@@ -236,6 +236,7 @@ static void app_http_ws_status_changed_event_handler(void *arg, esp_event_base_t
         cJSON *mqtt_status = cJSON_CreateObject();
         cJSON_AddBoolToObject(mqtt_status, "enabled", status_event->mqtt_enabled);
         cJSON_AddBoolToObject(mqtt_status, "connected", status_event->mqtt_connected);
+        cJSON_AddStringToObject(mqtt_status, "last_error", status_event->mqtt_last_error);
         cJSON_AddItemToObject(status, "mqtt_service", mqtt_status);
     }
     if (status_event->changed_mask & APP_STATUS_CHANGED_NTP_SERVICE) {

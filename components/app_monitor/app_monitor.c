@@ -41,6 +41,7 @@ typedef enum {
 } mqtt_service_status_t;
 
 extern mqtt_service_status_t get_mqtt_status(void);
+extern const char *get_mqtt_last_error(void);
 
 static uint8_t monitor_storage_i2c_addr(void)
 {
@@ -235,6 +236,7 @@ static void monitor_capture_status_event(app_status_event_t *event)
     mqtt_status = get_mqtt_status();
     event->mqtt_enabled = mqtt_status != MQTT_DISABLED;
     event->mqtt_connected = mqtt_status == MQTT_ENABLED_CONNECTED;
+    strlcpy(event->mqtt_last_error, get_mqtt_last_error(), sizeof(event->mqtt_last_error));
     event->ntp_enabled = services->enable_ntp;
     event->ntp_sync = get_ntp_sync_status() != 0;
 }
@@ -317,7 +319,8 @@ static uint32_t monitor_detect_status_changes(const app_status_event_t *current)
         changed_mask |= APP_STATUS_CHANGED_TIME_WARNING;
     }
     if (last_status_event.mqtt_enabled != current->mqtt_enabled ||
-        last_status_event.mqtt_connected != current->mqtt_connected) {
+        last_status_event.mqtt_connected != current->mqtt_connected ||
+        strcmp(last_status_event.mqtt_last_error, current->mqtt_last_error) != 0) {
         changed_mask |= APP_STATUS_CHANGED_MQTT_SERVICE;
     }
     if (last_status_event.ntp_enabled != current->ntp_enabled ||

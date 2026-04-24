@@ -111,8 +111,11 @@ static const app_time_zone_entry_t APP_TIME_ZONES[] = {
 static void initialize_sntp(services_t *config);
 static void app_time_reconfigure_services(const services_t *services, bool restart_sntp);
 static void app_time_finalize_ntp_sync(void);
+static bool app_time_wait_for_wifi(uint32_t timeout_ms);
+static bool app_time_wait_for_sntp_sync(uint32_t timeout_ms);
 static void app_time_cancel_ntp_wait_task(void);
 static void app_time_start_ntp_wait_task(void);
+static void app_time_apply_ntp_settings(const services_t *services, bool async_wait);
 static void app_time_wait_for_sync_task(void *arg);
 
 static const char *app_time_lookup_tz(const char *time_zone_name)
@@ -162,12 +165,13 @@ static void app_time_apply_timezone(const services_t *services)
     ESP_LOGI(TAG, "new TZ is: %s", getenv("TZ"));
 }
 
-static void app_time_apply_ntp_settings(const services_t *services)
+static bool app_time_ntp_enabled(const services_t *services)
 {
-    if (services == NULL) {
-        return;
-    }
+    return services != NULL && services->enable_ntp && strlen(services->ntp_server) > 5;
+}
 
+static void app_time_stop_sntp(void)
+{
     app_time_cancel_ntp_wait_task();
 
     if (esp_sntp_enabled()) {
@@ -176,10 +180,21 @@ static void app_time_apply_ntp_settings(const services_t *services)
     }
 
     ntp_sync = 0;
+}
 
-    if (services->enable_ntp && strlen(services->ntp_server) > 5) {
+static void app_time_apply_ntp_settings(const services_t *services, bool async_wait)
+{
+    if (services == NULL) {
+        return;
+    }
+
+    app_time_stop_sntp();
+
+    if (app_time_ntp_enabled(services)) {
         initialize_sntp((services_t *)services);
-        app_time_start_ntp_wait_task();
+        if (async_wait) {
+            app_time_start_ntp_wait_task();
+        }
     } else {
         ESP_LOGI(TAG, "SNTP disabled by services settings");
     }
@@ -196,7 +211,7 @@ static void app_time_reconfigure_services(const services_t *services, bool resta
     app_time_apply_timezone(services);
 
     if (restart_sntp) {
-        app_time_apply_ntp_settings(services);
+        app_time_apply_ntp_settings(services, true);
     } else {
         app_time_refresh_validity_from_system_clock();
     }
@@ -233,7 +248,7 @@ static void time_sync_notification_cb(struct timeval *tv)
 
 static void initialize_sntp(services_t *config)
 {
-    ESP_LOGI(TAG, "Initializing SNTP");
+    ESP_LOGI(TAG, "Starting SNTP with server %s", config->ntp_server);
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, config->ntp_server);
     esp_sntp_set_time_sync_notification_cb(time_sync_notification_cb);
@@ -288,6 +303,38 @@ static void app_time_cancel_ntp_wait_task(void)
     }
 }
 
+static bool app_time_wait_for_wifi(uint32_t timeout_ms)
+{
+    EventBits_t bits = xEventGroupWaitBits(
+        wifi_event_group,
+        WIFI_CONNECTED_BIT,
+        false,
+        true,
+        pdMS_TO_TICKS(timeout_ms));
+
+    return (bits & WIFI_CONNECTED_BIT) != 0;
+}
+
+static bool app_time_wait_for_sntp_sync(uint32_t timeout_ms)
+{
+    const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(timeout_ms);
+
+    ESP_LOGI(TAG, "Waiting up to %lu ms for SNTP sync", (unsigned long)timeout_ms);
+
+    while (xTaskGetTickCount() < deadline) {
+        sntp_sync_status_t sync_status = esp_sntp_get_sync_status();
+        if (ntp_sync || sync_status == SNTP_SYNC_STATUS_COMPLETED) {
+            app_time_finalize_ntp_sync();
+            return app_time_is_valid();
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+
+    app_time_refresh_validity_from_system_clock();
+    return false;
+}
+
 static void app_time_start_ntp_wait_task(void)
 {
     if (ntp_wait_task_handle != NULL) {
@@ -312,34 +359,20 @@ static void app_time_wait_for_sync_task(void *arg)
 {
     (void)arg;
 
-    EventBits_t bits = xEventGroupWaitBits(
-        wifi_event_group,
-        WIFI_CONNECTED_BIT,
-        false,
-        true,
-        pdMS_TO_TICKS(30000));
+    if (!app_time_ntp_enabled(get_service_config())) {
+        ntp_wait_task_handle = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
 
-    if ((bits & WIFI_CONNECTED_BIT) == 0) {
+    if (!app_time_wait_for_wifi(30000)) {
         ESP_LOGW(TAG, "Timed out waiting for Wi-Fi before SNTP sync");
         ntp_wait_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
 
-    int retry = 0;
-    sntp_sync_status_t sync_status = SNTP_SYNC_STATUS_RESET;
-
-    while ((sync_status = esp_sntp_get_sync_status()) == SNTP_SYNC_STATUS_RESET &&
-           !ntp_sync &&
-           ++retry < APP_TIME_SNTP_WAIT_RETRIES) {
-        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, APP_TIME_SNTP_WAIT_RETRIES);
-        vTaskDelay(pdMS_TO_TICKS(APP_TIME_SNTP_WAIT_INTERVAL_MS));
-    }
-
-    if (ntp_sync || sync_status == SNTP_SYNC_STATUS_COMPLETED || sync_status == SNTP_SYNC_STATUS_IN_PROGRESS) {
-        app_time_finalize_ntp_sync();
-    } else {
-        app_time_refresh_validity_from_system_clock();
+    if (!app_time_wait_for_sntp_sync(APP_TIME_SNTP_WAIT_RETRIES * APP_TIME_SNTP_WAIT_INTERVAL_MS)) {
         ESP_LOGW(TAG, "SNTP sync did not complete after enabling NTP at runtime");
     }
 
@@ -349,36 +382,29 @@ static void app_time_wait_for_sync_task(void *arg)
 
 static void obtain_time(void)
 {
-    xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT, false, true, 1000 * 30 / portTICK_PERIOD_MS);
-
     services_t *services = get_service_config();
 
-    if (services->enable_ntp && strlen(services->ntp_server) > 5) {
-        app_time_apply_ntp_settings(services);
+    if (!app_time_ntp_enabled(services)) {
+        app_time_refresh_validity_from_system_clock();
+        return;
     }
 
-    time_t now = 0;
-    struct tm timeinfo = {0};
-    int retry = 0;
-    const int retry_count = 10;
-
-    while (esp_sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET && ++retry < retry_count) {
-        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+    if (!app_time_wait_for_wifi(30000)) {
+        ESP_LOGW(TAG, "Timed out waiting for Wi-Fi before startup SNTP sync");
+        app_time_refresh_validity_from_system_clock();
+        return;
     }
 
-    time(&now);
-    localtime_r(&now, &timeinfo);
-
-    if (retry < retry_count) {
-        ntp_sync = 1;
+    app_time_apply_ntp_settings(services, false);
+    if (!app_time_wait_for_sntp_sync(APP_TIME_SNTP_WAIT_RETRIES * APP_TIME_SNTP_WAIT_INTERVAL_MS)) {
+        ESP_LOGW(TAG, "Startup SNTP sync did not complete");
     }
 }
 
 void init_clock(void)
 {
-    time_t now;
-    struct tm timeinfo;
+    time_t now = 0;
+    struct tm timeinfo = {0};
     char strftime_buf[64];
 
     services_t *services = get_service_config();
@@ -428,32 +454,6 @@ void init_clock(void)
     if (services->enable_ntp) {
         ESP_LOGI(TAG, "Connecting to WiFi and getting time over NTP.");
         obtain_time();
-
-        if (ntp_sync) {
-            time(&now);
-            localtime_r(&now, &timeinfo);
-
-            strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-            ESP_LOGI(TAG, "The NTP date/time is: %s", strftime_buf);
-            time_valid = app_time_is_datetime_valid(&timeinfo);
-
-            datetime.year = 1900 + timeinfo.tm_year - 2000;
-            datetime.month = timeinfo.tm_mon + 1;
-            datetime.day = timeinfo.tm_mday;
-            datetime.weekday = timeinfo.tm_wday + 1;
-            datetime.hour = timeinfo.tm_hour;
-            datetime.min = timeinfo.tm_min;
-            datetime.sec = timeinfo.tm_sec;
-
-            if (rtc_chip_available) {
-                mcp7940_set_datetime(&datetime);
-                rtc_backend = "MCP7940 RTC";
-                rtc_fallback = false;
-            } else {
-                rtc_backend = "NTP fallback";
-                rtc_fallback = true;
-            }
-        }
     } else {
         ESP_LOGI(TAG, "NTP Disabled. Will use local available time source.");
     }

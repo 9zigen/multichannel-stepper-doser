@@ -318,7 +318,7 @@ const initialState: MockState = {
     ap_ip_address: '192.168.4.1',
     ap_mac_address: '0A:EE:00:00:01:91',
     ap_clients: 1,
-    mqtt_service: { enabled: false, connected: false },
+    mqtt_service: { enabled: false, connected: false, last_error: '' },
     ntp_service: { enabled: true, sync: true },
     firmware_version: '1.1-dirty',
     firmware_date: '20/03/2026 11:02AM',

@@ -203,7 +203,7 @@ export type StatusState = {
   ap_ip_address: string;
   ap_mac_address: string;
   ap_clients: number;
-  mqtt_service: { enabled: boolean; connected: boolean };
+  mqtt_service: { enabled: boolean; connected: boolean; last_error?: string };
   ntp_service: { enabled: boolean; sync: boolean };
   firmware_version: string;
   firmware_date: string;
