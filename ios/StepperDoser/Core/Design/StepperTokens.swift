@@ -44,8 +44,8 @@ enum StepperColor {
     static let secondary       = Color(uiColor: .adaptive(dark: 0x1e293b, light: 0xdde6f0))
     static let secondaryForeground = Color(uiColor: .adaptive(dark: 0xe2e8f0, light: 0x0f172a))
     static let muted           = Color(uiColor: .adaptive(dark: 0x1e293b, light: 0xdde6f0))
-    /// Subdued / placeholder text
-    static let mutedForeground = Color(uiColor: .adaptive(dark: 0x64748b, light: 0x64748b))
+    /// Subdued / placeholder text — slate-400 on dark, slate-600 on light
+    static let mutedForeground = Color(uiColor: .adaptive(dark: 0x94a3b8, light: 0x475569))
     /// Tab bar / side rail surface
     static let sidebar         = Color(uiColor: .adaptive(dark: 0x0f1318, light: 0xf1f5f9))
 
@@ -145,16 +145,16 @@ enum StepperFont {
     /// Body / form field text
     static let body         = Font.system(size: 15)
     /// Secondary text — table cells, descriptions
-    static let small        = Font.system(size: 13)
+    static let small        = Font.system(size: 14)
     /// Uppercase micro labels — section headers, tile labels
-    static let micro        = Font.system(size: 10, weight: .medium)
-    /// Nano — heatmap axes, legend
-    static let nano         = Font.system(size: 9)
+    static let micro        = Font.system(size: 11, weight: .medium)
+    /// Nano — heatmap axes, legend (minimum readable size)
+    static let nano         = Font.system(size: 11)
     /// Help text / captions beneath form fields
-    static let caption      = Font.system(size: 12)
+    static let caption      = Font.system(size: 13)
     /// Monospaced numeric — IP addresses, firmware hashes
     static let mono         = Font.system(size: 13, weight: .medium, design: .monospaced)
-    static let monoSmall    = Font.system(size: 11, weight: .medium, design: .monospaced)
+    static let monoSmall    = Font.system(size: 12, weight: .medium, design: .monospaced)
 }
 
 enum StepperBadgeTone {
@@ -721,13 +721,18 @@ struct StepperSelectionChip: View {
     let title: String
     let isSelected: Bool
     var monospace: Bool = false
+    /// `true` (default) — chip expands to fill its parent (use in fixed HStack grids).
+    /// `false` — chip sizes to its content width (use inside ScrollView(.horizontal)).
+    var expand: Bool = true
 
     var body: some View {
         Text(title)
             .font(monospace ? StepperFont.monoSmall : StepperFont.small)
             .foregroundStyle(isSelected ? StepperColor.primaryForeground : StepperColor.foreground)
-            .frame(maxWidth: .infinity)
+            .lineLimit(1)
+            .padding(.horizontal, expand ? 0 : StepperSpacing.xl)
             .padding(.vertical, 8)
+            .frame(maxWidth: expand ? .infinity : nil)
             .background(
                 RoundedRectangle(cornerRadius: StepperRadius.lg, style: .continuous)
                     .fill(isSelected ? StepperColor.primary : StepperColor.secondary.opacity(0.24))

@@ -28,17 +28,20 @@ struct HistoryView: View {
                 if let history = session.history, !history.pumps.isEmpty, let selectedPump {
                     StepperPanel {
                         StepperSectionLabel(text: "Pump")
-                        HStack(spacing: StepperSpacing.xs) {
-                            ForEach(history.pumps) { pump in
-                                Button {
-                                    selectPump(pump.id)
-                                } label: {
-                                    StepperSelectionChip(
-                                        title: pump.name,
-                                        isSelected: pump.id == selectedPumpID
-                                    )
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: StepperSpacing.xs) {
+                                ForEach(history.pumps) { pump in
+                                    Button {
+                                        selectPump(pump.id)
+                                    } label: {
+                                        StepperSelectionChip(
+                                            title: pump.name,
+                                            isSelected: pump.id == selectedPumpID,
+                                            expand: false
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }

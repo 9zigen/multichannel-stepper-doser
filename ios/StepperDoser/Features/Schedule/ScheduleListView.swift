@@ -39,17 +39,20 @@ struct ScheduleListView: View {
                 } else if let selectedPump {
                     StepperPanel {
                         StepperSectionLabel(text: "Pump")
-                        HStack(spacing: StepperSpacing.xs) {
-                            ForEach(pumps) { pump in
-                                Button {
-                                    selectPump(pump.id)
-                                } label: {
-                                    StepperSelectionChip(
-                                        title: pump.name,
-                                        isSelected: pump.id == selectedPumpID
-                                    )
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: StepperSpacing.xs) {
+                                ForEach(pumps) { pump in
+                                    Button {
+                                        selectPump(pump.id)
+                                    } label: {
+                                        StepperSelectionChip(
+                                            title: pump.name,
+                                            isSelected: pump.id == selectedPumpID,
+                                            expand: false
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
