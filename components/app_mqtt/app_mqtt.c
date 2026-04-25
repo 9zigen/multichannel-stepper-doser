@@ -226,6 +226,13 @@ static void publish_json_topic(const char *topic, cJSON *root, int qos, int reta
     cJSON_Delete(root);
 }
 
+static void mqtt_add_rounded_number(cJSON *root, const char *name, double value)
+{
+    char number[24];
+    snprintf(number, sizeof(number), "%.2f", value);
+    cJSON_AddRawToObject(root, name, number);
+}
+
 static mqtt_pump_snapshot_t build_pump_snapshot(uint8_t pump_id)
 {
     const pumps_status_t *runtime = get_pumps_runtime_status();
@@ -325,10 +332,10 @@ static void publish_pump_state(uint8_t pump_id)
     cJSON_AddBoolToObject(root, "direction", snapshot.direction);
     cJSON_AddNumberToObject(root, "remaining_ticks", snapshot.remaining_ticks);
     cJSON_AddNumberToObject(root, "remaining_seconds", snapshot.remaining_seconds);
-    cJSON_AddNumberToObject(root, "volume_ml", snapshot.volume_ml);
-    cJSON_AddNumberToObject(root, "tank_current_vol", snapshot.tank_current_vol);
+    mqtt_add_rounded_number(root, "volume_ml", snapshot.volume_ml);
+    mqtt_add_rounded_number(root, "tank_current_vol", snapshot.tank_current_vol);
     cJSON_AddNumberToObject(root, "tank_full_vol", snapshot.tank_full_vol);
-    cJSON_AddNumberToObject(root, "running_hours", snapshot.running_hours);
+    mqtt_add_rounded_number(root, "running_hours", snapshot.running_hours);
 
     publish_json_topic(topic, root, services->mqtt_qos, services->mqtt_retain);
 }
