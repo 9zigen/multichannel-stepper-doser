@@ -1,8 +1,22 @@
 import React from 'react';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 
-import type { PumpHistoryDay, PumpState } from '@/lib/api.ts';
+import { resetPumpsHistoryTodayScheduled } from '@/lib/api.ts';
+import type { PumpHistoryDay, PumpHistoryResetResponse, PumpState } from '@/lib/api.ts';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePumpHistory } from './pump-history/use-pump-history';
 import PumpSelector from './pump-history/pump-selector';
@@ -18,8 +32,9 @@ type PumpHistoryCardProps = {
 const getLastDay = (days: PumpHistoryDay[]) => (days.length > 0 ? days[days.length - 1] : null);
 
 const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement => {
-  const { loading, historyPumps, selectedPump, setSelectedPumpId } = usePumpHistory(pumps);
+  const { history, loading, historyPumps, selectedPump, setSelectedPumpId, reloadHistory } = usePumpHistory(pumps);
   const [selectedDayStamp, setSelectedDayStamp] = React.useState<number | null>(null);
+  const [isResettingToday, setIsResettingToday] = React.useState(false);
 
   React.useEffect(() => {
     if (!selectedPump) return;
@@ -48,6 +63,26 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
     [selectedPump],
   );
 
+  const isTodaySelected = selectedDay?.day_stamp === history?.current_day_stamp;
+
+  const resetTodayScheduledHistory = async () => {
+    if (!selectedPump || !isTodaySelected) {
+      return;
+    }
+
+    try {
+      setIsResettingToday(true);
+      await resetPumpsHistoryTodayScheduled<PumpHistoryResetResponse>(selectedPump.id);
+      await reloadHistory();
+      toast.success(`${selectedPump.name} scheduled history reset for today.`);
+    } catch (error) {
+      console.error(error);
+      toast.error('Scheduled history reset failed.');
+    } finally {
+      setIsResettingToday(false);
+    }
+  };
+
   return (
     <Card className="flex h-full flex-col overflow-hidden border-border/50 bg-card/80 backdrop-blur-sm shadow-sm">
       <CardHeader className="pb-3">
@@ -59,6 +94,37 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="tabular-nums">{totalVolume} ml</Badge>
             <Badge variant="outline" className="tabular-nums">{activeDays} active days</Badge>
+            {selectedPump && selectedDay && isTodaySelected && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 text-xs"
+                    disabled={loading || isResettingToday}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    Reset today
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Reset today&apos;s scheduled history?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Reset today&apos;s scheduled dosing history for {selectedPump.name}? Manual dosing history will be
+                      preserved. If the current hour is active, the schedule may dose again.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isResettingToday}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={resetTodayScheduledHistory} disabled={isResettingToday}>
+                      {isResettingToday ? 'Resetting...' : 'Reset scheduled history'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
         <PumpSelector

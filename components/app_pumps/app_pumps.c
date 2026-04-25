@@ -446,6 +446,51 @@ static void vBackupTimerHandler(TimerHandle_t pxTimer)
     }
 }
 
+static uint32_t schedule_remaining_work_slots_today(const schedule_t *schedule,
+                                                    uint8_t current_hour,
+                                                    uint32_t last_run_hour)
+{
+    if (schedule == NULL || current_hour >= 24) {
+        return 0;
+    }
+
+    uint32_t slots = 0;
+    for (uint8_t hour = current_hour; hour < 24; ++hour) {
+        if ((schedule->work_hours & (1UL << hour)) == 0) {
+            continue;
+        }
+        if (hour == current_hour && last_run_hour == current_hour) {
+            continue;
+        }
+        slots++;
+    }
+
+    return slots;
+}
+
+static double schedule_next_dose_volume_ml(const schedule_t *schedule,
+                                           uint8_t current_hour,
+                                           uint32_t last_run_hour)
+{
+    if (schedule == NULL || schedule->pump_id >= MAX_PUMP || schedule->day_volume == 0) {
+        return 0.0;
+    }
+
+    const double scheduled_today_ml =
+        app_pumps_history_get_pump_scheduled_day_volume_ml(schedule->pump_id);
+    if (scheduled_today_ml >= (double)schedule->day_volume) {
+        return 0.0;
+    }
+
+    const uint32_t remaining_slots =
+        schedule_remaining_work_slots_today(schedule, current_hour, last_run_hour);
+    if (remaining_slots == 0) {
+        return 0.0;
+    }
+
+    return ((double)schedule->day_volume - scheduled_today_ml) / (double)remaining_slots;
+}
+
 static void vScheduleTimerHandler(TimerHandle_t pxTimer)
 {
     (void)pxTimer;
@@ -524,23 +569,22 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
         if (last_run_schedule_hour[j] != (uint32_t)time_info.tm_hour &&
             (schedule->week_days & (1 << time_info.tm_wday)) &&
             (schedule->work_hours & (1 << time_info.tm_hour))) {
-            last_run_schedule_day_stamp = current_day_stamp;
-            last_run_schedule_hour[j] = time_info.tm_hour;
-
-            double total_work_hours = 0.0;
-            for (uint8_t h = 0; h < 24; h++) {
-                if (schedule->work_hours & (1 << h)) {
-                    total_work_hours++;
-                }
+            double volume = schedule_next_dose_volume_ml(schedule,
+                                                         (uint8_t)time_info.tm_hour,
+                                                         last_run_schedule_hour[j]);
+            if (volume <= 0.0) {
+                ESP_LOGI(TAG, "schedule:%u pump:%u has no remaining periodic volume today",
+                         (unsigned)j,
+                         (unsigned)schedule->pump_id);
+                continue;
             }
 
-            double volume = 0.0;
-            if (total_work_hours > 0.0) {
-                volume = (double)schedule->day_volume / total_work_hours;
-            }
-
-            ESP_LOGD(TAG, "schedule:%d speed:%02f, workH:%f, Dvol:%lu, Hvol:%f",
-                     schedule->pump_id, schedule->speed, total_work_hours, schedule->day_volume, volume);
+            ESP_LOGD(TAG, "schedule:%u pump:%u speed:%.2f Dvol:%lu nextDose:%.2f",
+                     (unsigned)j,
+                     (unsigned)schedule->pump_id,
+                     schedule->speed,
+                     (unsigned long)schedule->day_volume,
+                     volume);
 
             char schedule_error[96];
             esp_err_t validation = app_pumps_validate_periodic_schedule(schedule->pump_id, schedule->speed,
@@ -554,12 +598,46 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
                 continue;
             }
 
+            last_run_schedule_day_stamp = current_day_stamp;
+            last_run_schedule_hour[j] = time_info.tm_hour;
             run_pump_on_volume(schedule->pump_id, volume, schedule->speed);
 
             app_pumps_storage_save_schedule_state(last_run_schedule_day_stamp, last_run_schedule_hour);
             break;
         }
     }
+}
+
+bool app_pumps_clear_today_schedule_run_marker(uint8_t pump_id)
+{
+    if (pump_id >= MAX_PUMP) {
+        return false;
+    }
+
+    const uint32_t current_day_stamp = app_pumps_current_local_day_stamp();
+    if (last_run_schedule_day_stamp != current_day_stamp) {
+        last_run_schedule_day_stamp = current_day_stamp;
+        for (uint8_t schedule_id = 0; schedule_id < MAX_SCHEDULE; ++schedule_id) {
+            last_run_schedule_hour[schedule_id] = 0xff;
+        }
+        app_pumps_storage_save_schedule_state(last_run_schedule_day_stamp, last_run_schedule_hour);
+        return true;
+    }
+
+    bool changed = false;
+    for (uint8_t schedule_id = 0; schedule_id < MAX_SCHEDULE; ++schedule_id) {
+        schedule_t *schedule = get_schedule_config(schedule_id);
+        if (schedule->pump_id == pump_id && last_run_schedule_hour[schedule_id] != 0xff) {
+            last_run_schedule_hour[schedule_id] = 0xff;
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        app_pumps_storage_save_schedule_state(last_run_schedule_day_stamp, last_run_schedule_hour);
+    }
+
+    return true;
 }
 
 esp_err_t app_pumps_register_backend(const app_pumps_backend_t *backend)

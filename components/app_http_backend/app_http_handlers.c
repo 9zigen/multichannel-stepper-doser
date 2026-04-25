@@ -902,6 +902,96 @@ esp_err_t pumps_history_backup_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t pumps_history_today_reset_post_handler(httpd_req_t *req)
+{
+    if (app_http_validate_request(req) != ESP_OK) {
+        send_unauthorized(req);
+        return ESP_OK;
+    }
+
+    app_http_set_cors_headers(req);
+
+    if (req->content_len == 0 || req->content_len >= SCRATCH_BUFSIZE) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid reset payload");
+        return ESP_OK;
+    }
+
+    char *buf = malloc(req->content_len + 1);
+    if (buf == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_OK;
+    }
+
+    int total_len = (int)req->content_len;
+    int cur_len = 0;
+    while (cur_len < total_len) {
+        int received = httpd_req_recv(req, buf + cur_len, total_len - cur_len);
+        if (received <= 0) {
+            free(buf);
+            return ESP_FAIL;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON *pump_id_json = cJSON_GetObjectItem(root, "pump_id");
+    cJSON *scope_json = cJSON_GetObjectItem(root, "scope");
+    if (!cJSON_IsNumber(pump_id_json) || pump_id_json->valueint < 0 || pump_id_json->valueint >= MAX_PUMP ||
+        !cJSON_IsString(scope_json) || scope_json->valuestring == NULL ||
+        strcmp(scope_json->valuestring, "scheduled") != 0) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Expected pump_id and scope=scheduled");
+        return ESP_OK;
+    }
+
+    const uint8_t pump_id = (uint8_t)pump_id_json->valueint;
+    cJSON_Delete(root);
+
+    const pumps_status_t *runtime = get_pumps_runtime_status();
+    if (runtime != NULL && runtime[pump_id].state != PUMP_OFF) {
+        httpd_resp_set_status(req, "409 Conflict");
+        httpd_resp_send(req, "Pump is running", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+
+    uint32_t day_stamp = 0;
+    esp_err_t err = app_pumps_history_reset_today_scheduled(pump_id, &day_stamp);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to reset scheduled history");
+        return ESP_OK;
+    }
+
+    bool reset_last_run = app_pumps_clear_today_schedule_run_marker(pump_id);
+
+    cJSON *response_json = cJSON_CreateObject();
+    if (response_json == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to build response");
+        return ESP_OK;
+    }
+    cJSON_AddBoolToObject(response_json, "success", true);
+    cJSON_AddNumberToObject(response_json, "pump_id", pump_id);
+    cJSON_AddNumberToObject(response_json, "day_stamp", day_stamp);
+    cJSON_AddBoolToObject(response_json, "reset_last_run", reset_last_run);
+    char *response = cJSON_PrintUnformatted(response_json);
+    cJSON_Delete(response_json);
+    if (response == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to build response");
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, response, (ssize_t)strlen(response));
+    free(response);
+    return ESP_OK;
+}
+
 esp_err_t websocket_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {

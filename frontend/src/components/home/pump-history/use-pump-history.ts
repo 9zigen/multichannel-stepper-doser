@@ -10,6 +10,7 @@ type UsePumpHistoryResult = {
   selectedPump: PumpHistoryPump | null;
   selectedPumpId: number | null;
   setSelectedPumpId: (id: number) => void;
+  reloadHistory: () => Promise<void>;
   pumps: PumpState[];
 };
 
@@ -18,40 +19,40 @@ export const usePumpHistory = (pumps: PumpState[]): UsePumpHistoryResult => {
   const [loading, setLoading] = React.useState(true);
   const [selectedPumpId, setSelectedPumpId] = React.useState<number | null>(pumps[0]?.id ?? null);
 
+  const loadHistory = React.useCallback(async (canCommit: () => boolean = () => true) => {
+    try {
+      setLoading(true);
+      const response = await getPumpsHistory<PumpHistoryState>();
+      if (!canCommit()) {
+        return;
+      }
+
+      setHistory(response);
+      setSelectedPumpId((current) => current ?? response.pumps[0]?.id ?? null);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      if (canCommit()) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
   React.useEffect(() => {
     let active = true;
 
-    const loadHistory = async () => {
-      try {
-        setLoading(true);
-        const response = await getPumpsHistory<PumpHistoryState>();
-        if (!active) {
-          return;
-        }
-
-        setHistory(response);
-        setSelectedPumpId((current) => current ?? response.pumps[0]?.id ?? null);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
     const handleBackendReady = () => {
-      void loadHistory();
+      void loadHistory(() => active);
     };
 
-    void loadHistory();
+    void loadHistory(() => active);
     window.addEventListener(BACKEND_SYSTEM_READY_EVENT, handleBackendReady);
 
     return () => {
       active = false;
       window.removeEventListener(BACKEND_SYSTEM_READY_EVENT, handleBackendReady);
     };
-  }, []);
+  }, [loadHistory]);
 
   const historyPumps = history?.pumps ?? [];
 
@@ -70,6 +71,7 @@ export const usePumpHistory = (pumps: PumpState[]): UsePumpHistoryResult => {
     selectedPump,
     selectedPumpId,
     setSelectedPumpId,
+    reloadHistory: () => loadHistory(),
     pumps,
   };
 };

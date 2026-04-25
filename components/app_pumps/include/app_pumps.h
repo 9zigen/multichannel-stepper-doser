@@ -146,3 +146,5 @@ uint32_t app_pumps_history_get_current_day_stamp(void);
 bool app_pumps_history_get_day(uint8_t pump_id, uint32_t day_stamp, pump_history_day_t *out_day);
 bool app_pumps_history_get_today(uint8_t pump_id, pump_history_day_t *out_day);
 esp_err_t app_pumps_history_backup(size_t *written_days);
+esp_err_t app_pumps_history_reset_today_scheduled(uint8_t pump_id, uint32_t *day_stamp);
+bool app_pumps_clear_today_schedule_run_marker(uint8_t pump_id);

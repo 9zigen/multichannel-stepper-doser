@@ -24,13 +24,13 @@ const ApiDocsPage: React.FC = (): React.ReactElement => {
         icon: Webhook,
         badge: 'HTTP JSON',
         keywords:
-          'rest api http json endpoints status settings run calibration pumps runtime history upload restart factory reset auth board config post get bearer token authorization safety limits calibration validation',
+          'rest api http json endpoints status settings run calibration pumps runtime history reset upload restart factory reset auth board config post get bearer token authorization safety limits calibration validation',
         content: (
           <>
             <div className="mb-3">
               <div className="mb-1 text-xs font-medium text-muted-foreground">Endpoints</div>
               <Code>
-                {'POST /api/auth\nGET  /api/status\nGET  /api/settings\nPOST /api/settings\nGET  /api/board-config\nPOST /api/board-config\nPOST /api/run\nPOST /api/calibration\nGET  /api/pumps/runtime\nGET  /api/pumps/history\nPOST /api/pumps/history/backup\nPOST /api/device/restart\nPOST /api/device/factory-reset\nPOST /upload'}
+                {'POST /api/auth\nGET  /api/status\nGET  /api/settings\nPOST /api/settings\nGET  /api/board-config\nPOST /api/board-config\nPOST /api/run\nPOST /api/calibration\nGET  /api/pumps/runtime\nGET  /api/pumps/history\nPOST /api/pumps/history/backup\nPOST /api/pumps/history/today/reset\nPOST /api/device/restart\nPOST /api/device/factory-reset\nPOST /upload'}
               </Code>
             </div>
             <div>

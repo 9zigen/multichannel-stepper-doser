@@ -809,6 +809,13 @@ httpd_handle_t start_webserver(void)
             .user_ctx = NULL,
         };
 
+        httpd_uri_t post_pumps_history_today_reset = {
+            .uri = "/api/pumps/history/today/reset",
+            .method = HTTP_POST,
+            .handler = pumps_history_today_reset_post_handler,
+            .user_ctx = NULL,
+        };
+
         httpd_uri_t get_board_config = {
             .uri = "/api/board-config",
             .method = HTTP_GET,
@@ -943,6 +950,7 @@ httpd_handle_t start_webserver(void)
         REGISTER_URI(post_run);
         REGISTER_URI(post_calibrate);
         REGISTER_URI(post_pumps_history_backup);
+        REGISTER_URI(post_pumps_history_today_reset);
         REGISTER_URI(get_schedule);
         REGISTER_URI(post_schedule);
         REGISTER_URI(get_settings);

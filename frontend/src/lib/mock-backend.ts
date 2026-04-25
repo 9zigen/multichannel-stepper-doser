@@ -338,6 +338,7 @@ const initialState: MockState = {
 
 let state = clone(initialState);
 let pumpRuntimeState: Record<number, MockPumpRuntimeState> = {};
+let mockTodayScheduledHistoryResets = new Set<number>();
 
 function formatMockDate(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -346,7 +347,8 @@ function formatMockDate(date: Date) {
 function createHistoryHours(pumpId: number, dayOffset: number): PumpHistoryHour[] {
   return Array.from({ length: 24 }, (_, hour) => {
     const activeWindow = ((hour + pumpId * 3 + dayOffset) % 7) < 3;
-    const scheduledVolume = activeWindow ? 8 + ((pumpId + hour + dayOffset) % 19) : 0;
+    const scheduledReset = dayOffset === 0 && mockTodayScheduledHistoryResets.has(pumpId);
+    const scheduledVolume = activeWindow && !scheduledReset ? 8 + ((pumpId + hour + dayOffset) % 19) : 0;
     const manualVolume = (dayOffset + hour + pumpId) % 17 === 0 ? 4 + ((hour + pumpId) % 9) : 0;
     const runtime = scheduledVolume > 0 || manualVolume > 0 ? 35 + ((hour * 11 + dayOffset * 7 + pumpId * 13) % 520) : 0;
     let flags = 0;
@@ -359,7 +361,7 @@ function createHistoryHours(pumpId: number, dayOffset: number): PumpHistoryHour[
       flags |= 2;
     }
 
-    if ((dayOffset + hour + pumpId) % 29 === 0 && runtime > 0) {
+    if (!scheduledReset && (dayOffset + hour + pumpId) % 29 === 0 && runtime > 0) {
       flags |= 4;
     }
 
@@ -819,6 +821,23 @@ export const mockAdapter: AxiosAdapter = async (config) => {
     return mockResponse;
   }
 
+  if (url === '/api/pumps/history/today/reset' && method === 'post') {
+    ensureAuthorized(config, method, url, requestBody);
+    const payload = parseRequestBody<{ pump_id?: number; scope?: string }>(config.data);
+    if (typeof payload.pump_id !== 'number' || payload.scope !== 'scheduled') {
+      rejectWithStatus(config, 400, { message: 'Expected pump_id and scope=scheduled' }, 'Bad Request');
+    }
+    mockTodayScheduledHistoryResets.add(payload.pump_id);
+    const mockResponse = response(config, {
+      success: true,
+      pump_id: payload.pump_id,
+      day_stamp: getMockPumpHistory().current_day_stamp,
+      reset_last_run: true,
+    });
+    debugRequest(config, { method, url, requestBody, responseBody: mockResponse.data, status: mockResponse.status });
+    return mockResponse;
+  }
+
   if (url === '/api/network/wifi/scan' && method === 'get') {
     ensureAuthorized(config, method, url, requestBody);
     const mockResponse = response(config, { networks: clone(mockWifiNetworks) });
@@ -882,4 +901,5 @@ export const mockAdapter: AxiosAdapter = async (config) => {
 export function resetMockState() {
   state = clone(initialState);
   pumpRuntimeState = {};
+  mockTodayScheduledHistoryResets = new Set<number>();
 }

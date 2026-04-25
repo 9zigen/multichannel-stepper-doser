@@ -2,9 +2,20 @@ import React from 'react';
 import { Controller, ControllerRenderProps, SubmitHandler, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Check, CircleHelp, LoaderCircle } from 'lucide-react';
+import { Check, CircleHelp, LoaderCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { Input } from '@/components/ui/input.tsx';
@@ -13,7 +24,14 @@ import { Toggle } from '@/components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
-import { PumpCalibrationState, PumpState, ScheduleState, SCHEDULE_MODE } from '@/lib/api.ts';
+import {
+  PumpCalibrationState,
+  PumpHistoryResetResponse,
+  PumpState,
+  resetPumpsHistoryTodayScheduled,
+  ScheduleState,
+  SCHEDULE_MODE,
+} from '@/lib/api.ts';
 import {
   formatDaysCount,
   formatHoursCount,
@@ -113,7 +131,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
     field.onChange(value.sort((a: number, b: number) => a - b));
   };
 
-  const onSubmit: SubmitHandler<FormData> = async (data) => {
+  const saveSchedule = async (data: FormData, resetTodayHistory: boolean) => {
     const nextPump: PumpState = {
       ...pump,
       ...data,
@@ -121,13 +139,29 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
     };
 
     if (await updatePump(nextPump, true)) {
+      if (resetTodayHistory) {
+        try {
+          await resetPumpsHistoryTodayScheduled<PumpHistoryResetResponse>(pump.id);
+          toast.success("Schedule saved and today's scheduled history reset.");
+        } catch (error) {
+          console.error(error);
+          toast.error('Schedule saved, but scheduled history reset failed.');
+        }
+      } else {
+        toast.success('Schedule settings saved.');
+      }
       reset(data);
-      toast.success('Schedule settings saved.');
       success?.();
       return;
     }
 
     toast.error('Schedule settings not saved.');
+  };
+
+  const onSubmit: SubmitHandler<FormData> = async (data) => saveSchedule(data, false);
+
+  const saveAndResetTodayHistory = () => {
+    void handleSubmit((data) => saveSchedule(data, true))();
   };
 
   return (
@@ -345,8 +379,41 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
         )}
 
         {/* Submit */}
-        <div className="flex justify-end">
-          <Button type="submit" size="sm" disabled={!isDirty}>
+        <div className="flex flex-wrap justify-end gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!isDirty || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <LoaderCircle className="animate-spin" data-icon="inline-start" />
+                ) : (
+                  <RotateCcw data-icon="inline-start" />
+                )}
+                Reset today + apply
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reset today&apos;s scheduled history and apply?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will save the schedule changes for {pump.name}, clear today&apos;s scheduled dosing history,
+                  and allow the current hour to dose again if the new schedule includes it. Manual dosing history is
+                  preserved.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={saveAndResetTodayHistory} disabled={isSubmitting}>
+                  {isSubmitting ? 'Applying...' : 'Reset today + apply'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button type="submit" size="sm" disabled={!isDirty || isSubmitting}>
             {isSubmitting ? (
               <>
                 <LoaderCircle className="animate-spin" data-icon="inline-start" /> Saving

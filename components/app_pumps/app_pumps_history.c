@@ -211,6 +211,22 @@ double app_pumps_history_get_pump_hour_volume_ml(uint8_t pump_id, uint8_t hour)
            s_today_history_manual_volume_accum[pump_id][hour];
 }
 
+double app_pumps_history_get_pump_scheduled_day_volume_ml(uint8_t pump_id)
+{
+    if (pump_id >= MAX_PUMP) {
+        return 0.0;
+    }
+
+    history_rollover_if_needed();
+
+    double total = 0.0;
+    for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
+        total += s_today_history_scheduled_volume_accum[pump_id][hour];
+    }
+
+    return total;
+}
+
 double app_pumps_history_get_pump_day_volume_ml(uint8_t pump_id)
 {
     if (pump_id >= MAX_PUMP) {
@@ -265,6 +281,48 @@ bool app_pumps_history_get_day(uint8_t pump_id, uint32_t day_stamp, pump_history
     }
 
     return history_load_day_blob(pump_id, day_stamp, out_day) == ESP_OK;
+}
+
+esp_err_t app_pumps_history_reset_today_scheduled(uint8_t pump_id, uint32_t *day_stamp)
+{
+    if (pump_id >= MAX_PUMP) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    history_rollover_if_needed();
+
+    pump_history_day_t *today = &s_today_history[pump_id];
+    pump_history_day_t reset_day = *today;
+    if (reset_day.day_stamp == 0) {
+        history_reset_day(&reset_day, app_pumps_current_local_day_stamp());
+    }
+
+    for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
+        reset_day.hours[hour].scheduled_volume_ml = 0;
+        reset_day.hours[hour].flags &= (uint8_t)~(PUMP_HISTORY_FLAG_SCHEDULED | PUMP_HISTORY_FLAG_CONTINUOUS);
+    }
+
+    esp_err_t err = history_save_day_blob(pump_id, &reset_day);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "failed to reset scheduled history for pump %u day %lu: %s",
+                 (unsigned)pump_id,
+                 (unsigned long)reset_day.day_stamp,
+                 esp_err_to_name(err));
+        return err;
+    }
+
+    *today = reset_day;
+    for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
+        s_today_history_scheduled_volume_accum[pump_id][hour] = 0.0;
+    }
+    s_today_history_dirty[pump_id] = false;
+    if (day_stamp != NULL) {
+        *day_stamp = today->day_stamp;
+    }
+    ESP_LOGI(TAG, "reset scheduled history for pump %u day %lu",
+             (unsigned)pump_id,
+             (unsigned long)today->day_stamp);
+    return ESP_OK;
 }
 
 esp_err_t app_pumps_history_backup(size_t *written_days)

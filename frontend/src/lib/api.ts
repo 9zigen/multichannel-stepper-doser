@@ -296,6 +296,13 @@ export type PumpHistoryState = {
   pumps: PumpHistoryPump[];
 };
 
+export type PumpHistoryResetResponse = {
+  success: boolean;
+  pump_id: number;
+  day_stamp: number;
+  reset_last_run: boolean;
+};
+
 export type SettingsSaveResponse = SettingsState;
 
 export type BoardConfigChannel = {
@@ -388,6 +395,14 @@ export const getBoardConfig = async <T>(): Promise<T> => {
 
 export const getPumpsHistory = async <T>(): Promise<T> => {
   const data = await http.get('/api/pumps/history');
+  return data.data as T;
+};
+
+export const resetPumpsHistoryTodayScheduled = async <T>(pumpId: number): Promise<T> => {
+  const data = await http.post('/api/pumps/history/today/reset', {
+    pump_id: pumpId,
+    scope: 'scheduled',
+  });
   return data.data as T;
 };
 
