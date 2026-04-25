@@ -25,6 +25,7 @@ static const char *TAG = "APP_PUMPS";
 static TimerHandle_t xBackupTimer;
 static TimerHandle_t xScheduleTimer;
 static pumps_status_t pumps[MAX_PUMP];
+static uint32_t last_run_schedule_day_stamp;
 static uint32_t last_run_schedule_hour[MAX_SCHEDULE];
 static const app_pumps_backend_t *s_backend;
 static bool runtime_event_dirty[MAX_PUMP];
@@ -454,6 +455,19 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
     time(&now);
     localtime_r(&now, &time_info);
 
+    const bool time_valid = app_time_is_valid();
+    const uint32_t current_day_stamp = app_pumps_current_local_day_stamp();
+    if (time_valid && last_run_schedule_day_stamp != current_day_stamp) {
+        ESP_LOGI(TAG, "schedule day changed from %lu to %lu, clearing last-run hours",
+                 (unsigned long)last_run_schedule_day_stamp,
+                 (unsigned long)current_day_stamp);
+        last_run_schedule_day_stamp = current_day_stamp;
+        for (uint8_t j = 0; j < MAX_SCHEDULE; ++j) {
+            last_run_schedule_hour[j] = 0xff;
+        }
+        app_pumps_storage_save_schedule_state(last_run_schedule_day_stamp, last_run_schedule_hour);
+    }
+
     bool continuous_mode[MAX_PUMP] = {false};
     for (uint8_t j = 0; j < MAX_SCHEDULE; ++j) {
         schedule_t *schedule = get_schedule_config(j);
@@ -503,13 +517,14 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
             continue;
         }
 
-        if (!app_time_is_valid()) {
+        if (!time_valid) {
             continue;
         }
 
         if (last_run_schedule_hour[j] != (uint32_t)time_info.tm_hour &&
             (schedule->week_days & (1 << time_info.tm_wday)) &&
             (schedule->work_hours & (1 << time_info.tm_hour))) {
+            last_run_schedule_day_stamp = current_day_stamp;
             last_run_schedule_hour[j] = time_info.tm_hour;
 
             double total_work_hours = 0.0;
@@ -541,7 +556,7 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
 
             run_pump_on_volume(schedule->pump_id, volume, schedule->speed);
 
-            app_pumps_storage_save_schedule_state(last_run_schedule_hour);
+            app_pumps_storage_save_schedule_state(last_run_schedule_day_stamp, last_run_schedule_hour);
             break;
         }
     }
@@ -912,7 +927,7 @@ int init_pumps(void)
      * but active pump runs are intentionally not resumed. Operators should see
      * the interrupted state and decide whether another dose is safe.
      */
-    app_pumps_storage_load_schedule_state(last_run_schedule_hour);
+    app_pumps_storage_load_schedule_state(&last_run_schedule_day_stamp, last_run_schedule_hour);
     app_pumps_storage_restore_tank_status();
     app_pumps_history_restore_today_from_backup();
 

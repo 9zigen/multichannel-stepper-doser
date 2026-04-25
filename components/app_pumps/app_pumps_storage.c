@@ -4,7 +4,7 @@
 #include "app_settings.h"
 #include "app_settings_storage.h"
 
-#define APP_PUMPS_SCHEDULE_MAGIC_ADDR 0x31
+#define APP_PUMPS_SCHEDULE_STATE_MAGIC 0x53434832U
 
 static const char *TAG = "APP_PUMPS_STORAGE";
 
@@ -12,6 +12,12 @@ typedef struct {
     uint8_t magic;
     double tank_current_vol[MAX_PUMP];
 } app_pumps_tank_status_t;
+
+typedef struct {
+    uint32_t magic;
+    uint32_t day_stamp;
+    uint32_t last_run_hour[MAX_SCHEDULE];
+} app_pumps_schedule_state_t;
 
 static uint8_t pump_storage_i2c_addr(void)
 {
@@ -68,38 +74,63 @@ bool app_pumps_storage_using_flash_fallback(void)
     return eeprom_using_fallback();
 }
 
-void app_pumps_storage_load_schedule_state(uint32_t last_run_schedule_hour[MAX_SCHEDULE])
+void app_pumps_storage_load_schedule_state(uint32_t *last_run_schedule_day_stamp,
+                                           uint32_t last_run_schedule_hour[MAX_SCHEDULE])
 {
     if (last_run_schedule_hour == NULL) {
         return;
     }
 
-    if (eeprom_read_byte(pump_storage_i2c_addr(), APP_PUMPS_SCHEDULE_MAGIC_ADDR) == EEPROM_MAGIC) {
-        esp_err_t err = eeprom_read(pump_storage_i2c_addr(),
-                                    EEPROM_SCHEDULE_STATUS_ADDR,
-                                    (uint8_t *)last_run_schedule_hour,
-                                    sizeof(uint32_t) * MAX_SCHEDULE);
-        if (err == ESP_OK) {
-            for (uint8_t schedule_id = 0; schedule_id < MAX_SCHEDULE; ++schedule_id) {
-                ESP_LOGI(TAG, "restored schedule last_run:%u:%lu",
-                         (unsigned)schedule_id,
-                         (unsigned long)last_run_schedule_hour[schedule_id]);
-            }
-            return;
-        }
-
-        ESP_LOGW(TAG, "schedule state restore failed: %s", esp_err_to_name(err));
+    const uint32_t current_day_stamp = app_pumps_current_local_day_stamp();
+    if (last_run_schedule_day_stamp != NULL) {
+        *last_run_schedule_day_stamp = current_day_stamp;
     }
-
     for (uint8_t schedule_id = 0; schedule_id < MAX_SCHEDULE; ++schedule_id) {
         last_run_schedule_hour[schedule_id] = 0xff;
     }
+
+    app_pumps_schedule_state_t state = {0};
+    esp_err_t err = eeprom_read(pump_storage_i2c_addr(),
+                                EEPROM_SCHEDULE_STATUS_ADDR,
+                                (uint8_t *)&state,
+                                sizeof(state));
+    if (err != ESP_OK) {
+        ESP_LOGD(TAG, "schedule state restore skipped: %s", esp_err_to_name(err));
+        return;
+    }
+
+    if (state.magic != APP_PUMPS_SCHEDULE_STATE_MAGIC || state.day_stamp != current_day_stamp) {
+        ESP_LOGI(TAG, "schedule state not current (stored_day=%lu current_day=%lu)",
+                 (unsigned long)state.day_stamp,
+                 (unsigned long)current_day_stamp);
+        return;
+    }
+
+    if (last_run_schedule_day_stamp != NULL) {
+        *last_run_schedule_day_stamp = state.day_stamp;
+    }
+    for (uint8_t schedule_id = 0; schedule_id < MAX_SCHEDULE; ++schedule_id) {
+        last_run_schedule_hour[schedule_id] = state.last_run_hour[schedule_id];
+        ESP_LOGI(TAG, "restored schedule last_run:%u:%lu day:%lu",
+                 (unsigned)schedule_id,
+                 (unsigned long)last_run_schedule_hour[schedule_id],
+                 (unsigned long)state.day_stamp);
+    }
 }
 
-esp_err_t app_pumps_storage_save_schedule_state(const uint32_t last_run_schedule_hour[MAX_SCHEDULE])
+esp_err_t app_pumps_storage_save_schedule_state(uint32_t last_run_schedule_day_stamp,
+                                                const uint32_t last_run_schedule_hour[MAX_SCHEDULE])
 {
     if (last_run_schedule_hour == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    app_pumps_schedule_state_t state = {
+        .magic = APP_PUMPS_SCHEDULE_STATE_MAGIC,
+        .day_stamp = last_run_schedule_day_stamp,
+    };
+    for (uint8_t schedule_id = 0; schedule_id < MAX_SCHEDULE; ++schedule_id) {
+        state.last_run_hour[schedule_id] = last_run_schedule_hour[schedule_id];
     }
 
     /*
@@ -109,11 +140,8 @@ esp_err_t app_pumps_storage_save_schedule_state(const uint32_t last_run_schedule
      */
     esp_err_t err = eeprom_write(pump_storage_i2c_addr(),
                                  EEPROM_SCHEDULE_STATUS_ADDR,
-                                 (uint8_t *)last_run_schedule_hour,
-                                 sizeof(uint32_t) * MAX_SCHEDULE);
-    if (err == ESP_OK) {
-        err = eeprom_write_byte(pump_storage_i2c_addr(), APP_PUMPS_SCHEDULE_MAGIC_ADDR, EEPROM_MAGIC);
-    }
+                                 (uint8_t *)&state,
+                                 sizeof(state));
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "schedule state backup failed: %s", esp_err_to_name(err));

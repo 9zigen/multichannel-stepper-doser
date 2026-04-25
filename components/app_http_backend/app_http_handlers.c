@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cJSON.h"
 
@@ -23,6 +24,7 @@
 #include "app_events.h"
 #include "app_interfaces.h"
 #include "app_monitor.h"
+#include "app_pumps.h"
 #include "app_settings.h"
 #include "auth.h"
 #include "connect.h"
@@ -523,6 +525,201 @@ static void send_unauthorized(httpd_req_t *req)
     httpd_resp_send(req, NULL, 0);
 }
 
+static esp_err_t send_history_chunk(httpd_req_t *req, const char *chunk)
+{
+    return httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN);
+}
+
+static esp_err_t flush_history_json_string_chunk(httpd_req_t *req, char *buffer, size_t *used)
+{
+    if (*used == 0) {
+        return ESP_OK;
+    }
+
+    esp_err_t err = httpd_resp_send_chunk(req, buffer, (ssize_t)*used);
+    *used = 0;
+    return err;
+}
+
+static esp_err_t send_history_json_string(httpd_req_t *req, const char *value)
+{
+    if (send_history_chunk(req, "\"") != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    char buffer[96];
+    size_t used = 0;
+    if (value == NULL) {
+        value = "";
+    }
+
+    for (const unsigned char *cursor = (const unsigned char *)value; *cursor != '\0'; ++cursor) {
+        const char *escape = NULL;
+        char unicode_escape[7];
+
+        switch (*cursor) {
+            case '"':
+                escape = "\\\"";
+                break;
+            case '\\':
+                escape = "\\\\";
+                break;
+            case '\b':
+                escape = "\\b";
+                break;
+            case '\f':
+                escape = "\\f";
+                break;
+            case '\n':
+                escape = "\\n";
+                break;
+            case '\r':
+                escape = "\\r";
+                break;
+            case '\t':
+                escape = "\\t";
+                break;
+            default:
+                if (*cursor < 0x20) {
+                    snprintf(unicode_escape, sizeof(unicode_escape), "\\u%04x", *cursor);
+                    escape = unicode_escape;
+                }
+                break;
+        }
+
+        if (escape != NULL) {
+            if (flush_history_json_string_chunk(req, buffer, &used) != ESP_OK ||
+                send_history_chunk(req, escape) != ESP_OK) {
+                return ESP_FAIL;
+            }
+            continue;
+        }
+
+        if (used == sizeof(buffer) &&
+            flush_history_json_string_chunk(req, buffer, &used) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        buffer[used++] = (char)*cursor;
+    }
+
+    if (flush_history_json_string_chunk(req, buffer, &used) != ESP_OK ||
+        send_history_chunk(req, "\"") != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+static void format_history_day_stamp(uint32_t day_stamp, char *buffer, size_t size)
+{
+    if (day_stamp == 0) {
+        snprintf(buffer, size, "%s", "");
+        return;
+    }
+
+    struct tm timeinfo = {
+        .tm_year = (int)(day_stamp / 1000U) - 1900,
+        .tm_mon = 0,
+        .tm_mday = 1,
+    };
+    time_t raw = mktime(&timeinfo);
+    raw += (time_t)((day_stamp % 1000U) * 24U * 60U * 60U);
+    localtime_r(&raw, &timeinfo);
+    strftime(buffer, size, "%Y-%m-%d", &timeinfo);
+}
+
+static esp_err_t send_pumps_history_json(httpd_req_t *req)
+{
+    char buffer[256];
+    const uint32_t current_day_stamp = app_pumps_history_get_current_day_stamp();
+
+    httpd_resp_set_type(req, "application/json");
+
+    snprintf(buffer,
+             sizeof(buffer),
+             "{\"retention_days\":%u,\"current_day_stamp\":%lu,\"pumps\":[",
+             (unsigned)APP_PUMP_HISTORY_RETAINED_DAYS,
+             (unsigned long)current_day_stamp);
+    if (send_history_chunk(req, buffer) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    for (uint8_t pump_id = 0; pump_id < MAX_PUMP; ++pump_id) {
+        const pump_t *pump_config = get_pump_config(pump_id);
+        if (pump_id > 0 && send_history_chunk(req, ",") != ESP_OK) {
+            return ESP_FAIL;
+        }
+
+        snprintf(buffer, sizeof(buffer), "{\"id\":%u,\"name\":", (unsigned)pump_id);
+        if (send_history_chunk(req, buffer) != ESP_OK ||
+            send_history_json_string(req, pump_config != NULL ? pump_config->name : "") != ESP_OK ||
+            send_history_chunk(req, ",\"days\":[") != ESP_OK) {
+            return ESP_FAIL;
+        }
+
+        bool first_day = true;
+        for (int offset = APP_PUMP_HISTORY_RETAINED_DAYS - 1; offset >= 0; --offset) {
+            if (current_day_stamp < (uint32_t)offset) {
+                continue;
+            }
+
+            const uint32_t day_stamp = current_day_stamp - (uint32_t)offset;
+            pump_history_day_t day = {0};
+            if (!app_pumps_history_get_day(pump_id, day_stamp, &day)) {
+                continue;
+            }
+
+            char date_string[16];
+            format_history_day_stamp(day.day_stamp, date_string, sizeof(date_string));
+            if (!first_day && send_history_chunk(req, ",") != ESP_OK) {
+                return ESP_FAIL;
+            }
+            first_day = false;
+
+            snprintf(buffer,
+                     sizeof(buffer),
+                     "{\"day_stamp\":%lu,\"date\":",
+                     (unsigned long)day.day_stamp);
+            if (send_history_chunk(req, buffer) != ESP_OK ||
+                send_history_json_string(req, date_string) != ESP_OK ||
+                send_history_chunk(req, ",\"hours\":[") != ESP_OK) {
+                return ESP_FAIL;
+            }
+
+            for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
+                const pump_history_hour_t *slot = &day.hours[hour];
+                snprintf(buffer,
+                         sizeof(buffer),
+                         "%s{\"hour\":%u,\"scheduled_volume_ml\":%u,\"manual_volume_ml\":%u,"
+                         "\"total_runtime_s\":%u,\"flags\":%u}",
+                         hour > 0 ? "," : "",
+                         (unsigned)hour,
+                         (unsigned)slot->scheduled_volume_ml,
+                         (unsigned)slot->manual_volume_ml,
+                         (unsigned)slot->total_runtime_s,
+                         (unsigned)slot->flags);
+                if (send_history_chunk(req, buffer) != ESP_OK) {
+                    return ESP_FAIL;
+                }
+            }
+
+            if (send_history_chunk(req, "]}") != ESP_OK) {
+                return ESP_FAIL;
+            }
+        }
+
+        if (send_history_chunk(req, "]}") != ESP_OK) {
+            return ESP_FAIL;
+        }
+    }
+
+    if (send_history_chunk(req, "]}") != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    return httpd_resp_send_chunk(req, NULL, 0);
+}
+
 static esp_err_t send_success_and_restart(httpd_req_t *req, bool erase_before_restart)
 {
     if (app_http_validate_request(req) != ESP_OK) {
@@ -667,10 +864,11 @@ esp_err_t pumps_history_get_handler(httpd_req_t *req)
     }
 
     app_http_set_cors_headers(req);
-    char *response = get_pumps_history_json();
-    httpd_resp_send(req, response, (ssize_t)strlen(response));
-    free(response);
-    return ESP_OK;
+    esp_err_t err = send_pumps_history_json(req);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "failed to stream pump history response: %s", esp_err_to_name(err));
+    }
+    return err;
 }
 
 esp_err_t pumps_history_backup_post_handler(httpd_req_t *req)

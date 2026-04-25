@@ -21,5 +21,7 @@ double app_pumps_history_get_total_day_volume_ml(void);
 esp_err_t app_pumps_storage_restore_tank_status(void);
 esp_err_t app_pumps_storage_backup_tank_status(void);
 bool app_pumps_storage_using_flash_fallback(void);
-void app_pumps_storage_load_schedule_state(uint32_t last_run_schedule_hour[MAX_SCHEDULE]);
-esp_err_t app_pumps_storage_save_schedule_state(const uint32_t last_run_schedule_hour[MAX_SCHEDULE]);
+void app_pumps_storage_load_schedule_state(uint32_t *last_run_schedule_day_stamp,
+                                           uint32_t last_run_schedule_hour[MAX_SCHEDULE]);
+esp_err_t app_pumps_storage_save_schedule_state(uint32_t last_run_schedule_day_stamp,
+                                                const uint32_t last_run_schedule_hour[MAX_SCHEDULE]);
