@@ -1,4 +1,8 @@
-set(SOURCES "app_pumps.c")
+set(SOURCES
+    "app_pumps.c"
+    "app_pumps_history.c"
+    "app_pumps_storage.c"
+)
 
 idf_component_register(
     SRCS ${SOURCES}

@@ -179,6 +179,16 @@ The service worker is intentionally conservative:
 
 Browsers generally require a secure context for service workers. `localhost` is allowed during local production previews, but a plain `http://<device-ip>` install may be blocked by the browser even though the manifest metadata is still served.
 
+### 3.5 Pump Persistence And Power-Loss Safety
+
+`app_pumps` keeps life-support behavior conservative. Runtime control lives in `app_pumps.c`; history/NVS blobs live in `app_pumps_history.c`; tank and schedule EEPROM/NVS-fallback helpers live in `app_pumps_storage.c`.
+
+After reset or power loss, persisted counters are restored but active pump runs are not resumed. This avoids turning an uncertain partial dose into an overdose. Operators or remote clients must explicitly start a replacement dose if needed.
+
+Runtime tank-volume changes are persisted from the backup timer. External EEPROM/FRAM gets a short cadence; NVS fallback uses a slower cadence to reduce flash wear.
+
+Power-loss test steps are documented in [`docs/pump-power-loss-testing.md`](docs/pump-power-loss-testing.md).
+
 ---
 
 ## 4. Shared API Reference

@@ -329,6 +329,7 @@ static void load_pump_aging_config(void)
 
 void save_pump_aging_state(uint32_t day_stamp)
 {
+    ESP_LOGI(TAG, "Saving pump aging state.");
     pump_aging_state.day_stamp = day_stamp;
     for (uint8_t i = 0; i < MAX_PUMP; ++i) {
         pump_aging_state.running_hours[i] = pump[i].running_hours;

@@ -115,11 +115,6 @@ typedef struct {
 } pump_runtime_event_t;
 
 typedef struct {
-    uint8_t magic;
-    double tank_current_vol[MAX_PUMP];
-} tank_status_t;
-
-typedef struct {
     const char *name;
     bool supports_direction;
     bool supports_speed_control;
