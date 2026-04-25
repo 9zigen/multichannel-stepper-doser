@@ -285,10 +285,18 @@ static void app_http_ws_system_event_handler(void *arg, esp_event_base_t event_b
 
 extern const uint8_t favicon_ico_start[] asm("_binary_favicon_ico_start");
 extern const uint8_t favicon_ico_end[] asm("_binary_favicon_ico_end");
+extern const uint8_t manifest_webmanifest_start[] asm("_binary_manifest_webmanifest_start");
+extern const uint8_t manifest_webmanifest_end[] asm("_binary_manifest_webmanifest_end");
+extern const uint8_t sw_js_start[] asm("_binary_sw_js_start");
+extern const uint8_t sw_js_end[] asm("_binary_sw_js_end");
 extern const uint8_t icon_svg_start[] asm("_binary_icon_svg_gz_start");
 extern const uint8_t icon_svg_end[] asm("_binary_icon_svg_gz_end");
 extern const uint8_t apple_touch_icon_png_start[] asm("_binary_apple_touch_icon_png_start");
 extern const uint8_t apple_touch_icon_png_end[] asm("_binary_apple_touch_icon_png_end");
+extern const uint8_t icon_192_maskable_png_start[] asm("_binary_icon_192_maskable_png_start");
+extern const uint8_t icon_192_maskable_png_end[] asm("_binary_icon_192_maskable_png_end");
+extern const uint8_t icon_512_maskable_png_start[] asm("_binary_icon_512_maskable_png_start");
+extern const uint8_t icon_512_maskable_png_end[] asm("_binary_icon_512_maskable_png_end");
 extern const uint8_t app_css_start[] asm("_binary_app_css_gz_start");
 extern const uint8_t app_css_end[] asm("_binary_app_css_gz_end");
 extern const uint8_t app_js_start[] asm("_binary_app_js_gz_start");
@@ -471,6 +479,23 @@ esp_err_t favicon_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t manifest_get_handler(httpd_req_t *req)
+{
+    const size_t size = (manifest_webmanifest_end - manifest_webmanifest_start);
+    httpd_resp_set_type(req, "application/manifest+json");
+    httpd_resp_send(req, (const char *)manifest_webmanifest_start, (ssize_t)size);
+    return ESP_OK;
+}
+
+esp_err_t service_worker_get_handler(httpd_req_t *req)
+{
+    const size_t size = (sw_js_end - sw_js_start);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_type(req, "text/javascript");
+    httpd_resp_send(req, (const char *)sw_js_start, (ssize_t)size);
+    return ESP_OK;
+}
+
 esp_err_t icon_svg_get_handler(httpd_req_t *req)
 {
     const size_t size = (icon_svg_end - icon_svg_start);
@@ -485,6 +510,29 @@ esp_err_t apple_touch_icon_get_handler(httpd_req_t *req)
     const size_t size = (apple_touch_icon_png_end - apple_touch_icon_png_start);
     httpd_resp_set_type(req, "image/png");
     httpd_resp_send(req, (const char *)apple_touch_icon_png_start, (ssize_t)size);
+    return ESP_OK;
+}
+
+esp_err_t png_icon_get_handler(httpd_req_t *req)
+{
+    const uint8_t *start = NULL;
+    const uint8_t *end = NULL;
+
+    if (strcmp(req->uri, "/icon-192-maskable.png") == 0) {
+        start = icon_192_maskable_png_start;
+        end = icon_192_maskable_png_end;
+    } else if (strcmp(req->uri, "/icon-512-maskable.png") == 0) {
+        start = icon_512_maskable_png_start;
+        end = icon_512_maskable_png_end;
+    }
+
+    if (start == NULL || end == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Icon not found");
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "image/png");
+    httpd_resp_send(req, (const char *)start, (ssize_t)(end - start));
     return ESP_OK;
 }
 
@@ -632,6 +680,20 @@ httpd_handle_t start_webserver(void)
             .user_ctx = NULL,
         };
 
+        httpd_uri_t get_manifest = {
+            .uri = "/manifest.webmanifest",
+            .method = HTTP_GET,
+            .handler = manifest_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_service_worker = {
+            .uri = "/sw.js",
+            .method = HTTP_GET,
+            .handler = service_worker_get_handler,
+            .user_ctx = NULL,
+        };
+
         httpd_uri_t get_icon_svg = {
             .uri = "/icon.svg",
             .method = HTTP_GET,
@@ -643,6 +705,13 @@ httpd_handle_t start_webserver(void)
             .uri = "/apple-touch-icon.png",
             .method = HTTP_GET,
             .handler = apple_touch_icon_get_handler,
+            .user_ctx = NULL,
+        };
+
+        httpd_uri_t get_png_icons = {
+            .uri = "/icon-*.png",
+            .method = HTTP_GET,
+            .handler = png_icon_get_handler,
             .user_ctx = NULL,
         };
 
@@ -834,8 +903,11 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &get_home_page);
         httpd_register_uri_handler(server, &head_home_page);
         httpd_register_uri_handler(server, &get_favicon);
+        httpd_register_uri_handler(server, &get_manifest);
+        httpd_register_uri_handler(server, &get_service_worker);
         httpd_register_uri_handler(server, &get_icon_svg);
         httpd_register_uri_handler(server, &get_apple_touch_icon);
+        httpd_register_uri_handler(server, &get_png_icons);
         httpd_register_uri_handler(server, &captive_hotspot_detect);
         httpd_register_uri_handler(server, &captive_generate_204);
         httpd_register_uri_handler(server, &captive_gen_204);

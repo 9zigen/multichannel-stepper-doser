@@ -29,6 +29,9 @@ void app_http_ws_init_event_bridge(void);
 
 esp_err_t index_get_handler(httpd_req_t *req);
 esp_err_t favicon_get_handler(httpd_req_t *req);
+esp_err_t manifest_get_handler(httpd_req_t *req);
+esp_err_t service_worker_get_handler(httpd_req_t *req);
+esp_err_t png_icon_get_handler(httpd_req_t *req);
 esp_err_t js_handler(httpd_req_t *req);
 esp_err_t css_handler(httpd_req_t *req);
 esp_err_t options_handler(httpd_req_t *req);

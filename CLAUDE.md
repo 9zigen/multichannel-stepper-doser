@@ -32,6 +32,8 @@ Read this before making changes. Sub-project details live in sibling files:
 
 **Critical constraint**: The web UI ships inside the firmware binary. Bundle size matters — every dependency and every byte counts. Brotli + gzip compression is applied via `vite-plugin-compression2`.
 
+**Flash baseline**: Current hardware targets assume 8 MB to 16 MB flash. The partition table provides two 3840 KB OTA app slots so the embedded web UI, PWA assets, and firmware features can fit with OTA still enabled. Avoid optimizing for older 4 MB layouts unless a dedicated legacy hardware profile is added.
+
 ---
 
 ## 2. Build Commands
@@ -155,6 +157,27 @@ The `app_provisioning` component provides BLE-assisted Wi-Fi onboarding using ES
 **Security**: `protocomm_security1` with a PoP (Proof-of-Possession) string derived from the device MAC.
 
 **Note**: There is no frontend or iOS page for BLE provisioning — it is a firmware-side out-of-band flow. The web UI and iOS app are unreachable during provisioning (device has no IP yet).
+
+### 3.4 Embedded Web UI And PWA Assets
+
+The ESP32 serves the built frontend directly from embedded binary assets in `app_http_backend`. The production web bundle is expected to include:
+
+- `/app.js` and `/app.css` from `frontend/dist/`
+- `/manifest.webmanifest`
+- `/sw.js`
+- `/icon.svg`, `/favicon.ico`, `/apple-touch-icon.png`
+- `/icon-192-maskable.png` and `/icon-512-maskable.png`
+
+Keep the icon set intentionally small. The manifest uses the 192 px and 512 px maskable icons for installability; extra PNG sizes quickly consume OTA partition headroom.
+
+The service worker is intentionally conservative:
+
+- It registers only in production builds and only in secure browser contexts.
+- It uses network-first caching for same-origin GET requests.
+- It does not intercept `/api`, `/ws`, or `/upload`, so runtime control and telemetry stay live.
+- It falls back to the cached app shell for navigation when the device is temporarily unreachable.
+
+Browsers generally require a secure context for service workers. `localhost` is allowed during local production previews, but a plain `http://<device-ip>` install may be blocked by the browser even though the manifest metadata is still served.
 
 ---
 

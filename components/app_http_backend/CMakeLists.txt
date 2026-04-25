@@ -8,8 +8,12 @@ set(WEB_FILES
         "../../frontend/dist/favicon.ico"
         "../../frontend/dist/app.css.gz"
         "../../frontend/dist/app.js.gz"
+        "../../frontend/dist/manifest.webmanifest"
+        "../../frontend/dist/sw.js"
         "../../frontend/dist/icon.svg.gz"
         "../../frontend/dist/apple-touch-icon.png"
+        "../../frontend/dist/icon-192-maskable.png"
+        "../../frontend/dist/icon-512-maskable.png"
         "../../frontend/dist/index.html.gz")
 
 idf_component_register(

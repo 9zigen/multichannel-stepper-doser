@@ -1,5 +1,20 @@
 # Frontend
 
+## PWA Build Notes
+
+Production builds register `public/sw.js` from `src/lib/service-worker.ts` and
+ship `public/manifest.webmanifest` for installable app metadata. The service
+worker is not registered during Vite development because the firmware build
+serves `/app.js` and `/app.css`, while the dev server uses Vite module paths.
+
+The service worker uses network-first caching for same-origin GET requests and
+intentionally skips `/api`, `/ws`, and `/upload`. Runtime state, telemetry, and
+manual pump controls must always come from the live device, not from cache.
+
+Browsers require a secure context for service workers. Localhost production
+previews can install normally, but plain `http://<device-ip>` may be treated as
+non-secure by some browsers.
+
 ## Dev Against Real Hardware
 
 To run the UI against a device on your local network, provide `VITE_DEVICE_IP` when starting Vite. When this variable is set, the frontend sends API requests to that device and the mock backend is disabled automatically.
