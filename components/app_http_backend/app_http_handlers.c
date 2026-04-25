@@ -42,7 +42,7 @@ esp_err_t upgrade_firmware(void);
 
 static uint32_t calibration_to_100ml_units(const pump_t *pump)
 {
-    if (pump->calibration_count == 0 || pump->calibration[0].flow <= 0.0f) {
+    if (pump->calibration_count == 0 || pump->calibration[0].flow < MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN) {
         return 0;
     }
 
@@ -68,10 +68,11 @@ static bool pump_calibration_points_valid(const pump_t *pump_config, char *error
     float last_speed = -1.0f;
     for (uint8_t i = 0; i < pump_config->calibration_count; ++i) {
         const pump_calibration_t *point = &pump_config->calibration[i];
-        if (point->speed <= 0.0f || point->flow <= 0.0f) {
-            snprintf(error, error_size, "Pump %u calibration point %u must have positive speed and flow",
+        if (point->speed <= 0.0f || point->flow < MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN) {
+            snprintf(error, error_size, "Pump %u calibration point %u must have positive speed and flow >= %.2f ml/min",
                      (unsigned)pump_config->id,
-                     (unsigned)i);
+                     (unsigned)i,
+                     (double)MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN);
             return false;
         }
 

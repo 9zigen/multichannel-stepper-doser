@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { PumpCalibrationState, PumpState, ScheduleState } from '@/lib/api.ts';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import { toast } from 'sonner';
-import PumpCalibration from '@/components/pump-calibration.tsx';
+import PumpCalibration, { roundCalibrationFlow } from '@/components/pump-calibration.tsx';
 import { CalibrationQualityChart } from '@/components/calibration-quality-chart.tsx';
 import { Check, FlaskConical, LoaderCircle, ShieldCheck, Square } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx';
@@ -51,7 +51,9 @@ const FormSchema = z.object({
   max_single_run_seconds: z.number().min(0, 'Must be 0 or greater'),
   max_hourly_ml: z.number().min(0, 'Must be 0 or greater'),
   max_daily_ml: z.number().min(0, 'Must be 0 or greater'),
-  calibration: z.array(z.object({ speed: z.number(), flow: z.number() })),
+  calibration: z.array(
+    z.object({ speed: z.number(), flow: z.number().min(0.01, 'Flow must be at least 0.01 ml/min') })
+  ),
   schedule: z.object({
     mode: z.union([z.literal(0), z.literal(1), z.literal(2)]),
     work_hours: z.array(z.number()),
@@ -61,6 +63,10 @@ const FormSchema = z.object({
     volume: z.number(),
   }),
 });
+
+const formatCalibrationFlow = (flow: number): string => roundCalibrationFlow(flow).toFixed(2);
+const normalizeCalibration = (calibration: PumpCalibrationState[]): PumpCalibrationState[] =>
+  calibration.map((point) => ({ ...point, flow: roundCalibrationFlow(point.flow) }));
 
 export interface PumpFormProps {
   pump: PumpState;
@@ -115,11 +121,11 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
       max_hourly_ml: max_hourly_ml,
       max_daily_ml: max_daily_ml,
       schedule: schedule,
-      calibration: calibration,
+      calibration: normalizeCalibration(calibration),
     },
   });
 
-  const [pumpCalibrations, setPumpCalibrations] = useState(calibration);
+  const [pumpCalibrations, setPumpCalibrations] = useState(() => normalizeCalibration(calibration));
   const [calibrationChanged, setCalibrationChanged] = useState(false);
 
   const direction_actual = watch('direction');
@@ -127,8 +133,9 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
   const activeCalibration = runtime.find((entry) => entry.id === id && entry.state === 'calibration') ?? null;
 
   useEffect(() => {
-    setPumpCalibrations(calibration);
-    setValue('calibration', calibration);
+    const normalizedCalibration = normalizeCalibration(calibration);
+    setPumpCalibrations(normalizedCalibration);
+    setValue('calibration', normalizedCalibration);
     if (calibration.length) {
       clearErrors('calibration');
     }
@@ -160,7 +167,10 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
 
   const updateCalibrationData = async (data: PumpCalibrationState[]) => {
     try {
-      await updatePump({ ...pump, calibration: data }, false);
+      const normalizedCalibration = normalizeCalibration(data);
+      await updatePump({ ...pump, calibration: normalizedCalibration }, false);
+      setPumpCalibrations(normalizedCalibration);
+      setValue('calibration', normalizedCalibration, { shouldDirty: true });
       setCalibrationChanged(true);
       toast.success('Pump calibration updated. Please save the pump settings to apply the changes.');
     } catch (e) {
@@ -317,7 +327,7 @@ const PumpForm = ({ pump, success }: PumpFormProps): React.ReactElement => {
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground">Flow </span>
-                    <span className="tabular-nums font-medium">{item.flow} ml/min</span>
+                    <span className="tabular-nums font-medium">{formatCalibrationFlow(item.flow)} ml/min</span>
                   </div>
                 </div>
                 <Button type="button" variant="destructive" size="sm" onClick={() => removeCalibration(index)}>

@@ -10,6 +10,12 @@ import { FlaskConical, Plus, Square } from 'lucide-react';
 import { usePumpRuntime } from '@/components/pump-runtime-provider.tsx';
 import { Badge } from '@/components/ui/badge.tsx';
 
+const MIN_CALIBRATION_FLOW_ML_PER_MIN = 0.01;
+
+export function roundCalibrationFlow(flow: number): number {
+  return Number(flow.toFixed(2));
+}
+
 export interface PumpFormProps {
   pump: PumpState;
   success?: (cal: PumpCalibrationState) => void;
@@ -157,7 +163,12 @@ const PumpCalibration = ({ pump, success }: PumpFormProps): React.ReactElement =
 
   const finishCalibration = async () => {
     if (stage === STAGE.STOP) {
-      const calibrationPoint = { speed, flow };
+      if (flow < MIN_CALIBRATION_FLOW_ML_PER_MIN) {
+        setError(`Flow must be at least ${MIN_CALIBRATION_FLOW_ML_PER_MIN.toFixed(2)} ml/min.`);
+        return;
+      }
+
+      const calibrationPoint = { speed, flow: roundCalibrationFlow(flow) };
       if (success) {
         success(calibrationPoint);
       } else {
@@ -178,8 +189,7 @@ const PumpCalibration = ({ pump, success }: PumpFormProps): React.ReactElement =
     setVolume(value);
     const diff = stopTimestamp - startTimestamp;
     const minutes = diff / 1000 / 60;
-    const flow = Math.floor(value / minutes);
-    console.log('Flow: ', flow, { diff, minutes });
+    const flow = minutes > 0 ? roundCalibrationFlow(value / minutes) : 0;
     setFlow(flow);
   };
 
@@ -262,6 +272,7 @@ const PumpCalibration = ({ pump, success }: PumpFormProps): React.ReactElement =
               <Input
                 type="number"
                 name="volume"
+                className="w-20"
                 placeholder="ml"
                 value={volume}
                 min="0.1"
@@ -277,15 +288,16 @@ const PumpCalibration = ({ pump, success }: PumpFormProps): React.ReactElement =
               <Input
                 type="number"
                 name="flow"
+                className="w-20"
                 placeholder="ml/min"
                 value={flow}
-                min="0.1"
-                step="0.1"
+                min={MIN_CALIBRATION_FLOW_ML_PER_MIN}
+                step={MIN_CALIBRATION_FLOW_ML_PER_MIN}
                 onChange={(e) => setFlow(Number(e.target.value))}
               ></Input>
             </div>
             <Button type="button" variant="secondary" className="" onClick={finishCalibration}>
-              Save calibration
+              Save
             </Button>
             <Button type="button" variant="outline" className="" onClick={discardCalibration}>
               Discard

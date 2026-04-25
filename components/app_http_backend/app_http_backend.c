@@ -610,7 +610,7 @@ httpd_handle_t start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.stack_size = 4096 + 2048;
-    config.max_uri_handlers = 36;
+    config.max_uri_handlers = 48;
     config.max_open_sockets = APP_HTTP_MAX_OPEN_SOCKETS;
     config.lru_purge_enable = true;
     config.backlog_conn = APP_HTTP_MAX_OPEN_SOCKETS;
@@ -622,8 +622,11 @@ httpd_handle_t start_webserver(void)
     config.keep_alive_count = 3;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
-    ESP_LOGI(TAG, "Starting web server on port: '%d' (max_open_sockets=%u, max_ws_clients=%u)",
-             config.server_port, (unsigned)config.max_open_sockets, (unsigned)APP_HTTP_MAX_WS_CLIENTS);
+    ESP_LOGI(TAG, "Starting web server on port: '%d' (max_uri_handlers=%u, max_open_sockets=%u, max_ws_clients=%u)",
+             config.server_port,
+             (unsigned)config.max_uri_handlers,
+             (unsigned)config.max_open_sockets,
+             (unsigned)APP_HTTP_MAX_WS_CLIENTS);
 
     if (server != NULL) {
         stop_webserver();
@@ -899,43 +902,60 @@ httpd_handle_t start_webserver(void)
             .user_ctx = NULL,
         };
 
-        httpd_register_uri_handler(server, &global_options);
-        httpd_register_uri_handler(server, &get_home_page);
-        httpd_register_uri_handler(server, &head_home_page);
-        httpd_register_uri_handler(server, &get_favicon);
-        httpd_register_uri_handler(server, &get_manifest);
-        httpd_register_uri_handler(server, &get_service_worker);
-        httpd_register_uri_handler(server, &get_icon_svg);
-        httpd_register_uri_handler(server, &get_apple_touch_icon);
-        httpd_register_uri_handler(server, &get_png_icons);
-        httpd_register_uri_handler(server, &captive_hotspot_detect);
-        httpd_register_uri_handler(server, &captive_generate_204);
-        httpd_register_uri_handler(server, &captive_gen_204);
-        httpd_register_uri_handler(server, &captive_ncsi);
-        httpd_register_uri_handler(server, &captive_connecttest);
-        httpd_register_uri_handler(server, &get_js);
-        httpd_register_uri_handler(server, &get_css);
-        httpd_register_uri_handler(server, &get_status);
-        httpd_register_uri_handler(server, &get_pumps_runtime);
-        httpd_register_uri_handler(server, &get_pumps_history);
-        httpd_register_uri_handler(server, &get_board_config);
-        httpd_register_uri_handler(server, &post_board_config);
-        httpd_register_uri_handler(server, &websocket);
-        httpd_register_uri_handler(server, &get_wifi_scan);
-        httpd_register_uri_handler(server, &post_run);
-        httpd_register_uri_handler(server, &post_calibrate);
-        httpd_register_uri_handler(server, &post_pumps_history_backup);
-        httpd_register_uri_handler(server, &get_schedule);
-        httpd_register_uri_handler(server, &post_schedule);
-        httpd_register_uri_handler(server, &get_settings);
-        httpd_register_uri_handler(server, &post_settings);
-        httpd_register_uri_handler(server, &post_auth);
-        httpd_register_uri_handler(server, &get_ota);
-        httpd_register_uri_handler(server, &post_device_restart);
-        httpd_register_uri_handler(server, &post_device_factory_reset);
-        httpd_register_uri_handler(server, &update_post);
-        httpd_register_uri_handler(server, &get_spa_fallback);
-        httpd_register_uri_handler(server, &head_spa_fallback);
+#define REGISTER_URI(route) do { \
+            esp_err_t reg_err = httpd_register_uri_handler(server, &(route)); \
+            if (reg_err != ESP_OK) { \
+                ESP_LOGE(TAG, "Failed to register HTTP route %s %s: %s", \
+                         (route).method == HTTP_GET ? "GET" : \
+                         (route).method == HTTP_POST ? "POST" : \
+                         (route).method == HTTP_HEAD ? "HEAD" : \
+                         (route).method == HTTP_OPTIONS ? "OPTIONS" : "OTHER", \
+                         (route).uri, esp_err_to_name(reg_err)); \
+                httpd_stop(server); \
+                server = NULL; \
+                return NULL; \
+            } \
+        } while (0)
+
+        REGISTER_URI(global_options);
+        REGISTER_URI(get_home_page);
+        REGISTER_URI(head_home_page);
+        REGISTER_URI(get_favicon);
+        REGISTER_URI(get_manifest);
+        REGISTER_URI(get_service_worker);
+        REGISTER_URI(get_icon_svg);
+        REGISTER_URI(get_apple_touch_icon);
+        REGISTER_URI(get_png_icons);
+        REGISTER_URI(captive_hotspot_detect);
+        REGISTER_URI(captive_generate_204);
+        REGISTER_URI(captive_gen_204);
+        REGISTER_URI(captive_ncsi);
+        REGISTER_URI(captive_connecttest);
+        REGISTER_URI(get_js);
+        REGISTER_URI(get_css);
+        REGISTER_URI(get_status);
+        REGISTER_URI(get_pumps_runtime);
+        REGISTER_URI(get_pumps_history);
+        REGISTER_URI(get_board_config);
+        REGISTER_URI(post_board_config);
+        REGISTER_URI(websocket);
+        REGISTER_URI(get_wifi_scan);
+        REGISTER_URI(post_run);
+        REGISTER_URI(post_calibrate);
+        REGISTER_URI(post_pumps_history_backup);
+        REGISTER_URI(get_schedule);
+        REGISTER_URI(post_schedule);
+        REGISTER_URI(get_settings);
+        REGISTER_URI(post_settings);
+        REGISTER_URI(post_auth);
+        REGISTER_URI(get_ota);
+        REGISTER_URI(post_device_restart);
+        REGISTER_URI(post_device_factory_reset);
+        REGISTER_URI(update_post);
+        REGISTER_URI(get_spa_fallback);
+        REGISTER_URI(head_spa_fallback);
+
+#undef REGISTER_URI
 
         return server;
     }

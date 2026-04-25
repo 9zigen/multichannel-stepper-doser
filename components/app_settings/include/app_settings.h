@@ -12,6 +12,7 @@
 #define MAX_BOARD_ADC_CHANNELS          2
 #define MAX_BOARD_GPIO_INPUTS           3
 #define MAX_BOARD_GPIO_OUTPUTS          3
+#define MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN 0.01f
 
 #define HOUR_0              1 << 0
 #define HOUR_1              1 << 1

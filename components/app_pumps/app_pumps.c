@@ -85,12 +85,14 @@ static double pump_flow_ml_per_min(const pump_t *pump_config, float rpm)
     }
 
     if (pump_config->calibration_count == 1) {
-        return pump_config->calibration[0].flow > 0.0f ? pump_config->calibration[0].flow : 0.0;
+        return pump_config->calibration[0].flow >= MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN
+                   ? pump_config->calibration[0].flow
+                   : 0.0;
     }
 
     const pump_calibration_t *points = pump_config->calibration;
     if (rpm <= points[0].speed) {
-        return points[0].flow;
+        return points[0].flow >= MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN ? points[0].flow : 0.0;
     }
 
     for (uint8_t i = 1; i < pump_config->calibration_count; ++i) {
@@ -100,7 +102,7 @@ static double pump_flow_ml_per_min(const pump_t *pump_config, float rpm)
             double left_flow = points[i - 1].flow;
             double right_flow = points[i].flow;
             if (right_speed <= left_speed) {
-                return right_flow > 0.0 ? right_flow : 0.0;
+                return right_flow >= MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN ? right_flow : 0.0;
             }
 
             double ratio = ((double)rpm - left_speed) / (right_speed - left_speed);
@@ -108,7 +110,8 @@ static double pump_flow_ml_per_min(const pump_t *pump_config, float rpm)
         }
     }
 
-    return points[pump_config->calibration_count - 1].flow;
+    const float flow = points[pump_config->calibration_count - 1].flow;
+    return flow >= MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN ? flow : 0.0;
 }
 
 static bool pump_has_valid_calibration(const pump_t *pump_config)
@@ -119,7 +122,7 @@ static bool pump_has_valid_calibration(const pump_t *pump_config)
 
     for (uint8_t i = 0; i < pump_config->calibration_count; ++i) {
         if (pump_config->calibration[i].speed > 0.0f &&
-            pump_config->calibration[i].flow > 0.0f) {
+            pump_config->calibration[i].flow >= MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN) {
             return true;
         }
     }
