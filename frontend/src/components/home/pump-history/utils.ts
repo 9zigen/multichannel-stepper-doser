@@ -8,6 +8,7 @@ export const FLAG_CALIBRATION = 8;
 const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short' });
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 const VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+const COMPACT_VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const HISTORY_HOUR_VOLUME_MAX_ML = 6553.5;
 
 export const formatMonth = (date: Date) => MONTH_FORMATTER.format(date);
@@ -36,6 +37,34 @@ export const formatHistoryVolume = (volume: number, saturated = false) => {
 
 export const formatStoredHistoryVolume = (volume: number) =>
   formatHistoryVolume(volume, isSaturatedHistoryVolume(volume));
+
+export const formatCompactHistoryVolume = (volume: number, saturated = false) => {
+  if (saturated) {
+    return '>6.5L';
+  }
+
+  if (!Number.isFinite(volume) || volume <= 0) {
+    return '0ml';
+  }
+
+  if (volume < 0.01) {
+    return '<0.01ml';
+  }
+
+  if (volume <= 999) {
+    return `${COMPACT_VOLUME_FORMATTER.format(volume)}ml`;
+  }
+
+  const liters = volume / 1000;
+  if (liters > 999) {
+    return '>999L';
+  }
+
+  return `${COMPACT_VOLUME_FORMATTER.format(liters)}L`;
+};
+
+export const formatCompactHourVolume = (hour: PumpHistoryHour) =>
+  formatCompactHistoryVolume(getHourVolume(hour), isSaturatedHourVolume(hour));
 
 export const formatRuntime = (seconds: number) => {
   if (seconds < 60) {

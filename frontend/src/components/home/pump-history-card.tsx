@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarDays, RotateCcw } from 'lucide-react';
+import { CalendarDays, RotateCcw, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { resetPumpsHistoryTodayScheduled } from '@/lib/api.ts';
@@ -108,7 +108,7 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-7 gap-1.5 px-2 text-xs"
+                    className="h-7 gap-1.5 border-amber-400/40 bg-amber-400/5 px-2 text-xs text-amber-900 hover:bg-amber-400/10 dark:text-amber-200"
                     disabled={loading || isResettingToday}
                   >
                     <RotateCcw className="size-3.5" />
@@ -117,10 +117,13 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Reset today&apos;s scheduled history?</AlertDialogTitle>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <ShieldAlert className="size-4 text-amber-500" />
+                      Reset today&apos;s scheduled history?
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
                       Reset today&apos;s scheduled dosing history for {selectedPump.name}? Manual dosing history will be
-                      preserved. If the current hour is active, the schedule may dose again.
+                      preserved. If the current hour is active, the schedule may dose again after the reset.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

@@ -1,11 +1,12 @@
 import React from 'react';
-import { CalendarDays, Clock3, Droplets } from 'lucide-react';
+import { CalendarDays, Clock3, Droplets, Info } from 'lucide-react';
 
 import type { PumpHistoryDay } from '@/lib/api.ts';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   flagTitle,
+  formatCompactHourVolume,
   formatDayVolume,
   formatHourLabel,
   formatHourVolume,
@@ -22,11 +23,22 @@ type DayDetailProps = {
   day: PumpHistoryDay | null;
 };
 
+const flagLegend = [
+  { code: 'S', label: 'Scheduled' },
+  { code: 'M', label: 'Manual' },
+  { code: 'C', label: 'Continuous' },
+  { code: 'K', label: 'Calibration' },
+];
+
 const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
   if (!day) {
     return (
-      <div className="flex h-full min-h-32 items-center justify-center text-sm text-muted-foreground">
-        Select a day on the heatmap.
+      <div className="flex h-full min-h-32 flex-col items-center justify-center gap-1 text-center">
+        <Info className="size-4 text-muted-foreground/70" />
+        <div className="text-sm font-medium">Select a day</div>
+        <div className="max-w-56 text-xs text-muted-foreground">
+          Pick a cell on the heatmap to inspect hourly dosing details.
+        </div>
       </div>
     );
   }
@@ -37,9 +49,11 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
 
   if (activeHours.length === 0) {
     return (
-      <div className="flex h-full min-h-32 flex-col items-center justify-center gap-2">
+      <div className="flex h-full min-h-32 flex-col items-center justify-center gap-2 text-center">
         <Badge variant="outline">{formatShortDate(dayDate)}</Badge>
-        <span className="text-xs text-muted-foreground">No activity recorded.</span>
+        <span className="max-w-56 text-xs text-muted-foreground">
+          No dosing activity was recorded for this pump on the selected day.
+        </span>
       </div>
     );
   }
@@ -63,6 +77,16 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
         <Badge variant="outline" className="tabular-nums">
           {activeHours.length}h active
         </Badge>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/30 bg-background/50 px-2 py-1 text-[10px] text-muted-foreground">
+        <span className="mr-0.5 uppercase tracking-wider">Flags</span>
+        {flagLegend.map((item) => (
+          <span key={item.code} className="inline-flex items-center gap-1">
+            <span className="rounded bg-secondary px-1 font-semibold text-foreground/80">{item.code}</span>
+            {item.label}
+          </span>
+        ))}
       </div>
 
       {/* Hourly table */}
@@ -90,11 +114,17 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
                   <td className="whitespace-nowrap py-1.5 pr-3 font-medium tabular-nums">
                     {formatHourLabel(hour.hour)}
                     {flags.length > 0 && (
-                      <span className="ml-1 text-[9px] text-muted-foreground" title={flagTitle(hour.flags)}>{flags.join('')}</span>
+                      <span
+                        className="ml-1 rounded bg-secondary px-1 text-[9px] text-muted-foreground"
+                        title={flagTitle(hour.flags)}
+                      >
+                        {flags.join('')}
+                      </span>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-2 py-1.5 text-right">
-                    <span className="font-semibold tabular-nums">{formatHourVolume(hour)}</span>
+                    <span className="font-semibold tabular-nums sm:hidden">{formatCompactHourVolume(hour)}</span>
+                    <span className="hidden font-semibold tabular-nums sm:inline">{formatHourVolume(hour)}</span>
                   </td>
                   <td className="hidden whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums sm:table-cell">
                     {formatStoredHistoryVolume(hour.scheduled_volume_ml)}

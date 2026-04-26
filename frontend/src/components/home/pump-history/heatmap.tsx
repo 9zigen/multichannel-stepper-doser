@@ -4,10 +4,12 @@ import type { PumpHistoryDay } from '@/lib/api.ts';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils.ts';
 import {
+  formatCompactHistoryVolume,
   formatDayVolume,
   getBarIntensityClass,
   getDayVolume,
   getIntensityClass,
+  isSaturatedDayVolume,
   parseHistoryDate,
 } from './utils';
 
@@ -169,6 +171,7 @@ const Heatmap = ({ days, selectedDay, onDaySelect }: HeatmapProps): React.ReactE
                 const vol = getDayVolume(day);
                 const pct = maxDayVolume > 0 ? Math.max(vol / maxDayVolume, 0.04) : 0.04;
                 const selected = day.day_stamp === selectedDay?.day_stamp;
+                const saturated = isSaturatedDayVolume(day);
                 return (
                   <button
                     key={day.day_stamp}
@@ -182,7 +185,13 @@ const Heatmap = ({ days, selectedDay, onDaySelect }: HeatmapProps): React.ReactE
                     )}
                     style={{ height: `${pct * 100}%`, animationDelay: `${i * 15}ms` }}
                     onClick={() => onDaySelect(day.day_stamp)}
-                  />
+                  >
+                    {selected && (
+                      <span className="sr-only">
+                        {day.date} {formatCompactHistoryVolume(vol, saturated)}
+                      </span>
+                    )}
+                  </button>
                 );
               })}
             </div>
