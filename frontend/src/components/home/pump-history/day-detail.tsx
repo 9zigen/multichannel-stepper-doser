@@ -1,6 +1,8 @@
 import React from 'react';
 import { CalendarDays, Clock3, Droplets, Info } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
+
 import type { PumpHistoryDay } from '@/lib/api.ts';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -29,6 +31,13 @@ const flagLegend = [
   { code: 'C', label: 'Continuous' },
   { code: 'K', label: 'Calibration' },
 ];
+
+const flagColorClass: Record<string, string> = {
+  S: 'bg-primary/15 text-primary',
+  M: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
+  C: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  K: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+};
 
 const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
   if (!day) {
@@ -83,7 +92,9 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
         <span className="mr-0.5 uppercase tracking-wider">Flags</span>
         {flagLegend.map((item) => (
           <span key={item.code} className="inline-flex items-center gap-1">
-            <span className="rounded bg-secondary px-1 font-semibold text-foreground/80">{item.code}</span>
+            <span className={cn('rounded px-1 font-semibold', flagColorClass[item.code])}>
+              {item.code}
+            </span>
             {item.label}
           </span>
         ))}
@@ -114,11 +125,18 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
                   <td className="whitespace-nowrap py-1.5 pr-3 font-medium tabular-nums">
                     {formatHourLabel(hour.hour)}
                     {flags.length > 0 && (
-                      <span
-                        className="ml-1 rounded bg-secondary px-1 text-[9px] text-muted-foreground"
-                        title={flagTitle(hour.flags)}
-                      >
-                        {flags.join('')}
+                      <span className="ml-1 inline-flex gap-px" title={flagTitle(hour.flags)}>
+                        {flags.map((flag) => (
+                          <span
+                            key={flag}
+                            className={cn(
+                              'rounded px-0.5 text-[9px] font-semibold leading-none',
+                              flagColorClass[flag] ?? 'bg-secondary text-foreground/70',
+                            )}
+                          >
+                            {flag}
+                          </span>
+                        ))}
                       </span>
                     )}
                   </td>
