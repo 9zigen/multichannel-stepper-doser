@@ -7,9 +7,10 @@ export const FLAG_CALIBRATION = 8;
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short' });
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-const VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+const VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const COMPACT_VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
-const HISTORY_HOUR_VOLUME_MAX_ML = 6553.5;
+const HISTORY_HOUR_VOLUME_MAX_ML = 42949672.95;
+const HISTORY_HOUR_VOLUME_OVERFLOW_LABEL = '>42,949L';
 
 export const formatMonth = (date: Date) => MONTH_FORMATTER.format(date);
 export const formatShortDate = (date: Date) => DATE_FORMATTER.format(date);
@@ -25,7 +26,7 @@ export const isSaturatedDayVolume = (day: PumpHistoryDay) => day.hours.some(isSa
 
 export const formatHistoryVolume = (volume: number, saturated = false) => {
   if (saturated) {
-    return '> 6.5L';
+    return HISTORY_HOUR_VOLUME_OVERFLOW_LABEL;
   }
 
   if (volume >= 1000) {
@@ -40,7 +41,7 @@ export const formatStoredHistoryVolume = (volume: number) =>
 
 export const formatCompactHistoryVolume = (volume: number, saturated = false) => {
   if (saturated) {
-    return '>6.5L';
+    return HISTORY_HOUR_VOLUME_OVERFLOW_LABEL;
   }
 
   if (!Number.isFinite(volume) || volume <= 0) {

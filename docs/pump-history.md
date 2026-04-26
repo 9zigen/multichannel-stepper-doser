@@ -15,20 +15,21 @@ Each pump has 24 hourly slots per day.
 
 Each slot stores:
 
-- `scheduled_volume_dml`
-- `manual_volume_dml`
+- `scheduled_volume_cml`
+- `manual_volume_cml`
 - `total_runtime_s`
 - `flags`
 
-The volume fields are stored in NVS as unsigned 16-bit deci-milliliter values:
+The volume fields are stored in NVS as unsigned 32-bit centi-milliliter values:
 
-- `1` stored unit = `0.1 ml`
-- maximum stored value per source and hour = `6553.5 ml`
-- values above the maximum saturate to `6553.5 ml`
+- `1` stored unit = `0.01 ml`
+- maximum stored value per source and hour = about `42,949,672.95 ml`
+- values above the maximum saturate to the maximum stored value
 
 The HTTP and MQTT APIs keep the public field names `scheduled_volume_ml` and
-`manual_volume_ml` and expose decimal milliliter values. The Web UI treats the
-saturated value as overflow/unknown-high and displays it as `> 6.5L`.
+`manual_volume_ml` and expose decimal milliliter values. This keeps sub-ml
+scheduled doses useful after reboot, for example `0.83 ml` persisted as
+`83` stored units.
 
 Flags indicate whether the hour contains:
 
@@ -110,4 +111,5 @@ Request body:
 - Multiple runs in one hour are merged into the same slot
 - If the day rolls over before an automatic/manual backup, unsaved current-day
   data is discarded
-- Per-hour scheduled and manual volume counters are clamped at `6553.5 ml`
+- Per-hour scheduled and manual volume counters are clamped at the `uint32_t`
+  centi-ml maximum, which is far above expected dosing volumes

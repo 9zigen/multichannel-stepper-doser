@@ -380,9 +380,9 @@ static void publish_today_history(void)
             cJSON *hour_json = cJSON_CreateObject();
             cJSON_AddNumberToObject(hour_json, "hour", hour);
             cJSON_AddNumberToObject(hour_json, "scheduled_volume_ml",
-                                    app_pumps_history_volume_dml_to_ml(slot->scheduled_volume_dml));
+                                    app_pumps_history_volume_cml_to_ml(slot->scheduled_volume_cml));
             cJSON_AddNumberToObject(hour_json, "manual_volume_ml",
-                                    app_pumps_history_volume_dml_to_ml(slot->manual_volume_dml));
+                                    app_pumps_history_volume_cml_to_ml(slot->manual_volume_cml));
             cJSON_AddNumberToObject(hour_json, "total_runtime_s", slot->total_runtime_s);
             cJSON_AddNumberToObject(hour_json, "flags", slot->flags);
             cJSON_AddItemToArray(hours_json, hour_json);

@@ -298,9 +298,9 @@ char *get_pumps_history_json(void)
                 cJSON *hour_json = cJSON_CreateObject();
                 cJSON_AddItemToObject(hour_json, "hour", cJSON_CreateNumber(hour));
                 cJSON_AddItemToObject(hour_json, "scheduled_volume_ml",
-                                      cJSON_CreateNumber(app_pumps_history_volume_dml_to_ml(slot->scheduled_volume_dml)));
+                                      cJSON_CreateNumber(app_pumps_history_volume_cml_to_ml(slot->scheduled_volume_cml)));
                 cJSON_AddItemToObject(hour_json, "manual_volume_ml",
-                                      cJSON_CreateNumber(app_pumps_history_volume_dml_to_ml(slot->manual_volume_dml)));
+                                      cJSON_CreateNumber(app_pumps_history_volume_cml_to_ml(slot->manual_volume_cml)));
                 cJSON_AddItemToObject(hour_json, "total_runtime_s", cJSON_CreateNumber(slot->total_runtime_s));
                 cJSON_AddItemToObject(hour_json, "flags", cJSON_CreateNumber(slot->flags));
                 cJSON_AddItemToArray(hours_json, hour_json);

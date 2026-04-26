@@ -31,7 +31,7 @@ partition sizes, or power-loss handling.
 | Tank current volume backup | I2C EEPROM or NVS fallback | `0x64` or `EE_0064` | Dosing run completes/stops, safety stop, normal restart, pump settings save | Per completed/stopped run | Medium if NVS fallback | Stores all pump `tank_current_vol` values. Designed to avoid per-second flash writes. |
 | Periodic schedule last-run marker | I2C EEPROM or NVS fallback | `0x32` or `EE_0032` | Schedule day rollover, scheduled dose start, manual reset of today's scheduled history marker | Per scheduled run/change | Medium if NVS fallback | Prevents duplicate same-hour periodic doses after reboot. Does not resume an interrupted pump. |
 | Reboot counter | I2C EEPROM or NVS fallback | `0x90` or `EE_0090` | Boot | Every boot | Medium if NVS fallback | Used by monitor telemetry. Frequent reset loops can wear fallback NVS. |
-| Pump history day blobs | NVS `pump_hist` | `HIS_P1_D00` ... `HIS_P4_D27` | Dirty backup after run completion/stop, slow 300 s safety net, HTTP/MQTT backup command, normal restart, scheduled-history reset | Per dirty pump day | Medium | 28-day ring per pump. Hour volumes are stored as 0.1 ml fixed point. |
+| Pump history day blobs | NVS `pump_hist` | `HIS_P1_D00` ... `HIS_P4_D27` | Dirty backup after run completion/stop, slow 300 s safety net, HTTP/MQTT backup command, normal restart, scheduled-history reset | Per dirty pump day | Medium | 28-day ring per pump. Hour volumes are stored as 0.01 ml fixed point. |
 | NVS erase | NVS partition | whole NVS partition | Factory reset, NVS no-free-pages recovery during init | Rare | High but rare | Factory reset is intentionally destructive. |
 | OTA image and web bundle | OTA/app flash partitions | active update partition | OTA update endpoint | User action | Medium during update | Writes firmware image and embedded frontend assets; normal OTA wear expectations apply. |
 
@@ -52,7 +52,7 @@ Schedule daily targets and pump history hourly volumes intentionally avoid raw
 floating-point storage in NVS:
 
 - Schedule `day_volume_dml`: `uint32_t`, where `25` means `2.5 ml/day`.
-- History `*_volume_dml`: `uint16_t`, where `1` means `0.1 ml`.
+- History `*_volume_cml`: `uint32_t`, where `1` means `0.01 ml`.
 - HTTP/MQTT/UI payloads still expose milliliters as decimal values, for example
   `{ "volume": 2.5 }`.
 
