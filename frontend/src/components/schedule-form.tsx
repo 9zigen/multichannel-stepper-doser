@@ -2,7 +2,7 @@ import React from 'react';
 import { Controller, ControllerRenderProps, SubmitHandler, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Check, CircleHelp, LoaderCircle, RotateCcw } from 'lucide-react';
+import { AlertTriangle, Check, CircleHelp, LoaderCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -82,6 +82,67 @@ type ScheduleFormProps = {
 
 const hours = Array.from(Array(24).keys());
 const weekdayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const MIN_CALIBRATION_FLOW_ML_PER_MIN = 0.01;
+const LIMIT_NUMBER_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+const COMPACT_VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+
+const formatLimitNumber = (value: number) => LIMIT_NUMBER_FORMATTER.format(value);
+
+const formatCompactDoseVolume = (volumeMl: number) => {
+  if (!Number.isFinite(volumeMl) || volumeMl <= 0) {
+    return '0ml';
+  }
+
+  if (volumeMl < 0.01) {
+    return '<0.01ml';
+  }
+
+  if (volumeMl <= 999) {
+    return `${COMPACT_VOLUME_FORMATTER.format(volumeMl)}ml`;
+  }
+
+  const volumeL = volumeMl / 1000;
+  if (volumeL > 999) {
+    return '>999L';
+  }
+
+  return `${COMPACT_VOLUME_FORMATTER.format(volumeL)}L`;
+};
+
+const estimateFlowMlPerMin = (calibration: PumpCalibrationState[], rpm: number) => {
+  if (!Number.isFinite(rpm) || rpm <= 0) {
+    return 0;
+  }
+
+  const points = calibration
+    .filter((point) => point.speed > 0 && point.flow >= MIN_CALIBRATION_FLOW_ML_PER_MIN)
+    .sort((left, right) => left.speed - right.speed);
+
+  if (points.length === 0) {
+    return 0;
+  }
+
+  if (points.length === 1 || rpm <= points[0].speed) {
+    return points[0].flow;
+  }
+
+  for (let index = 1; index < points.length; index += 1) {
+    const right = points[index];
+    if (rpm > right.speed) {
+      continue;
+    }
+
+    const left = points[index - 1];
+    if (right.speed <= left.speed) {
+      return right.flow;
+    }
+
+    const ratio = (rpm - left.speed) / (right.speed - left.speed);
+    return left.flow + (right.flow - left.flow) * ratio;
+  }
+
+  return points[points.length - 1].flow;
+};
 
 const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement => {
   const updatePump = useAppStore((state: AppStoreState) => state.updatePump);
@@ -94,6 +155,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
     formState: { isDirty, isSubmitting, errors },
     watch,
     reset,
+    setValue,
   } = useForm<FormData>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -116,6 +178,40 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
   const selectedWeekdays = watch('schedule.weekdays');
   const selectedSpeed = watch('schedule.speed');
   const selectedVolume = watch('schedule.volume');
+  const volumePerActiveHour =
+    selectedHours.length > 0 && Number.isFinite(selectedVolume) ? selectedVolume / selectedHours.length : 0;
+  const volumePerActiveHourLabel = formatCompactDoseVolume(volumePerActiveHour);
+
+  const dosingCapacity = React.useMemo(() => {
+    if (modeActual !== SCHEDULE_MODE.PERIODIC) {
+      return null;
+    }
+
+    const flowMlPerMin = estimateFlowMlPerMin(pump.calibration, selectedSpeed);
+    const activeHours = selectedHours.length;
+    const maxDailyVolume = flowMlPerMin * 60 * activeHours;
+    const requestedVolume = Number.isFinite(selectedVolume) ? selectedVolume : 0;
+
+    return {
+      activeHours,
+      flowMlPerMin,
+      maxDailyVolume,
+      missingCalibration: requestedVolume > 0 && flowMlPerMin <= 0,
+      unreachable: requestedVolume > maxDailyVolume && requestedVolume > 0,
+    };
+  }, [modeActual, pump.calibration, selectedHours.length, selectedSpeed, selectedVolume]);
+
+  const scheduleNotReachable = dosingCapacity?.unreachable ?? false;
+  const scheduleMissingCalibration = dosingCapacity?.missingCalibration ?? false;
+
+  const clampDailyVolumeToCapacity = () => {
+    if (!dosingCapacity || dosingCapacity.maxDailyVolume <= 0) {
+      return;
+    }
+
+    const limitedVolume = Number(dosingCapacity.maxDailyVolume.toFixed(2));
+    setValue('schedule.volume', limitedVolume, { shouldDirty: true, shouldValidate: true });
+  };
 
   const toggleHour = (field: ControllerRenderProps<FormData, 'schedule.work_hours'>, hour: number) => {
     const value = field.value.includes(hour)
@@ -290,10 +386,17 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                     type="number"
                     placeholder="10"
                     min="0.1"
+                    max={
+                      dosingCapacity && dosingCapacity.maxDailyVolume > 0
+                        ? dosingCapacity.maxDailyVolume
+                        : undefined
+                    }
                     step="0.1"
                     className="h-8 text-sm tabular-nums"
                     {...register('schedule.volume', { valueAsNumber: true })}
-                    aria-invalid={!!errors.schedule?.volume}
+                    aria-invalid={
+                      !!errors.schedule?.volume || scheduleNotReachable || scheduleMissingCalibration
+                    }
                   />
                   <div
                     className={cn(
@@ -311,6 +414,55 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                 </div>
               )}
             </div>
+
+            {modeActual === SCHEDULE_MODE.PERIODIC && dosingCapacity && (
+              <div
+                className={cn(
+                  'mt-3 flex items-start gap-2 rounded-md border p-2 text-xs transition-colors',
+                  scheduleMissingCalibration || scheduleNotReachable
+                    ? 'border-amber-400/40 bg-amber-400/10 text-amber-900 dark:text-amber-200'
+                    : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-900 dark:text-emerald-200',
+                )}
+              >
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                <div className="min-w-0 space-y-1">
+                  {scheduleMissingCalibration ? (
+                    <p>
+                      Calibration is required to estimate the reachable daily volume for scheduled dosing.
+                    </p>
+                  ) : scheduleNotReachable ? (
+                    <>
+                      <p>
+                        Requested {formatLimitNumber(selectedVolume)} ml/day is not reachable at{' '}
+                        {formatLimitNumber(selectedSpeed)} rpm with {dosingCapacity.activeHours} active hour
+                        {dosingCapacity.activeHours === 1 ? '' : 's'}.
+                      </p>
+                      <p>
+                        Estimated flow is {formatLimitNumber(dosingCapacity.flowMlPerMin)} ml/min, so this schedule can
+                        dose up to {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day. Increase speed, add active
+                        hours, or lower the target.
+                      </p>
+                      {dosingCapacity.maxDailyVolume > 0 && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          onClick={clampDailyVolumeToCapacity}
+                        >
+                          Limit to {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <p>
+                      Estimated capacity: {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day at{' '}
+                      {formatLimitNumber(dosingCapacity.flowMlPerMin)} ml/min.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -359,17 +511,29 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                   control={control}
                   render={({ field }) => (
                     <div className="grid grid-cols-6 gap-1 sm:grid-cols-8 xl:grid-cols-12">
-                      {hours.map((hour) => (
-                        <Toggle
-                          key={hour}
-                          size="sm"
-                          pressed={field.value.includes(hour)}
-                          onClick={() => toggleHour(field, hour)}
-                          className="h-7 rounded-md px-0 text-xs tabular-nums"
-                        >
-                          {String(hour).padStart(2, '0')}
-                        </Toggle>
-                      ))}
+                      {hours.map((hour) => {
+                        const selected = field.value.includes(hour);
+
+                        return (
+                          <Toggle
+                            key={hour}
+                            size="sm"
+                            pressed={selected}
+                            onClick={() => toggleHour(field, hour)}
+                            className={cn(
+                              'rounded-md px-0 text-xs tabular-nums',
+                              selected ? 'h-10 flex-col gap-0.5' : 'h-7',
+                            )}
+                          >
+                            <span>{String(hour).padStart(2, '0')}</span>
+                            {selected && (
+                              <span className="text-[9px] font-semibold leading-none text-primary/80">
+                                {volumePerActiveHourLabel}
+                              </span>
+                            )}
+                          </Toggle>
+                        );
+                      })}
                     </div>
                   )}
                 />
@@ -386,7 +550,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={!isDirty || isSubmitting}
+                disabled={!isDirty || isSubmitting || scheduleNotReachable || scheduleMissingCalibration}
               >
                 {isSubmitting ? (
                   <LoaderCircle className="animate-spin" data-icon="inline-start" />
@@ -407,13 +571,20 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={saveAndResetTodayHistory} disabled={isSubmitting}>
+                <AlertDialogAction
+                  onClick={saveAndResetTodayHistory}
+                  disabled={isSubmitting || scheduleNotReachable || scheduleMissingCalibration}
+                >
                   {isSubmitting ? 'Applying...' : 'Reset today + apply'}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <Button type="submit" size="sm" disabled={!isDirty || isSubmitting}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!isDirty || isSubmitting || scheduleNotReachable || scheduleMissingCalibration}
+          >
             {isSubmitting ? (
               <>
                 <LoaderCircle className="animate-spin" data-icon="inline-start" /> Saving
