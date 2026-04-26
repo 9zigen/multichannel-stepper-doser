@@ -19,7 +19,7 @@ struct HistoryView: View {
                     if let selectedPump {
                         VStack(alignment: .trailing, spacing: StepperSpacing.sm) {
                             StepperBadge(text: "\(selectedPump.days.count) days", tone: .secondary)
-                            StepperBadge(text: "\(Int(totalVolume(for: selectedPump))) ml", tone: .outline)
+                            StepperBadge(text: selectedPump.formattedTotalVolume, tone: .outline)
                         }
                     }
                 }
@@ -77,7 +77,7 @@ struct HistoryView: View {
                             ) {
                                 StepperMetricTile(
                                     label: "Total Volume",
-                                    value: "\(Int(dayVolume(selectedDay))) ml",
+                                    value: selectedDay.formattedVolume,
                                     caption: "\(activeHours(selectedDay).count) active hour(s)",
                                     tone: .primary
                                 )
@@ -92,7 +92,7 @@ struct HistoryView: View {
                             VStack(spacing: StepperSpacing.md) {
                                 ForEach(activeHours(selectedDay), id: \.hour) { hour in
                                     StepperKeyValueRow(hourLabel(hour.hour)) {
-                                        Text("\(Int(hour.scheduledVolumeMl + hour.manualVolumeMl)) ml • \(runtimeLabel(hour.totalRuntimeS))")
+                                        Text("\(hour.formattedVolume) • \(runtimeLabel(hour.totalRuntimeS))")
                                             .font(StepperFont.monoSmall)
                                     }
                                 }
@@ -183,29 +183,21 @@ struct HistoryView: View {
         }
     }
 
-    private func totalVolume(for pump: PumpHistoryPump) -> Double {
-        pump.days.reduce(0) { $0 + dayVolume($1) }
-    }
-
-    private func dayVolume(_ day: PumpHistoryDay) -> Double {
-        day.hours.reduce(0) { $0 + $1.scheduledVolumeMl + $1.manualVolumeMl }
-    }
-
     private func dayRuntime(_ day: PumpHistoryDay) -> Double {
         day.hours.reduce(0) { $0 + $1.totalRuntimeS }
     }
 
     private func activeHours(_ day: PumpHistoryDay) -> [PumpHistoryHour] {
-        day.hours.filter { ($0.scheduledVolumeMl + $0.manualVolumeMl) > 0 || $0.totalRuntimeS > 0 }
+        day.hours.filter { $0.totalVolumeMl > 0 || $0.totalRuntimeS > 0 }
     }
 
     private func heatmapPoints(for pump: PumpHistoryPump) -> [StepperHeatmapPoint] {
-        let maxVolume = max(pump.days.map(dayVolume).max() ?? 0, 1)
+        let maxVolume = max(pump.days.map(\.totalVolumeMl).max() ?? 0, 1)
         return pump.days.map { day in
             StepperHeatmapPoint(
                 id: day.dayStamp,
-                ratio: dayVolume(day) / maxVolume,
-                label: "\(day.date) · \(Int(dayVolume(day))) ml"
+                ratio: day.totalVolumeMl / maxVolume,
+                label: "\(day.date) · \(day.formattedVolume)"
             )
         }
     }
@@ -214,8 +206,8 @@ struct HistoryView: View {
         pump.days.suffix(30).map { day in
             StepperMiniBarPoint(
                 id: day.dayStamp,
-                value: dayVolume(day),
-                label: "\(day.date) · \(Int(dayVolume(day))) ml"
+                value: day.totalVolumeMl,
+                label: "\(day.date) · \(day.formattedVolume)"
             )
         }
     }

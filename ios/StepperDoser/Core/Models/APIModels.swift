@@ -191,6 +191,67 @@ struct PumpHistoryResponse: Codable, Equatable, Sendable {
     var pumps: [PumpHistoryPump]
 }
 
+// MARK: — Pump history volume helpers
+//
+// Firmware stores volumes as deci-milliliters (uint16) internally and converts
+// to float ml before sending JSON: `scheduled_volume_ml` / `manual_volume_ml`.
+// Max per-slot value is UINT16_MAX / 10 = 6553.5 ml — treat as saturated.
+
+private let kHistoryVolumeMaxMl: Double = 6553.5
+
+extension PumpHistoryHour {
+    /// Total volume for this hour slot (scheduled + manual).
+    var totalVolumeMl: Double { scheduledVolumeMl + manualVolumeMl }
+
+    /// True when either component has hit the firmware storage ceiling.
+    var isSaturated: Bool {
+        scheduledVolumeMl >= kHistoryVolumeMaxMl || manualVolumeMl >= kHistoryVolumeMaxMl
+    }
+
+    /// Human-readable total volume for display (e.g. "1.5 ml", "1.2 L", "> 6.5L").
+    var formattedVolume: String { PumpHistoryVolume.format(totalVolumeMl, saturated: isSaturated) }
+}
+
+extension PumpHistoryDay {
+    /// Sum of all hour volumes for this day.
+    var totalVolumeMl: Double { hours.reduce(0) { $0 + $1.totalVolumeMl } }
+
+    /// True when any hour slot in this day is saturated.
+    var isSaturated: Bool { hours.contains(where: \.isSaturated) }
+
+    /// Human-readable total volume for this day.
+    var formattedVolume: String { PumpHistoryVolume.format(totalVolumeMl, saturated: isSaturated) }
+}
+
+extension PumpHistoryPump {
+    /// Sum of all day volumes across the pump's retained history.
+    var totalVolumeMl: Double { days.reduce(0) { $0 + $1.totalVolumeMl } }
+
+    /// Human-readable total volume for the whole pump history window.
+    var formattedTotalVolume: String { PumpHistoryVolume.format(totalVolumeMl) }
+}
+
+/// Centralised volume formatting matching frontend `formatHistoryVolume` in utils.ts.
+enum PumpHistoryVolume {
+    /// Format a volume value with optional saturation override.
+    /// - saturated: show "> 6.5L" regardless of numeric value.
+    /// - ≥ 1000 ml: show in litres with 1 decimal (trailing zero stripped).
+    /// - else: show in ml with 1 decimal (trailing zero stripped).
+    static func format(_ ml: Double, saturated: Bool = false) -> String {
+        if saturated || ml >= kHistoryVolumeMaxMl { return "> 6.5L" }
+        if ml >= 1000 {
+            let l = ml / 1000
+            return l.truncatingRemainder(dividingBy: 1) == 0
+                ? "\(Int(l)) L"
+                : String(format: "%.1f L", l)
+        }
+        let rounded = (ml * 10).rounded() / 10
+        return rounded.truncatingRemainder(dividingBy: 1) == 0
+            ? "\(Int(rounded)) ml"
+            : String(format: "%.1f ml", rounded)
+    }
+}
+
 struct DeviceActionResponse: Codable, Sendable {
     var success: Bool
     var message: String?

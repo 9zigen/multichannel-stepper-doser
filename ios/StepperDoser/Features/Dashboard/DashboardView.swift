@@ -528,9 +528,8 @@ private struct TodayDosingCard: View {
                 HourlyHeatmapView(hours: today.hours)
 
                 // Summary metrics — 3 equal columns
-                let totalVolume = today.hours.reduce(0.0) { $0 + $1.scheduledVolumeMl + $1.manualVolumeMl }
                 let totalRuntime = today.hours.reduce(0.0) { $0 + $1.totalRuntimeS }
-                let activeCount = today.hours.filter { $0.scheduledVolumeMl + $0.manualVolumeMl > 0 || $0.totalRuntimeS > 0 }.count
+                let activeCount = today.hours.filter { $0.totalVolumeMl > 0 || $0.totalRuntimeS > 0 }.count
 
                 LazyVGrid(
                     columns: [
@@ -542,7 +541,7 @@ private struct TodayDosingCard: View {
                 ) {
                     StepperMetricTile(
                         label: "Volume",
-                        value: "\(Int(totalVolume)) ml",
+                        value: today.formattedVolume,
                         caption: "Total today",
                         tone: .primary
                     )
@@ -562,8 +561,8 @@ private struct TodayDosingCard: View {
 
                 // Busiest hours (top 3 by volume)
                 let busiest = today.hours
-                    .filter { $0.scheduledVolumeMl + $0.manualVolumeMl > 0 }
-                    .sorted { ($0.scheduledVolumeMl + $0.manualVolumeMl) > ($1.scheduledVolumeMl + $1.manualVolumeMl) }
+                    .filter { $0.totalVolumeMl > 0 }
+                    .sorted { $0.totalVolumeMl > $1.totalVolumeMl }
                     .prefix(3)
 
                 if !busiest.isEmpty {
@@ -576,10 +575,7 @@ private struct TodayDosingCard: View {
                                         .font(StepperFont.monoSmall)
                                         .foregroundStyle(StepperColor.foreground)
                                     Spacer()
-                                    StepperBadge(
-                                        text: "\(Int(hour.scheduledVolumeMl + hour.manualVolumeMl)) ml",
-                                        tone: .primary
-                                    )
+                                    StepperBadge(text: hour.formattedVolume, tone: .primary)
                                     Text(runtimeLabel(hour.totalRuntimeS))
                                         .font(StepperFont.caption)
                                         .foregroundStyle(StepperColor.mutedForeground)
