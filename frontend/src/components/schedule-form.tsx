@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button.tsx';
 import { Input } from '@/components/ui/input.tsx';
 import { Label } from '@/components/ui/label.tsx';
 import { Toggle } from '@/components/ui/toggle';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { AppStoreState, useAppStore } from '@/hooks/use-store.ts';
 import {
@@ -82,6 +81,13 @@ type ScheduleFormProps = {
 
 const hours = Array.from(Array(24).keys());
 const weekdayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+const formatHourLabel = (hour: number, use12h: boolean): string => {
+  if (!use12h) return String(hour).padStart(2, '0');
+  if (hour === 0) return '12a';
+  if (hour === 12) return '12p';
+  return hour < 12 ? `${hour}a` : `${hour - 12}p`;
+};
 const MIN_CALIBRATION_FLOW_ML_PER_MIN = 0.01;
 const LIMIT_NUMBER_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const COMPACT_VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
@@ -147,6 +153,17 @@ const estimateFlowMlPerMin = (calibration: PumpCalibrationState[], rpm: number) 
 const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement => {
   const updatePump = useAppStore((state: AppStoreState) => state.updatePump);
   const [showHelp, setShowHelp] = React.useState(false);
+  const [use12h, setUse12h] = React.useState<boolean>(() => {
+    try { return localStorage.getItem('ui-hours-format') === '12h'; } catch { return false; }
+  });
+
+  const toggleHourFormat = () => {
+    setUse12h((v) => {
+      const next = !v;
+      try { localStorage.setItem('ui-hours-format', next ? '12h' : '24h'); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const {
     control,
@@ -265,64 +282,61 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
       <div className="flex flex-col gap-3">
         {/* Mode selector */}
         <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Mode</span>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {modeActual === SCHEDULE_MODE.PERIODIC && (
-                <>
-                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatVolumePerDay(selectedVolume)}</Badge>
-                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatRpm(selectedSpeed)}</Badge>
-                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatDaysCount(selectedWeekdays)} · {formatHoursCount(selectedHours)}</Badge>
-                </>
-              )}
-              {modeActual === SCHEDULE_MODE.CONTINUOUS && (
-                <Badge variant="outline" className="text-[10px] tabular-nums">{formatRpm(selectedSpeed)}</Badge>
-              )}
-            </div>
-          </div>
+          <span className="mb-2.5 block text-[10px] uppercase tracking-wider text-muted-foreground">Mode</span>
 
           <Controller
             name="schedule.mode"
             control={control}
             render={({ field }) => (
-              <ToggleGroup
-                type="single"
-                spacing={3}
-                className="grid w-full grid-cols-3"
-                value={String(field.value)}
-                onValueChange={(value) => {
-                  if (value !== '') {
-                    field.onChange(Number(value));
-                  }
-                }}
-              >
+              <div className="grid w-full grid-cols-3 gap-2">
                 {Object.entries(scheduleModeMeta).map(([value, meta]) => {
                   const selected = field.value === Number(value);
                   return (
-                    <ToggleGroupItem
+                    <button
                       key={value}
-                      value={value}
+                      type="button"
+                      onClick={() => field.onChange(Number(value))}
                       className={cn(
-                        'h-8 rounded-md border border-transparent px-2 text-sm font-medium shadow-none transition-all',
-                        'flex items-center gap-1.5 hover:bg-secondary/25',
+                        'flex flex-col items-center gap-1.5 rounded-lg border py-3 transition-all',
                         selected
-                          ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_12px_rgba(34,211,238,0.1)]'
-                          : 'text-foreground/80',
+                          ? 'border-primary/40 bg-primary/10 text-primary shadow-[0_0_16px_rgba(34,211,238,0.12)]'
+                          : 'border-border/40 bg-secondary/5 text-muted-foreground hover:border-border/70 hover:bg-secondary/15 hover:text-foreground',
                       )}
                     >
-                      <meta.icon className="size-3.5 shrink-0" />
-                      <span>{meta.label}</span>
-                    </ToggleGroupItem>
+                      <meta.icon className="size-5 shrink-0" />
+                      <span className="text-[11px] font-medium leading-none">{meta.label}</span>
+                    </button>
                   );
                 })}
-              </ToggleGroup>
+              </div>
             )}
           />
 
-          {modeActual === SCHEDULE_MODE.OFF && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Automatic dosing is disabled. Manual control remains available.
-            </p>
+          <p className="mt-2.5 text-xs leading-snug text-muted-foreground">
+            {scheduleModeMeta[modeActual].description}
+          </p>
+
+          {(modeActual === SCHEDULE_MODE.PERIODIC || modeActual === SCHEDULE_MODE.CONTINUOUS) && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {modeActual === SCHEDULE_MODE.PERIODIC && (
+                <>
+                  <Badge variant="outline" className="text-[10px] tabular-nums border-primary/30 bg-primary/5 text-primary">
+                    {formatVolumePerDay(selectedVolume)}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] tabular-nums">
+                    {formatRpm(selectedSpeed)}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] tabular-nums">
+                    {formatDaysCount(selectedWeekdays)} · {formatHoursCount(selectedHours)}
+                  </Badge>
+                </>
+              )}
+              {modeActual === SCHEDULE_MODE.CONTINUOUS && (
+                <Badge variant="outline" className="text-[10px] tabular-nums">
+                  {formatRpm(selectedSpeed)}
+                </Badge>
+              )}
+            </div>
           )}
         </div>
 
@@ -502,9 +516,24 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Hours</span>
-                  <span className="text-[10px] tabular-nums text-muted-foreground/60">
-                    {selectedHours.length}/24
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] tabular-nums text-muted-foreground/60">
+                      {selectedHours.length}/24
+                    </span>
+                    <button
+                      type="button"
+                      onClick={toggleHourFormat}
+                      className={cn(
+                        'rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors',
+                        use12h
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground/60 hover:text-muted-foreground',
+                      )}
+                      aria-label="Toggle 12/24-hour format"
+                    >
+                      {use12h ? '12h' : '24h'}
+                    </button>
+                  </div>
                 </div>
                 <Controller
                   name="schedule.work_hours"
@@ -521,11 +550,12 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                             pressed={selected}
                             onClick={() => toggleHour(field, hour)}
                             className={cn(
-                              'rounded-md px-0 text-xs tabular-nums',
+                              'rounded-md px-0 tabular-nums',
+                              use12h ? 'text-[10px]' : 'text-xs',
                               selected ? 'h-10 flex-col gap-0.5' : 'h-7',
                             )}
                           >
-                            <span>{String(hour).padStart(2, '0')}</span>
+                            <span>{formatHourLabel(hour, use12h)}</span>
                             {selected && (
                               <span className="text-[9px] font-semibold leading-none text-primary/80">
                                 {volumePerActiveHourLabel}

@@ -76,12 +76,12 @@ const Schedule: React.FC = (): React.ReactElement => {
                     {scheduleStats.active}/{pumps.length} active
                   </Badge>
                   {scheduleStats.dailyMl > 0 && (
-                    <Badge variant="secondary" className="text-xs tabular-nums">
+                    <Badge variant="outline" className="text-xs tabular-nums border-primary/30 bg-primary/5 text-primary">
                       {formatVolumePerDay(scheduleStats.dailyMl)}
                     </Badge>
                   )}
                   {scheduleStats.continuous.length > 0 && (
-                    <Badge variant="secondary" className="text-xs tabular-nums">
+                    <Badge variant="outline" className="text-xs tabular-nums border-amber-400/40 bg-amber-400/5 text-amber-600 dark:text-amber-400">
                       {scheduleStats.continuous.length} continuous
                     </Badge>
                   )}
