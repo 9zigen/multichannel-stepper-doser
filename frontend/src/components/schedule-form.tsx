@@ -279,10 +279,10 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
 
   return (
     <form className="w-full" onSubmit={handleSubmit(onSubmit)}>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-6">
         {/* Mode selector */}
-        <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
-          <span className="mb-2.5 block text-[10px] uppercase tracking-wider text-muted-foreground">Mode</span>
+        <div>
+          <span className="mb-2.5 block text-[10px] uppercase tracking-wider text-muted-foreground/60">Mode</span>
 
           <Controller
             name="schedule.mode"
@@ -342,9 +342,9 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
 
         {/* Output target */}
         {modeActual !== SCHEDULE_MODE.OFF && (
-          <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
+          <div>
             <div className="mb-2 flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Output target</span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Output target</span>
               <button
                 type="button"
                 onClick={() => setShowHelp((v) => !v)}
@@ -482,8 +482,8 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
 
         {/* Timing rules — compact */}
         {modeActual === SCHEDULE_MODE.PERIODIC && (
-          <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
-            <span className="mb-2 block text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div>
+            <span className="mb-2 block text-[10px] uppercase tracking-wider text-muted-foreground/60">
               Timing rules
             </span>
 
@@ -573,7 +573,7 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
         )}
 
         {/* Submit */}
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border/20 pt-4">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
