@@ -138,9 +138,17 @@ typedef struct {
     uint8_t  week_days;                   // Doses every weekday bitmask 0 - 7 bit
     float    speed;                       // Motor speed int RPM
     uint32_t time;                        // Continuous or manual runtime
-    uint32_t day_volume;                  // dose volume in mL (1/1000 l)
+    uint32_t day_volume_dml;              // Daily target in deci-milliliters: 25 = 2.5 ml
     bool     active;                      // Need send by WS to GUI
 } schedule_t;
+
+#define SCHEDULE_VOLUME_SCALE 10U
+#define SCHEDULE_VOLUME_MAX_ML ((double)UINT32_MAX / (double)SCHEDULE_VOLUME_SCALE)
+
+static inline double schedule_volume_dml_to_ml(uint32_t volume_dml)
+{
+    return (double)volume_dml / (double)SCHEDULE_VOLUME_SCALE;
+}
 
 typedef struct {
     char username[32];

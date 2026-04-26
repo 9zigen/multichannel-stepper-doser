@@ -42,6 +42,19 @@ static const char *TAG = "WEBSERVER";
 
 esp_err_t upgrade_firmware(void);
 
+static uint32_t schedule_volume_ml_to_dml(double volume_ml)
+{
+    if (!(volume_ml > 0.0)) {
+        return 0;
+    }
+
+    if (volume_ml >= SCHEDULE_VOLUME_MAX_ML) {
+        return UINT32_MAX;
+    }
+
+    return (uint32_t)(volume_ml * (double)SCHEDULE_VOLUME_SCALE + 0.5);
+}
+
 static uint32_t calibration_to_100ml_units(const pump_t *pump)
 {
     if (pump->calibration_count == 0 || pump->calibration[0].flow < MIN_PUMP_CALIBRATION_FLOW_ML_PER_MIN) {
@@ -93,7 +106,7 @@ static bool pump_calibration_points_valid(const pump_t *pump_config, char *error
 static double schedule_single_dose_ml(const schedule_t *schedule_config)
 {
     if (schedule_config == NULL || schedule_config->mode != SCHEDULE_MODE_PERIODIC ||
-        schedule_config->day_volume == 0) {
+        schedule_config->day_volume_dml == 0) {
         return 0.0;
     }
 
@@ -108,7 +121,7 @@ static double schedule_single_dose_ml(const schedule_t *schedule_config)
         return 0.0;
     }
 
-    return (double)schedule_config->day_volume / (double)slots;
+    return schedule_volume_dml_to_ml(schedule_config->day_volume_dml) / (double)slots;
 }
 
 static esp_err_t validate_pump_payload(const pump_t *pump_config, const schedule_t *schedule_config,
@@ -126,7 +139,7 @@ static esp_err_t validate_pump_payload(const pump_t *pump_config, const schedule
     if (schedule_config->mode == SCHEDULE_MODE_PERIODIC && schedule_config->active) {
         esp_err_t periodic_validation = app_pumps_validate_periodic_schedule(pump_config->id,
                                                                              schedule_config->speed,
-                                                                             schedule_config->day_volume,
+                                                                             schedule_volume_dml_to_ml(schedule_config->day_volume_dml),
                                                                              error,
                                                                              error_size);
         if (periodic_validation != ESP_OK) {
@@ -149,7 +162,7 @@ static esp_err_t validate_pump_payload(const pump_t *pump_config, const schedule
         }
 
         if (pump_config->safety.max_daily_ml > 0 &&
-            schedule_config->day_volume > pump_config->safety.max_daily_ml) {
+            schedule_volume_dml_to_ml(schedule_config->day_volume_dml) > (double)pump_config->safety.max_daily_ml) {
             snprintf(error, error_size, "Pump %u schedule volume exceeds max_daily_ml",
                      (unsigned)pump_config->id);
             return ESP_ERR_INVALID_ARG;
@@ -1653,9 +1666,10 @@ esp_err_t schedule_post_handler(httpd_req_t *req)
                 }
             }
 
-            schedule_config->speed = speed->valueint;
+            schedule_config->speed = cJSON_IsNumber(speed) ? speed->valuedouble : 0;
             schedule_config->time = run_time != NULL ? run_time->valueint : 0;
-            schedule_config->day_volume = volume != NULL ? volume->valueint : 0;
+            schedule_config->day_volume_dml = cJSON_IsNumber(volume) ?
+                schedule_volume_ml_to_dml(volume->valuedouble) : 0;
             schedule_config->active = schedule_config->mode != SCHEDULE_MODE_OFF;
 
             id++;
@@ -1824,7 +1838,8 @@ esp_err_t settings_post_handler(httpd_req_t *req)
 
                 schedule_config->speed = cJSON_IsNumber(speed) ? speed->valuedouble : 0;
                 schedule_config->time = cJSON_IsNumber(time) ? time->valueint : 0;
-                schedule_config->day_volume = cJSON_IsNumber(volume) ? volume->valueint : 0;
+                schedule_config->day_volume_dml = cJSON_IsNumber(volume) ?
+                    schedule_volume_ml_to_dml(volume->valuedouble) : 0;
                 schedule_config->active = schedule_config->mode != SCHEDULE_MODE_OFF;
             }
 

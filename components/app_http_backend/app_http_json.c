@@ -176,7 +176,8 @@ char *get_schedule_json(void)
 
         cJSON_AddItemToObject(schedule_item, "speed", cJSON_CreateNumber(schedule_config->speed));
         cJSON_AddItemToObject(schedule_item, "time", cJSON_CreateNumber((double)schedule_config->time));
-        cJSON_AddItemToObject(schedule_item, "volume", cJSON_CreateNumber((double)schedule_config->day_volume));
+        cJSON_AddItemToObject(schedule_item, "volume",
+                              cJSON_CreateNumber(schedule_volume_dml_to_ml(schedule_config->day_volume_dml)));
         cJSON_AddItemToArray(schedule, schedule_item);
     }
     cJSON_AddItemToObject(root, "schedule", schedule);
@@ -437,7 +438,8 @@ char *get_settings_json(void)
         cJSON_AddItemToObject(schedule_item, "weekdays", schedule_week_days);
         cJSON_AddItemToObject(schedule_item, "speed", cJSON_CreateNumber(schedule_config->speed));
         cJSON_AddItemToObject(schedule_item, "time", cJSON_CreateNumber((double)schedule_config->time));
-        cJSON_AddItemToObject(schedule_item, "volume", cJSON_CreateNumber((double)schedule_config->day_volume));
+        cJSON_AddItemToObject(schedule_item, "volume",
+                              cJSON_CreateNumber(schedule_volume_dml_to_ml(schedule_config->day_volume_dml)));
         cJSON_AddItemToObject(pump_item, "schedule", schedule_item);
 
         cJSON *calibration = cJSON_CreateArray();

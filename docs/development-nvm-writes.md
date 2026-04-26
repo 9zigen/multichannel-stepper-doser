@@ -22,7 +22,7 @@ partition sizes, or power-loss handling.
 | Service settings | NVS `storage` | `service` | Services settings save, provisioning apply, time-zone-only update, default/normalization init | User action | Low | Includes hostname, OTA URL, NTP, MQTT, discovery, global daily safety limit. |
 | Pump settings | NVS `storage` | `PUMP1_CFG` ... `PUMP4_CFG` | Pump settings save, default init | User action | Low | One blob per pump. Includes tank config, current tank value snapshot, direction, safety limits, calibration count. |
 | Pump calibration points | NVS `storage` | `PUMP1_CAL1` ... | Pump settings save | User action | Low | Saved with pump settings. Unused point keys are erased during save. |
-| Schedule settings | NVS `storage` | `schedule` | Schedule settings save, pump settings save with embedded schedule, default init | User action | Low | Persistent configuration, not the runtime last-run marker. |
+| Schedule settings | NVS `storage` | `schedule` | Schedule settings save, pump settings save with embedded schedule, default init | User action | Low | Persistent configuration, not the runtime last-run marker. Daily volume is stored as 0.1 ml fixed point. |
 | Auth settings | NVS `storage` | `auth` | Auth settings save, provisioning apply, default init, first startup if token is missing | User action | Low | Current token behavior should avoid rewriting on every successful login. |
 | Board hardware config | NVS `storage` | `stepper_cfg` | Board settings save, default init | User action | Low | Pins, I2C addresses, CAN pins, ADC/GPIO definitions. |
 | App onboarding state | NVS `storage` | `APP_STATE` | Provisioning/app settings save, default init | User action | Low | Currently mainly `onboarding_completed`. |
@@ -45,6 +45,19 @@ partition sizes, or power-loss handling.
   but do not make clients poll them repeatedly.
 - Treat NVS fallback for EEPROM as a development/failsafe mode. For production
   life-support dosing, prefer real EEPROM or FRAM for runtime durability.
+
+## Fixed-Point Volume Fields
+
+Schedule daily targets and pump history hourly volumes intentionally avoid raw
+floating-point storage in NVS:
+
+- Schedule `day_volume_dml`: `uint32_t`, where `25` means `2.5 ml/day`.
+- History `*_volume_dml`: `uint16_t`, where `1` means `0.1 ml`.
+- HTTP/MQTT/UI payloads still expose milliliters as decimal values, for example
+  `{ "volume": 2.5 }`.
+
+This keeps persistent blobs compact and deterministic while allowing operator
+inputs down to `0.1 ml/day`.
 
 ## Current Runtime Persistence Policy
 

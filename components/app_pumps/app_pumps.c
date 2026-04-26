@@ -502,13 +502,14 @@ static double schedule_next_dose_volume_ml(const schedule_t *schedule,
                                            uint8_t current_hour,
                                            uint32_t last_run_hour)
 {
-    if (schedule == NULL || schedule->pump_id >= MAX_PUMP || schedule->day_volume == 0) {
+    if (schedule == NULL || schedule->pump_id >= MAX_PUMP || schedule->day_volume_dml == 0) {
         return 0.0;
     }
 
+    const double day_volume_ml = schedule_volume_dml_to_ml(schedule->day_volume_dml);
     const double scheduled_today_ml =
         app_pumps_history_get_pump_scheduled_day_volume_ml(schedule->pump_id);
-    if (scheduled_today_ml >= (double)schedule->day_volume) {
+    if (scheduled_today_ml >= day_volume_ml) {
         return 0.0;
     }
 
@@ -518,7 +519,7 @@ static double schedule_next_dose_volume_ml(const schedule_t *schedule,
         return 0.0;
     }
 
-    return ((double)schedule->day_volume - scheduled_today_ml) / (double)remaining_slots;
+    return (day_volume_ml - scheduled_today_ml) / (double)remaining_slots;
 }
 
 static void vScheduleTimerHandler(TimerHandle_t pxTimer)
@@ -611,16 +612,17 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
                 continue;
             }
 
-            ESP_LOGD(TAG, "schedule:%u pump:%u speed:%.2f Dvol:%lu nextDose:%.2f",
+            const double day_volume_ml = schedule_volume_dml_to_ml(schedule->day_volume_dml);
+            ESP_LOGD(TAG, "schedule:%u pump:%u speed:%.2f Dvol:%.1f nextDose:%.2f",
                      (unsigned)j,
                      (unsigned)schedule->pump_id,
                      schedule->speed,
-                     (unsigned long)schedule->day_volume,
+                     day_volume_ml,
                      volume);
 
             char schedule_error[96];
             esp_err_t validation = app_pumps_validate_periodic_schedule(schedule->pump_id, schedule->speed,
-                                                                        schedule->day_volume,
+                                                                        day_volume_ml,
                                                                         schedule_error,
                                                                         sizeof(schedule_error));
             if (validation != ESP_OK) {
@@ -716,10 +718,10 @@ bool app_pumps_has_calibration(uint8_t pump_id)
     return pump_has_valid_calibration(get_pump_config(pump_id));
 }
 
-esp_err_t app_pumps_validate_periodic_schedule(uint8_t pump_id, float rpm, uint32_t day_volume_ml,
+esp_err_t app_pumps_validate_periodic_schedule(uint8_t pump_id, float rpm, double day_volume_ml,
                                                char *error, size_t error_size)
 {
-    if (day_volume_ml == 0) {
+    if (day_volume_ml <= 0.0) {
         if (error != NULL && error_size > 0) {
             error[0] = '\0';
         }

@@ -631,7 +631,7 @@ void set_default_schedule()
         schedule[i].week_days       = 0; /* Pump Work Week days */
         schedule[i].speed           = 0; /* Pump speed flow */
         schedule[i].time            = 0;
-        schedule[i].day_volume      = 0; /* Day volume in ml */
+        schedule[i].day_volume_dml  = 0; /* Daily volume in 0.1 ml units */
         schedule[i].active          = false;
     }
     save_schedule();

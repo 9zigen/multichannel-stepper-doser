@@ -70,7 +70,7 @@ const FormSchema = z.object({
     weekdays: z.array(z.number()),
     speed: z.number(),
     time: z.number(),
-    volume: z.number(),
+    volume: z.number().min(0, 'Daily volume cannot be negative.'),
   }),
 });
 
@@ -220,14 +220,17 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
 
   const scheduleNotReachable = dosingCapacity?.unreachable ?? false;
   const scheduleMissingCalibration = dosingCapacity?.missingCalibration ?? false;
+  const reachableDailyVolumeLimit = Math.max(
+    0,
+    Math.floor((dosingCapacity?.maxDailyVolume ?? 0) * 10) / 10,
+  );
 
   const clampDailyVolumeToCapacity = () => {
-    if (!dosingCapacity || dosingCapacity.maxDailyVolume <= 0) {
+    if (reachableDailyVolumeLimit <= 0) {
       return;
     }
 
-    const limitedVolume = Number(dosingCapacity.maxDailyVolume.toFixed(2));
-    setValue('schedule.volume', limitedVolume, { shouldDirty: true, shouldValidate: true });
+    setValue('schedule.volume', reachableDailyVolumeLimit, { shouldDirty: true, shouldValidate: true });
   };
 
   const toggleHour = (field: ControllerRenderProps<FormData, 'schedule.work_hours'>, hour: number) => {
@@ -453,13 +456,13 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                       {formatLimitNumber(dosingCapacity.flowMlPerMin)} ml/min ×{' '}
                       {dosingCapacity.activeHours}h active — increase speed, add hours, or lower the target.
                     </p>
-                    {dosingCapacity.maxDailyVolume > 0 && (
+                    {reachableDailyVolumeLimit > 0 && (
                       <button
                         type="button"
                         onClick={clampDailyVolumeToCapacity}
                         className="mt-1.5 text-[11px] font-medium text-amber-700 underline underline-offset-2 dark:text-amber-300"
                       >
-                        Use {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day
+                        Use {formatLimitNumber(reachableDailyVolumeLimit)} ml/day
                       </button>
                     )}
                   </div>

@@ -143,7 +143,7 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
 void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direction);
 double app_pumps_estimate_flow_ml_per_min(uint8_t pump_id, float rpm);
 bool app_pumps_has_calibration(uint8_t pump_id);
-esp_err_t app_pumps_validate_periodic_schedule(uint8_t pump_id, float rpm, uint32_t day_volume_ml,
+esp_err_t app_pumps_validate_periodic_schedule(uint8_t pump_id, float rpm, double day_volume_ml,
                                                char *error, size_t error_size);
 esp_err_t app_pumps_validate_manual_run(uint8_t pump_id, float rpm, int32_t time_seconds,
                                         char *error, size_t error_size);
