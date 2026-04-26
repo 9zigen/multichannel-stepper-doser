@@ -107,18 +107,32 @@ const Schedule: React.FC = (): React.ReactElement => {
                         onClick={() => setSelectedPumpId(pump.id)}
                         className={cn(
                           'shrink-0 rounded-full border px-3 py-1 text-sm font-medium transition-all',
-                          'lg:w-full lg:shrink lg:rounded-lg lg:px-3 lg:py-2.5 lg:text-left',
+                          'lg:flex lg:w-full lg:shrink lg:flex-col lg:items-start lg:gap-0.5 lg:rounded-lg lg:px-3 lg:py-2.5',
                           isSelected
                             ? 'border-primary/40 bg-primary/10 text-primary shadow-[0_0_12px_rgba(34,211,238,0.1)]'
                             : 'border-border/50 bg-secondary/10 text-muted-foreground hover:bg-secondary/20 hover:text-foreground',
                         )}
                       >
-                        <span className="lg:block">{pump.name}</span>
+                        {/* Name row: dot (desktop) + name + inline status (mobile) */}
+                        <span className="lg:flex lg:items-center lg:gap-1.5">
+                          <span
+                            className={cn(
+                              'hidden size-1.5 shrink-0 rounded-full lg:inline-block',
+                              pump.schedule.mode === SCHEDULE_MODE.PERIODIC
+                                ? 'bg-primary/60'
+                                : pump.schedule.mode === SCHEDULE_MODE.CONTINUOUS
+                                  ? 'bg-amber-400/60'
+                                  : 'bg-muted-foreground/25',
+                            )}
+                          />
+                          {pump.name}
+                          <span className="ml-1.5 text-[10px] opacity-60 lg:hidden">{statusText}</span>
+                        </span>
+                        {/* Desktop-only status row */}
                         <span
                           className={cn(
-                            'ml-1.5 text-[10px] opacity-60',
-                            'lg:ml-0 lg:mt-0.5 lg:block lg:tabular-nums',
-                            isSelected ? 'lg:text-primary/70 lg:opacity-100' : '',
+                            'hidden text-[10px] tabular-nums lg:block',
+                            isSelected ? 'text-primary/70' : 'opacity-50',
                           )}
                         >
                           {statusText}

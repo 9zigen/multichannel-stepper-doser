@@ -388,6 +388,14 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                 {errors.schedule?.speed && (
                   <p className="text-[11px] text-destructive">{errors.schedule.speed.message}</p>
                 )}
+                {modeActual === SCHEDULE_MODE.PERIODIC &&
+                  dosingCapacity &&
+                  !scheduleMissingCalibration &&
+                  dosingCapacity.flowMlPerMin > 0 && (
+                    <span className="text-[11px] tabular-nums text-muted-foreground/50">
+                      ≈ {formatLimitNumber(dosingCapacity.flowMlPerMin)} ml/min
+                    </span>
+                  )}
               </div>
 
               {modeActual === SCHEDULE_MODE.PERIODIC && (
@@ -527,38 +535,102 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                 <Controller
                   name="schedule.work_hours"
                   control={control}
-                  render={({ field }) => (
-                    <div className="grid grid-cols-6 gap-1 sm:grid-cols-8 xl:grid-cols-12">
-                      {hours.map((hour) => {
-                        const selected = field.value.includes(hour);
-
-                        return (
-                          <Toggle
-                            key={hour}
-                            size="sm"
-                            pressed={selected}
-                            onClick={() => toggleHour(field, hour)}
+                  render={({ field }) => {
+                    const renderHourToggle = (hour: number) => {
+                      const selected = field.value.includes(hour);
+                      return (
+                        <Toggle
+                          key={hour}
+                          size="sm"
+                          pressed={selected}
+                          onClick={() => toggleHour(field, hour)}
+                          className={cn(
+                            'h-10 flex-col gap-0.5 rounded-md px-0 tabular-nums',
+                            use12h ? 'text-[10px]' : 'text-xs',
+                          )}
+                        >
+                          <span>{formatHourLabel(hour, use12h)}</span>
+                          <span
                             className={cn(
-                              'h-10 flex-col gap-0.5 rounded-md px-0 tabular-nums',
-                              use12h ? 'text-[10px]' : 'text-xs',
+                              'text-[9px] font-semibold leading-none',
+                              selected ? 'text-primary/80' : 'text-transparent',
                             )}
                           >
-                            <span>{formatHourLabel(hour, use12h)}</span>
-                            <span
-                              className={cn(
-                                'text-[9px] font-semibold leading-none',
-                                selected ? 'text-primary/80' : 'text-transparent',
-                              )}
-                            >
-                              {volumePerActiveHourLabel}
-                            </span>
-                          </Toggle>
-                        );
-                      })}
-                    </div>
-                  )}
+                            {volumePerActiveHourLabel}
+                          </span>
+                        </Toggle>
+                      );
+                    };
+                    return (
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <span className="mb-1 block text-[9px] uppercase tracking-wider text-muted-foreground/35">
+                            AM
+                          </span>
+                          <div className="grid grid-cols-6 gap-1 xl:grid-cols-12">
+                            {hours.slice(0, 12).map(renderHourToggle)}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="mb-1 block text-[9px] uppercase tracking-wider text-muted-foreground/35">
+                            PM
+                          </span>
+                          <div className="grid grid-cols-6 gap-1 xl:grid-cols-12">
+                            {hours.slice(12, 24).map(renderHourToggle)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }}
                 />
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Weekly schedule preview */}
+        {modeActual === SCHEDULE_MODE.PERIODIC && (
+          <div>
+            <span className="mb-3 block text-[10px] uppercase tracking-wider text-muted-foreground/60">
+              Weekly preview
+            </span>
+            <div className="flex gap-2">
+              {/* Day labels */}
+              <div className="flex flex-col gap-px">
+                {weekdayLabels.map((label) => (
+                  <div key={label} className="flex h-4 w-5 items-center">
+                    <span className="text-[9px] text-muted-foreground/40">{label}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Hour columns */}
+              <div className="flex flex-col gap-px">
+                {Array.from({ length: 7 }).map((_, dayIndex) => (
+                  <div key={dayIndex} className="flex gap-px">
+                    {hours.map((hour) => {
+                      const active =
+                        selectedWeekdays.includes(dayIndex) && selectedHours.includes(hour);
+                      return (
+                        <div
+                          key={hour}
+                          className={cn(
+                            'h-4 w-1.5 rounded-[1px] transition-colors duration-150',
+                            active ? 'bg-primary/60' : 'bg-secondary/25',
+                          )}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Hour markers: 12a 6a 12p 6p 12a */}
+            <div className="mt-1 flex justify-between pl-7 text-[9px] text-muted-foreground/35">
+              <span>12a</span>
+              <span>6a</span>
+              <span>12p</span>
+              <span>6p</span>
+              <span>12a</span>
             </div>
           </div>
         )}
