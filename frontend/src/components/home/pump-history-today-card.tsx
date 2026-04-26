@@ -11,7 +11,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils.ts';
 import { usePumpHistory } from './pump-history/use-pump-history';
 import PumpSelector from './pump-history/pump-selector';
-import { formatHourLabel, formatRuntime, getBarIntensityClass, getDayRuntime, getDayVolume, getHourVolume } from './pump-history/utils';
+import {
+  formatDayVolume,
+  formatHistoryVolume,
+  formatHourLabel,
+  formatHourVolume,
+  formatRuntime,
+  getBarIntensityClass,
+  getDayRuntime,
+  getHourVolume,
+  isSaturatedHourVolume,
+} from './pump-history/utils';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
@@ -73,7 +83,8 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
     return today.hours
       .map((hour) => ({
         hour: hour.hour,
-        volume: hour.scheduled_volume_ml + hour.manual_volume_ml,
+        saturated: isSaturatedHourVolume(hour),
+        volume: getHourVolume(hour),
         runtime: hour.total_runtime_s,
       }))
       .filter((hour) => hour.volume > 0)
@@ -117,12 +128,15 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
 
             <div className="grid grid-cols-12 gap-1">
               {HOURS.map((hour) => {
-                const volume = today.hours[hour] ? getHourVolume(today.hours[hour]) : 0;
+                const historyHour = today.hours[hour] ?? null;
+                const volume = historyHour ? getHourVolume(historyHour) : 0;
 
                 return (
                   <div
                     key={hour}
-                    title={`${formatHourLabel(hour)} · ${volume} ml`}
+                    title={`${formatHourLabel(hour)} · ${
+                      historyHour ? formatHourVolume(historyHour) : formatHistoryVolume(0)
+                    }`}
                     className={cn(
                       'animate-fade-in-up flex h-5 items-end justify-center rounded-[3px] text-[8px]',
                       getBarIntensityClass(volume, maxHourVolume),
@@ -142,7 +156,7 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
                   <Droplets className="size-3.5" />
                   Total volume
                 </span>
-                <span className="font-semibold">{getDayVolume(today)} ml</span>
+                <span className="font-semibold">{formatDayVolume(today)}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="flex items-center gap-2 text-muted-foreground">
@@ -169,7 +183,7 @@ const PumpHistoryTodayCard = ({ pumps }: { pumps: PumpState[] }): React.ReactEle
                     <div key={hour.hour} className="animate-fade-in-up flex items-center justify-between text-sm" style={{ animationDelay: `${index * 50}ms` }}>
                       <span className="font-medium">{formatHourLabel(hour.hour)}</span>
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{hour.volume} ml</Badge>
+                        <Badge variant="secondary">{formatHistoryVolume(hour.volume, hour.saturated)}</Badge>
                         <span className="w-16 text-right text-xs text-muted-foreground">{formatRuntime(hour.runtime)}</span>
                       </div>
                     </div>

@@ -7,11 +7,35 @@ export const FLAG_CALIBRATION = 8;
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short' });
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+const HISTORY_HOUR_VOLUME_MAX_ML = 6553.5;
 
 export const formatMonth = (date: Date) => MONTH_FORMATTER.format(date);
 export const formatShortDate = (date: Date) => DATE_FORMATTER.format(date);
 
 export const formatHourLabel = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
+
+export const isSaturatedHistoryVolume = (volume: number) => volume >= HISTORY_HOUR_VOLUME_MAX_ML;
+
+export const isSaturatedHourVolume = (hour: PumpHistoryHour) =>
+  isSaturatedHistoryVolume(hour.scheduled_volume_ml) || isSaturatedHistoryVolume(hour.manual_volume_ml);
+
+export const isSaturatedDayVolume = (day: PumpHistoryDay) => day.hours.some(isSaturatedHourVolume);
+
+export const formatHistoryVolume = (volume: number, saturated = false) => {
+  if (saturated) {
+    return '> 6.5L';
+  }
+
+  if (volume >= 1000) {
+    return `${VOLUME_FORMATTER.format(volume / 1000)} L`;
+  }
+
+  return `${VOLUME_FORMATTER.format(volume)} ml`;
+};
+
+export const formatStoredHistoryVolume = (volume: number) =>
+  formatHistoryVolume(volume, isSaturatedHistoryVolume(volume));
 
 export const formatRuntime = (seconds: number) => {
   if (seconds < 60) {
@@ -31,8 +55,14 @@ export const parseHistoryDate = (date: string) => {
 export const getHourVolume = (hour: PumpHistoryHour) =>
   hour.scheduled_volume_ml + hour.manual_volume_ml;
 
+export const formatHourVolume = (hour: PumpHistoryHour) =>
+  formatHistoryVolume(getHourVolume(hour), isSaturatedHourVolume(hour));
+
 export const getDayVolume = (day: PumpHistoryDay) =>
   day.hours.reduce((sum, hour) => sum + getHourVolume(hour), 0);
+
+export const formatDayVolume = (day: PumpHistoryDay) =>
+  formatHistoryVolume(getDayVolume(day), isSaturatedDayVolume(day));
 
 export const getDayRuntime = (day: PumpHistoryDay) =>
   day.hours.reduce((sum, hour) => sum + hour.total_runtime_s, 0);

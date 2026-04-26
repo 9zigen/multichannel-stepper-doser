@@ -15,6 +15,10 @@
 #define PUMP_TIMER_INTERVAL ((1000 / PUMP_TIMER_UNIT_IN_SEC) / portTICK_RATE_MS)
 #define APP_PUMP_HISTORY_RETAINED_DAYS 28
 #define APP_PUMP_HISTORY_HOURS 24
+#define APP_PUMP_HISTORY_VOLUME_SCALE 10U
+#define APP_PUMP_HISTORY_VOLUME_MAX_DML UINT16_MAX
+#define APP_PUMP_HISTORY_VOLUME_MAX_ML \
+    ((double)APP_PUMP_HISTORY_VOLUME_MAX_DML / (double)APP_PUMP_HISTORY_VOLUME_SCALE)
 
 typedef enum {
     PUMP_HISTORY_SOURCE_NONE = 0,
@@ -32,12 +36,17 @@ typedef enum {
 } pump_history_flag_t;
 
 typedef struct __attribute__((packed)) {
-    uint16_t scheduled_volume_ml;
-    uint16_t manual_volume_ml;
+    uint16_t scheduled_volume_dml;
+    uint16_t manual_volume_dml;
     uint16_t total_runtime_s;
     uint8_t flags;
     uint8_t reserved;
 } pump_history_hour_t;
+
+static inline double app_pumps_history_volume_dml_to_ml(uint16_t volume_dml)
+{
+    return (double)volume_dml / (double)APP_PUMP_HISTORY_VOLUME_SCALE;
+}
 
 typedef struct __attribute__((packed)) {
     uint32_t day_stamp;

@@ -6,12 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   flagTitle,
+  formatDayVolume,
   formatHourLabel,
+  formatHourVolume,
   formatRuntime,
   formatShortDate,
+  formatStoredHistoryVolume,
   getActiveHours,
   getDayRuntime,
-  getDayVolume,
   parseHistoryDate,
   renderFlags,
 } from './utils';
@@ -31,7 +33,6 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
 
   const activeHours = getActiveHours(day);
   const dayDate = parseHistoryDate(day.date);
-  const totalVolume = getDayVolume(day);
   const totalRuntime = getDayRuntime(day);
 
   if (activeHours.length === 0) {
@@ -53,7 +54,7 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
         </Badge>
         <Badge variant="outline" className="gap-1 tabular-nums">
           <Droplets className="size-3" />
-          {totalVolume} ml
+          {formatDayVolume(day)}
         </Badge>
         <Badge variant="outline" className="gap-1 tabular-nums">
           <Clock3 className="size-3" />
@@ -78,7 +79,6 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
           </thead>
           <tbody>
             {activeHours.map((hour, index) => {
-              const hourTotal = hour.scheduled_volume_ml + hour.manual_volume_ml;
               const flags = renderFlags(hour.flags);
 
               return (
@@ -94,14 +94,13 @@ const DayDetail = ({ day }: DayDetailProps): React.ReactElement => {
                     )}
                   </td>
                   <td className="whitespace-nowrap px-2 py-1.5 text-right">
-                    <span className="font-semibold tabular-nums">{hourTotal}</span>
-                    <span className="text-muted-foreground"> ml</span>
+                    <span className="font-semibold tabular-nums">{formatHourVolume(hour)}</span>
                   </td>
                   <td className="hidden whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums sm:table-cell">
-                    {hour.scheduled_volume_ml}
+                    {formatStoredHistoryVolume(hour.scheduled_volume_ml)}
                   </td>
                   <td className="hidden whitespace-nowrap px-2 py-1.5 text-right text-muted-foreground tabular-nums sm:table-cell">
-                    {hour.manual_volume_ml}
+                    {formatStoredHistoryVolume(hour.manual_volume_ml)}
                   </td>
                   <td className="whitespace-nowrap pl-2 py-1.5 text-right text-muted-foreground tabular-nums">
                     {formatRuntime(hour.total_runtime_s)}

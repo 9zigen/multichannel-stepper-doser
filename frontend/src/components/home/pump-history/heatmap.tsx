@@ -4,6 +4,7 @@ import type { PumpHistoryDay } from '@/lib/api.ts';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils.ts';
 import {
+  formatDayVolume,
   getBarIntensityClass,
   getDayVolume,
   getIntensityClass,
@@ -142,7 +143,7 @@ const Heatmap = ({ days, selectedDay, onDaySelect }: HeatmapProps): React.ReactE
                     <button
                       key={day.day_stamp}
                       type="button"
-                      title={`${day.date} · ${totalVolume} ml`}
+                      title={`${day.date} · ${formatDayVolume(day)}`}
                       className={cn(
                         'size-[14px] rounded-[3px] border border-black/5 transition hover:scale-110 hover:border-border',
                         getIntensityClass(totalVolume, maxDayVolume),
@@ -172,7 +173,7 @@ const Heatmap = ({ days, selectedDay, onDaySelect }: HeatmapProps): React.ReactE
                   <button
                     key={day.day_stamp}
                     type="button"
-                    title={`${day.date} · ${vol} ml`}
+                    title={`${day.date} · ${formatDayVolume(day)}`}
                     className={cn(
                       'flex-1 origin-bottom rounded-t-sm animate-bar-rise transition-colors hover:opacity-80',
                       selected

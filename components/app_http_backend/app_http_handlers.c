@@ -690,12 +690,12 @@ static esp_err_t send_pumps_history_json(httpd_req_t *req)
                 const pump_history_hour_t *slot = &day.hours[hour];
                 snprintf(buffer,
                          sizeof(buffer),
-                         "%s{\"hour\":%u,\"scheduled_volume_ml\":%u,\"manual_volume_ml\":%u,"
+                         "%s{\"hour\":%u,\"scheduled_volume_ml\":%.1f,\"manual_volume_ml\":%.1f,"
                          "\"total_runtime_s\":%u,\"flags\":%u}",
                          hour > 0 ? "," : "",
                          (unsigned)hour,
-                         (unsigned)slot->scheduled_volume_ml,
-                         (unsigned)slot->manual_volume_ml,
+                         app_pumps_history_volume_dml_to_ml(slot->scheduled_volume_dml),
+                         app_pumps_history_volume_dml_to_ml(slot->manual_volume_dml),
                          (unsigned)slot->total_runtime_s,
                          (unsigned)slot->flags);
                 if (send_history_chunk(req, buffer) != ESP_OK) {

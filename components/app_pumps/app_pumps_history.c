@@ -105,6 +105,23 @@ static bool history_source_is_scheduled(pump_history_source_t source)
     return source == PUMP_HISTORY_SOURCE_SCHEDULED || source == PUMP_HISTORY_SOURCE_CONTINUOUS;
 }
 
+static uint16_t history_volume_ml_to_dml(double volume_ml)
+{
+    if (volume_ml <= 0.0) {
+        return 0;
+    }
+    if (volume_ml >= APP_PUMP_HISTORY_VOLUME_MAX_ML) {
+        return APP_PUMP_HISTORY_VOLUME_MAX_DML;
+    }
+
+    const double volume_dml = lround(volume_ml * (double)APP_PUMP_HISTORY_VOLUME_SCALE);
+    if (volume_dml > (double)APP_PUMP_HISTORY_VOLUME_MAX_DML) {
+        return APP_PUMP_HISTORY_VOLUME_MAX_DML;
+    }
+
+    return (uint16_t)volume_dml;
+}
+
 static void history_clear_runtime_accumulators(uint8_t pump_id)
 {
     memset(s_today_history_runtime_subticks[pump_id], 0, sizeof(s_today_history_runtime_subticks[pump_id]));
@@ -148,8 +165,10 @@ void app_pumps_history_restore_today_from_backup(void)
         if (history_load_day_blob(pump_id, day_stamp, &persisted_day) == ESP_OK) {
             s_today_history[pump_id] = persisted_day;
             for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
-                s_today_history_scheduled_volume_accum[pump_id][hour] = persisted_day.hours[hour].scheduled_volume_ml;
-                s_today_history_manual_volume_accum[pump_id][hour] = persisted_day.hours[hour].manual_volume_ml;
+                s_today_history_scheduled_volume_accum[pump_id][hour] =
+                    app_pumps_history_volume_dml_to_ml(persisted_day.hours[hour].scheduled_volume_dml);
+                s_today_history_manual_volume_accum[pump_id][hour] =
+                    app_pumps_history_volume_dml_to_ml(persisted_day.hours[hour].manual_volume_dml);
             }
             ESP_LOGI(TAG, "restored history for pump %u day %lu", (unsigned)pump_id, (unsigned long)day_stamp);
         }
@@ -172,18 +191,18 @@ void app_pumps_history_record_activity(uint8_t pump_id, pump_history_source_t so
     if (volume_delta_ml > 0.0) {
         if (history_source_is_scheduled(source)) {
             double next = s_today_history_scheduled_volume_accum[pump_id][hour] + volume_delta_ml;
-            if (next > (double)UINT16_MAX) {
-                next = (double)UINT16_MAX;
+            if (next > APP_PUMP_HISTORY_VOLUME_MAX_ML) {
+                next = APP_PUMP_HISTORY_VOLUME_MAX_ML;
             }
             s_today_history_scheduled_volume_accum[pump_id][hour] = next;
-            hour_slot->scheduled_volume_ml = (uint16_t)lround(next);
+            hour_slot->scheduled_volume_dml = history_volume_ml_to_dml(next);
         } else {
             double next = s_today_history_manual_volume_accum[pump_id][hour] + volume_delta_ml;
-            if (next > (double)UINT16_MAX) {
-                next = (double)UINT16_MAX;
+            if (next > APP_PUMP_HISTORY_VOLUME_MAX_ML) {
+                next = APP_PUMP_HISTORY_VOLUME_MAX_ML;
             }
             s_today_history_manual_volume_accum[pump_id][hour] = next;
-            hour_slot->manual_volume_ml = (uint16_t)lround(next);
+            hour_slot->manual_volume_dml = history_volume_ml_to_dml(next);
         }
     }
 
@@ -298,7 +317,7 @@ esp_err_t app_pumps_history_reset_today_scheduled(uint8_t pump_id, uint32_t *day
     }
 
     for (uint8_t hour = 0; hour < APP_PUMP_HISTORY_HOURS; ++hour) {
-        reset_day.hours[hour].scheduled_volume_ml = 0;
+        reset_day.hours[hour].scheduled_volume_dml = 0;
         reset_day.hours[hour].flags &= (uint8_t)~(PUMP_HISTORY_FLAG_SCHEDULED | PUMP_HISTORY_FLAG_CONTINUOUS);
     }
 

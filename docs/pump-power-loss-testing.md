@@ -10,10 +10,12 @@ unbounded overdose after reboot.
 - All pump runtime states initialize as `PUMP_OFF`.
 - The motor backend is not asked to restart an interrupted run.
 - Tank current volume is restored from the latest EEPROM/NVS fallback backup.
-  Runtime tank-volume changes are backed up about every 1 second with the
-  external EEPROM/FRAM backend, or about every 30 seconds when using the NVS
-  fallback to avoid excessive flash wear.
+  Runtime tank-volume changes are normally backed up when a dosing run
+  completes or is stopped, reducing flash wear while keeping completed-dose
+  accounting durable.
 - Pump history is restored from the latest NVS history backup.
+  History is backed up after run completion/stop and by a slow 300 second
+  safety-net during long-running activity.
 - Periodic schedule last-run hour state is restored, so a reboot in the same
   hour should not duplicate a periodic dose that already started.
 - A manual operator or remote client must explicitly start any replacement dose.
@@ -29,8 +31,8 @@ unbounded overdose after reboot.
 7. Confirm runtime state is off for every pump.
 8. Confirm no motor output is active after boot.
 9. Confirm tank volume restored to the latest persisted backup, allowing for
-   the expected backup interval: about 1 second with external EEPROM/FRAM, or
-   about 30 seconds with the NVS fallback.
+   the expected uncertainty if power was cut before the run completion/stop
+   backup.
 10. Confirm the Web UI shows no active manual run.
 
 ## Scheduled-Run Outage Test
@@ -61,5 +63,5 @@ unbounded overdose after reboot.
 - No pump restarts automatically after reboot.
 - No schedule duplicates in the same hour after the last-run marker was saved.
 - Safety limits still reject new manual runs after reboot.
-- The amount of tank-volume uncertainty is bounded by the configured backup
-  cadence and is acceptable for the application.
+- The amount of tank-volume uncertainty is bounded by the completion/stop
+  backup policy and is acceptable for the application.

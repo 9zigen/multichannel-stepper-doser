@@ -6,7 +6,7 @@ Pump dosing history is stored as hourly aggregates for debugging, anomaly detect
 
 The implementation is split into:
 
-- RAM: current local day only
+- RAM: live current local day
 - NVS: retained daily snapshots for up to 28 days
 
 ## Hourly Data Model
@@ -15,10 +15,20 @@ Each pump has 24 hourly slots per day.
 
 Each slot stores:
 
-- `scheduled_volume_ml`
-- `manual_volume_ml`
+- `scheduled_volume_dml`
+- `manual_volume_dml`
 - `total_runtime_s`
 - `flags`
+
+The volume fields are stored in NVS as unsigned 16-bit deci-milliliter values:
+
+- `1` stored unit = `0.1 ml`
+- maximum stored value per source and hour = `6553.5 ml`
+- values above the maximum saturate to `6553.5 ml`
+
+The HTTP and MQTT APIs keep the public field names `scheduled_volume_ml` and
+`manual_volume_ml` and expose decimal milliliter values. The Web UI treats the
+saturated value as overflow/unknown-high and displays it as `> 6.5L`.
 
 Flags indicate whether the hour contains:
 
@@ -29,7 +39,7 @@ Flags indicate whether the hour contains:
 
 ## Retention
 
-- Current day is aggregated in RAM only
+- Current day is aggregated in RAM and backed up to NVS when dirty
 - Historical days are stored in NVS as one blob per pump and day slot
 - Retention window: 28 days
 
@@ -44,10 +54,13 @@ NVS key format:
 
 ## Backup
 
-Backups are manual only.
+Backups are dirty-only and intentionally conservative for flash wear.
 
 Supported triggers:
 
+- automatic backup after a dosing run completes or is stopped
+- slow 300 second safety-net backup during long-running activity
+- normal Web/API restart before `esp_restart()`
 - HTTP API
 - MQTT command
 
@@ -71,6 +84,16 @@ Older days remain in NVS and are loaded on demand for API responses.
 
 Response includes `written_days`.
 
+- `POST /api/pumps/history/today/reset`
+  Clears today's scheduled/continuous history for one pump while preserving
+  manual and calibration history.
+
+Request body:
+
+```json
+{ "pump_id": 0, "scope": "scheduled" }
+```
+
 ## MQTT
 
 - Command: `<hostname>/command/history_backup`
@@ -85,4 +108,6 @@ Response includes `written_days`.
 
 - This is an hourly aggregate system, not a per-event log
 - Multiple runs in one hour are merged into the same slot
-- If the day rolls over before a manual backup, unsaved current-day data is discarded
+- If the day rolls over before an automatic/manual backup, unsaved current-day
+  data is discarded
+- Per-hour scheduled and manual volume counters are clamped at `6553.5 ml`

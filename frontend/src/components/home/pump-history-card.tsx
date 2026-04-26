@@ -23,7 +23,7 @@ import PumpSelector from './pump-history/pump-selector';
 import Heatmap from './pump-history/heatmap';
 import DayDetail from './pump-history/day-detail';
 import { HeatmapSkeleton, DayDetailSkeleton } from './pump-history/skeletons';
-import { getDayVolume } from './pump-history/utils';
+import { formatHistoryVolume, getDayVolume, isSaturatedDayVolume } from './pump-history/utils';
 
 type PumpHistoryCardProps = {
   pumps: PumpState[];
@@ -55,6 +55,11 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
 
   const totalVolume = React.useMemo(
     () => selectedPump?.days.reduce((sum, day) => sum + getDayVolume(day), 0) ?? 0,
+    [selectedPump],
+  );
+
+  const hasSaturatedVolume = React.useMemo(
+    () => selectedPump?.days.some(isSaturatedDayVolume) ?? false,
     [selectedPump],
   );
 
@@ -92,7 +97,9 @@ const PumpHistoryCard = ({ pumps }: PumpHistoryCardProps): React.ReactElement =>
             <CardTitle className="text-lg">History</CardTitle>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="tabular-nums">{totalVolume} ml</Badge>
+            <Badge variant="secondary" className="tabular-nums">
+              {formatHistoryVolume(totalVolume, hasSaturatedVolume)}
+            </Badge>
             <Badge variant="outline" className="tabular-nums">{activeDays} active days</Badge>
             {selectedPump && selectedDay && isTodaySelected && (
               <AlertDialog>
