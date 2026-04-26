@@ -88,6 +88,18 @@ const COMPACT_VOLUME_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractio
 
 const formatLimitNumber = (value: number) => LIMIT_NUMBER_FORMATTER.format(value);
 
+const formatUsHourCompact = (hour: number) => {
+  const period = hour < 12 ? 'a' : 'p';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}${period}`;
+};
+
+const formatUsHourLong = (hour: number) => {
+  const period = hour < 12 ? 'AM' : 'PM';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12} ${period}`;
+};
+
 const formatCompactDoseVolume = (volumeMl: number) => {
   if (!Number.isFinite(volumeMl) || volumeMl <= 0) {
     return '0ml';
@@ -181,6 +193,8 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
   const volumePerActiveHour =
     selectedHours.length > 0 && Number.isFinite(selectedVolume) ? selectedVolume / selectedHours.length : 0;
   const volumePerActiveHourLabel = formatCompactDoseVolume(volumePerActiveHour);
+  const selectedModeMeta = scheduleModeMeta[modeActual];
+  const SelectedModeIcon = selectedModeMeta.icon;
 
   const dosingCapacity = React.useMemo(() => {
     if (modeActual !== SCHEDULE_MODE.PERIODIC) {
@@ -265,65 +279,95 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
       <div className="flex flex-col gap-3">
         {/* Mode selector */}
         <div className="rounded-lg border border-border/40 bg-secondary/10 p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Mode</span>
-            <div className="flex flex-wrap items-center gap-1.5">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Mode</span>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Choose how this pump should behave when automation is enabled.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               {modeActual === SCHEDULE_MODE.PERIODIC && (
                 <>
-                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatVolumePerDay(selectedVolume)}</Badge>
-                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatRpm(selectedSpeed)}</Badge>
-                  <Badge variant="outline" className="text-[10px] tabular-nums">{formatDaysCount(selectedWeekdays)} · {formatHoursCount(selectedHours)}</Badge>
+                  <Badge variant="outline" className="gap-1 border-border/60 bg-background/70 px-2 text-[10px]">
+                    <span className="text-muted-foreground">Target</span>
+                    <span className="font-semibold tabular-nums">{formatVolumePerDay(selectedVolume)}</span>
+                  </Badge>
+                  <Badge variant="outline" className="gap-1 border-border/60 bg-background/70 px-2 text-[10px]">
+                    <span className="text-muted-foreground">Speed</span>
+                    <span className="font-semibold tabular-nums">{formatRpm(selectedSpeed)}</span>
+                  </Badge>
+                  <Badge variant="outline" className="gap-1 border-border/60 bg-background/70 px-2 text-[10px]">
+                    <span className="text-muted-foreground">Timing</span>
+                    <span className="font-semibold tabular-nums">
+                      {formatDaysCount(selectedWeekdays)} · {formatHoursCount(selectedHours)}
+                    </span>
+                  </Badge>
                 </>
               )}
               {modeActual === SCHEDULE_MODE.CONTINUOUS && (
-                <Badge variant="outline" className="text-[10px] tabular-nums">{formatRpm(selectedSpeed)}</Badge>
+                <Badge variant="outline" className="gap-1 border-border/60 bg-background/70 px-2 text-[10px]">
+                  <span className="text-muted-foreground">Speed</span>
+                  <span className="font-semibold tabular-nums">{formatRpm(selectedSpeed)}</span>
+                </Badge>
               )}
             </div>
           </div>
 
-          <Controller
-            name="schedule.mode"
-            control={control}
-            render={({ field }) => (
-              <ToggleGroup
-                type="single"
-                spacing={3}
-                className="grid w-full grid-cols-3"
-                value={String(field.value)}
-                onValueChange={(value) => {
-                  if (value !== '') {
-                    field.onChange(Number(value));
-                  }
-                }}
-              >
-                {Object.entries(scheduleModeMeta).map(([value, meta]) => {
-                  const selected = field.value === Number(value);
-                  return (
-                    <ToggleGroupItem
-                      key={value}
-                      value={value}
-                      className={cn(
-                        'h-8 rounded-md border border-transparent px-2 text-sm font-medium shadow-none transition-all',
-                        'flex items-center gap-1.5 hover:bg-secondary/25',
-                        selected
-                          ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_12px_rgba(34,211,238,0.1)]'
-                          : 'text-foreground/80',
-                      )}
-                    >
-                      <meta.icon className="size-3.5 shrink-0" />
-                      <span>{meta.label}</span>
-                    </ToggleGroupItem>
-                  );
-                })}
-              </ToggleGroup>
-            )}
-          />
+          <div className="grid gap-3 lg:grid-cols-[auto_1fr] lg:items-stretch">
+            <Controller
+              name="schedule.mode"
+              control={control}
+              render={({ field }) => (
+                <ToggleGroup
+                  type="single"
+                  spacing={2}
+                  className="grid grid-cols-3 gap-1 rounded-full border border-border/50 bg-background/70 p-1 lg:w-44"
+                  value={String(field.value)}
+                  onValueChange={(value) => {
+                    if (value !== '') {
+                      field.onChange(Number(value));
+                    }
+                  }}
+                >
+                  {Object.entries(scheduleModeMeta).map(([value, meta]) => {
+                    const selected = field.value === Number(value);
+                    return (
+                      <ToggleGroupItem
+                        key={value}
+                        value={value}
+                        title={meta.label}
+                        aria-label={meta.label}
+                        className={cn(
+                          'size-10 rounded-full border border-transparent p-0 shadow-none transition-all',
+                          'text-muted-foreground hover:bg-secondary/30 hover:text-foreground',
+                          selected &&
+                            'border-primary/30 bg-primary text-primary-foreground shadow-[0_8px_22px_rgba(15,23,42,0.16)] hover:bg-primary hover:text-primary-foreground',
+                        )}
+                      >
+                        <meta.icon className="size-4" />
+                      </ToggleGroupItem>
+                    );
+                  })}
+                </ToggleGroup>
+              )}
+            />
 
-          {modeActual === SCHEDULE_MODE.OFF && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Automatic dosing is disabled. Manual control remains available.
-            </p>
-          )}
+            <div className="relative overflow-hidden rounded-xl border border-border/50 bg-gradient-to-br from-background via-secondary/10 to-secondary/30 p-3">
+              <div className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full bg-primary/10 blur-2xl" />
+              <div className="relative flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <SelectedModeIcon className="size-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{selectedModeMeta.label}</div>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    {selectedModeMeta.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Output target */}
@@ -524,8 +568,9 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                               'rounded-md px-0 text-xs tabular-nums',
                               selected ? 'h-10 flex-col gap-0.5' : 'h-7',
                             )}
+                            title={`${formatUsHourLong(hour)}${selected ? ` · ${volumePerActiveHourLabel}` : ''}`}
                           >
-                            <span>{String(hour).padStart(2, '0')}</span>
+                            <span>{formatUsHourCompact(hour)}</span>
                             {selected && (
                               <span className="text-[9px] font-semibold leading-none text-primary/80">
                                 {volumePerActiveHourLabel}
