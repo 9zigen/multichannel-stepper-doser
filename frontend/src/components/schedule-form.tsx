@@ -430,51 +430,40 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
             </div>
 
             {modeActual === SCHEDULE_MODE.PERIODIC && dosingCapacity && (
-              <div
-                className={cn(
-                  'mt-3 flex items-start gap-2 rounded-md border p-2 text-xs transition-colors',
-                  scheduleMissingCalibration || scheduleNotReachable
-                    ? 'border-amber-400/40 bg-amber-400/10 text-amber-900 dark:text-amber-200'
-                    : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-900 dark:text-emerald-200',
+              <div className="mt-3">
+                {scheduleMissingCalibration ? (
+                  <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="size-3.5 shrink-0" />
+                    <span>Calibration required to estimate reachable daily volume.</span>
+                  </div>
+                ) : scheduleNotReachable ? (
+                  <div className="rounded-md border border-amber-400/30 bg-amber-400/8 p-2.5">
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                      Max {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day reachable at current settings
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-amber-600/80 dark:text-amber-400/70">
+                      {formatLimitNumber(dosingCapacity.flowMlPerMin)} ml/min ×{' '}
+                      {dosingCapacity.activeHours}h active — increase speed, add hours, or lower the target.
+                    </p>
+                    {dosingCapacity.maxDailyVolume > 0 && (
+                      <button
+                        type="button"
+                        onClick={clampDailyVolumeToCapacity}
+                        className="mt-1.5 text-[11px] font-medium text-amber-700 underline underline-offset-2 dark:text-amber-300"
+                      >
+                        Use {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                    <div className="size-1.5 rounded-full bg-emerald-500/70" />
+                    <span className="tabular-nums">
+                      Capacity {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day
+                      at {formatLimitNumber(dosingCapacity.flowMlPerMin)} ml/min
+                    </span>
+                  </div>
                 )}
-              >
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                <div className="min-w-0 space-y-1">
-                  {scheduleMissingCalibration ? (
-                    <p>
-                      Calibration is required to estimate the reachable daily volume for scheduled dosing.
-                    </p>
-                  ) : scheduleNotReachable ? (
-                    <>
-                      <p>
-                        Requested {formatLimitNumber(selectedVolume)} ml/day is not reachable at{' '}
-                        {formatLimitNumber(selectedSpeed)} rpm with {dosingCapacity.activeHours} active hour
-                        {dosingCapacity.activeHours === 1 ? '' : 's'}.
-                      </p>
-                      <p>
-                        Estimated flow is {formatLimitNumber(dosingCapacity.flowMlPerMin)} ml/min, so this schedule can
-                        dose up to {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day. Increase speed, add active
-                        hours, or lower the target.
-                      </p>
-                      {dosingCapacity.maxDailyVolume > 0 && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-xs"
-                          onClick={clampDailyVolumeToCapacity}
-                        >
-                          Limit to {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    <p>
-                      Estimated capacity: {formatLimitNumber(dosingCapacity.maxDailyVolume)} ml/day at{' '}
-                      {formatLimitNumber(dosingCapacity.flowMlPerMin)} ml/min.
-                    </p>
-                  )}
-                </div>
               </div>
             )}
           </div>
@@ -550,17 +539,19 @@ const ScheduleForm = ({ pump, success }: ScheduleFormProps): React.ReactElement 
                             pressed={selected}
                             onClick={() => toggleHour(field, hour)}
                             className={cn(
-                              'rounded-md px-0 tabular-nums',
+                              'h-10 flex-col gap-0.5 rounded-md px-0 tabular-nums',
                               use12h ? 'text-[10px]' : 'text-xs',
-                              selected ? 'h-10 flex-col gap-0.5' : 'h-7',
                             )}
                           >
                             <span>{formatHourLabel(hour, use12h)}</span>
-                            {selected && (
-                              <span className="text-[9px] font-semibold leading-none text-primary/80">
-                                {volumePerActiveHourLabel}
-                              </span>
-                            )}
+                            <span
+                              className={cn(
+                                'text-[9px] font-semibold leading-none',
+                                selected ? 'text-primary/80' : 'text-transparent',
+                              )}
+                            >
+                              {volumePerActiveHourLabel}
+                            </span>
                           </Toggle>
                         );
                       })}
