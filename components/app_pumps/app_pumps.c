@@ -30,7 +30,9 @@ static uint32_t last_run_schedule_hour[MAX_SCHEDULE];
 static const app_pumps_backend_t *s_backend;
 static bool runtime_event_dirty[MAX_PUMP];
 static bool s_tank_volume_dirty;
-static uint32_t s_tank_backup_elapsed_seconds;
+static bool s_tank_backup_requested;
+static bool s_history_backup_requested;
+static uint32_t s_history_backup_elapsed_seconds;
 static void mark_pump_runtime_dirty(uint8_t pump_id);
 
 #define PUMP_ALERT_DRIVER_MASK (PUMP_ALERT_DRIVER_RESET | \
@@ -49,8 +51,11 @@ static void mark_pump_runtime_dirty(uint8_t pump_id);
                                 PUMP_ALERT_LIMIT_DAILY_VOLUME | \
                                 PUMP_ALERT_LIMIT_GLOBAL_DAILY_VOLUME)
 
-#define APP_PUMPS_TANK_BACKUP_EEPROM_INTERVAL_S 1U
-#define APP_PUMPS_TANK_BACKUP_NVS_INTERVAL_S 30U
+/*
+ * History is persisted on run completion/stop. The interval below is only a
+ * slow safety net for long continuous/manual runs, so keep it flash-friendly.
+ */
+#define APP_PUMPS_HISTORY_BACKUP_INTERVAL_S 300U
 
 uint32_t app_pumps_current_local_day_stamp(void)
 {
@@ -344,6 +349,18 @@ static void mark_pump_runtime_dirty(uint8_t pump_id)
     runtime_event_dirty[pump_id] = true;
 }
 
+static void request_history_backup(void)
+{
+    s_history_backup_requested = true;
+}
+
+static void request_tank_backup(void)
+{
+    if (s_tank_volume_dirty) {
+        s_tank_backup_requested = true;
+    }
+}
+
 static void runtime_event_flush_callback(void *arg)
 {
     (void)arg;
@@ -382,6 +399,8 @@ static void run_timer_callback(void *arg)
                 pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
                 set_pump_alert_flags(pump_id, limit_flags, true);
                 stop_pump(pump_id);
+                request_history_backup();
+                request_tank_backup();
             }
 
             if (pumps[pump_id].time == 0) {
@@ -389,6 +408,8 @@ static void run_timer_callback(void *arg)
                 pumps[pump_id].run_ticks = 0;
                 pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
                 stop_pump(pump_id);
+                request_history_backup();
+                request_tank_backup();
             }
             mark_pump_runtime_dirty(pump_id);
         } else if (pumps[pump_id].state == PUMP_CONTINUOUS) {
@@ -407,6 +428,8 @@ static void run_timer_callback(void *arg)
                 pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
                 set_pump_alert_flags(pump_id, limit_flags, true);
                 stop_pump(pump_id);
+                request_history_backup();
+                request_tank_backup();
             }
             mark_pump_runtime_dirty(pump_id);
         } else if (pumps[pump_id].state == PUMP_CAL) {
@@ -427,22 +450,29 @@ static void vBackupTimerHandler(TimerHandle_t pxTimer)
         save_pump_aging_state(day_stamp);
     }
 
-    if (!s_tank_volume_dirty) {
-        s_tank_backup_elapsed_seconds = 0;
-        return;
+    s_history_backup_elapsed_seconds++;
+    if (s_history_backup_requested ||
+        s_history_backup_elapsed_seconds >= APP_PUMPS_HISTORY_BACKUP_INTERVAL_S) {
+        size_t written_days = 0;
+        esp_err_t err = app_pumps_history_backup(&written_days);
+        if (err == ESP_OK) {
+            if (written_days > 0) {
+                ESP_LOGI(TAG, "backed up pump history days:%u", (unsigned)written_days);
+            }
+            s_history_backup_requested = false;
+            s_history_backup_elapsed_seconds = 0;
+        } else {
+            ESP_LOGW(TAG, "pump history backup failed: %s", esp_err_to_name(err));
+        }
     }
 
-    s_tank_backup_elapsed_seconds++;
-    const uint32_t interval_s = app_pumps_storage_using_flash_fallback()
-                                    ? APP_PUMPS_TANK_BACKUP_NVS_INTERVAL_S
-                                    : APP_PUMPS_TANK_BACKUP_EEPROM_INTERVAL_S;
-    if (s_tank_backup_elapsed_seconds < interval_s) {
+    if (!s_tank_volume_dirty || !s_tank_backup_requested) {
         return;
     }
 
     if (app_pumps_storage_backup_tank_status() == ESP_OK) {
         s_tank_volume_dirty = false;
-        s_tank_backup_elapsed_seconds = 0;
+        s_tank_backup_requested = false;
     }
 }
 
@@ -527,6 +557,8 @@ static void vScheduleTimerHandler(TimerHandle_t pxTimer)
             pumps[pump_id].run_ticks = 0;
             pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
             stop_pump(pump_id);
+            request_history_backup();
+            request_tank_backup();
             mark_pump_runtime_dirty(pump_id);
         }
     }
@@ -848,6 +880,8 @@ esp_err_t run_pump_manual(uint8_t pump_id, float rpm, bool direction, int32_t ti
         pumps[pump_id].time = 0;
         pumps[pump_id].run_ticks = 0;
         pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
+        request_history_backup();
+        request_tank_backup();
         mark_pump_runtime_dirty(pump_id);
         return ESP_OK;
     }
@@ -901,6 +935,8 @@ esp_err_t run_pump_manual_seconds(uint8_t pump_id, float rpm, bool direction, in
         pumps[pump_id].time = 0;
         pumps[pump_id].run_ticks = 0;
         pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
+        request_history_backup();
+        request_tank_backup();
         mark_pump_runtime_dirty(pump_id);
         return ESP_OK;
     }
@@ -967,6 +1003,7 @@ void run_pump_calibration(uint8_t pump_id, bool is_start, float rpm, bool direct
         pumps[pump_id].run_ticks = 0;
         pumps[pump_id].history_source = PUMP_HISTORY_SOURCE_NONE;
         stop_pump(pump_id);
+        request_history_backup();
         mark_pump_runtime_dirty(pump_id);
     }
 }
@@ -975,7 +1012,7 @@ void backup_eeprom_tank_status(void)
 {
     if (app_pumps_storage_backup_tank_status() == ESP_OK) {
         s_tank_volume_dirty = false;
-        s_tank_backup_elapsed_seconds = 0;
+        s_tank_backup_requested = false;
     }
 }
 
@@ -998,7 +1035,9 @@ int init_pumps(void)
         runtime_event_dirty[i] = false;
     }
     s_tank_volume_dirty = false;
-    s_tank_backup_elapsed_seconds = 0;
+    s_tank_backup_requested = false;
+    s_history_backup_requested = false;
+    s_history_backup_elapsed_seconds = 0;
 
     /*
      * Safety policy after reset/power loss: persisted counters are restored,

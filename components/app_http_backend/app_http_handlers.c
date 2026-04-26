@@ -733,6 +733,18 @@ static esp_err_t send_success_and_restart(httpd_req_t *req, bool erase_before_re
     httpd_resp_send(req, response, (ssize_t)strlen(response));
     free(response);
 
+    if (!erase_before_restart) {
+        backup_eeprom_tank_status();
+
+        size_t written_days = 0;
+        esp_err_t backup_err = app_pumps_history_backup(&written_days);
+        if (backup_err != ESP_OK) {
+            ESP_LOGW(TAG, "pump history backup before restart failed: %s", esp_err_to_name(backup_err));
+        } else if (written_days > 0) {
+            ESP_LOGI(TAG, "backed up pump history before restart days:%u", (unsigned)written_days);
+        }
+    }
+
     app_events_dispatch_system(SHUTTING_DOWN, NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(150));
 
